@@ -5,8 +5,8 @@
   "scripts": {
     "format:check": "prettier --no-error-on-unmatched-pattern --check apps/{frontend,backend}/src/**/*.{js,ts,tsx}",
     "format": "prettier --no-error-on-unmatched-pattern --write apps/{frontend,backend}/src/**/*.{js,ts,tsx}",
-    "lint:check": "eslint 'apps/frontend/src/**/*.{ts,tsx}' && eslint 'apps/backend/src/**/*.{ts,tsx}'",
-    "lint": "eslint 'apps/frontend/src/**/*.{ts,tsx}' --fix && eslint 'apps/backend/src/**/*.{ts,tsx}' --fix",
+    "lint:check": "eslint \"apps/frontend/src/**/*.{ts,tsx}\" && eslint \"apps/backend/src/**/*.{ts,tsx}\"",
+    "lint": "eslint \"apps/frontend/src/**/*.{ts,tsx}\" --fix && eslint \"apps/backend/src/**/*.{ts,tsx}\" --fix",
     "prepush": "yarn run format:check && yarn run lint:check",
     "prepush:fix": "yarn run format && yarn run lint",
     "prepare": "husky install",
