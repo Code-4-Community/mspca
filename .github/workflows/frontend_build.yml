@@ -2,12 +2,12 @@ name: Frontend build
 
 on:
   push:
-    branches: ['main']
+    branches: ['**']
   pull_request:
-    branches: ['main']
+    branches: ['**']
 
 jobs:
-  build:
+  frontend-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,13 +21,12 @@ jobs:
 
     - name: Create .env file
       run: |
-
         echo "AWS_SECRET_ACCESS_KEY=dummy" >> .env
         echo "AWS_ACCESS_KEY_ID=dummy" >> .env
         echo "AWS_REGION=us-east-2" >> .env
 
     - name: Install Dependencies
-      run: yarn install
+      run: yarn install --frozen-lockfile
 
     - name: Build frontend
       run: npx nx build frontend

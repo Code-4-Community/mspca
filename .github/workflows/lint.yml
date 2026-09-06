@@ -2,9 +2,9 @@ name: Linter run
 
 on:
   push:
-    branches: ['main']
+    branches: ['**']
   pull_request:
-    branches: ['main']
+    branches: ['**']
 
 jobs:
   lint:
@@ -12,8 +12,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Use Node.js 24.x
       uses: actions/setup-node@v4
@@ -22,10 +20,7 @@ jobs:
         cache: 'yarn'
 
     - name: Install Dependencies
-      run: yarn install
-
-    - name: Derive appropriate SHAs for nx affected
-      uses: nrwl/nx-set-shas@v4
+      run: yarn install --frozen-lockfile
 
     - name: Run linter
-      run: npx nx affected -t lint
+      run: yarn lint:check

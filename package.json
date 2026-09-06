@@ -5,17 +5,17 @@
   "scripts": {
     "format:check": "prettier --no-error-on-unmatched-pattern --check apps/{frontend,backend}/src/**/*.{js,ts,tsx}",
     "format": "prettier --no-error-on-unmatched-pattern --write apps/{frontend,backend}/src/**/*.{js,ts,tsx}",
-    "lint:check": "eslint \"apps/frontend/src/**/*.{ts,tsx}\" && eslint \"apps/backend/src/**/*.{ts,tsx}\"",
-    "lint": "eslint \"apps/frontend/src/**/*.{ts,tsx}\" --fix && eslint \"apps/backend/src/**/*.{ts,tsx}\" --fix",
+    "lint:check": "eslint apps/frontend --ext .ts,.tsx && eslint apps/backend --ext .ts,.tsx",
+    "lint": "eslint apps/frontend --ext .ts,.tsx --fix && eslint apps/backend --ext .ts,.tsx --fix",
+    "test": "jest --runInBand",
     "prepush": "yarn run format:check && yarn run lint:check",
     "prepush:fix": "yarn run format && yarn run lint",
     "prepare": "husky install",
-    "typeorm": "ts-node -r tsconfig-paths/register --project apps/backend/tsconfig.app.json ./node_modules/typeorm/cli.js",
-    "migration:generate": "yarn typeorm migration:generate apps/backend/src/migrations/$name -d apps/backend/src/data-source.ts",
-    "migration:run": "yarn typeorm migration:run -d apps/backend/src/data-source.ts",
-    "migration:revert": "yarn typeorm migration:revert -d apps/backend/src/data-source.ts",
-    "migration:create": "yarn typeorm migration:create apps/backend/src/migrations/$name",
-    "test": "jest"
+    "typeorm:migrate": "ts-node --project apps/backend/tsconfig.app.json -r dotenv/config ./node_modules/typeorm/cli.js migration:run -d apps/backend/src/config/typeorm.ts",
+    "typeorm:revert": "ts-node --project apps/backend/tsconfig.app.json -r dotenv/config ./node_modules/typeorm/cli.js migration:revert -d apps/backend/src/config/typeorm.ts",
+    "typeorm:create": "ts-node --project apps/backend/tsconfig.app.json -r dotenv/config ./node_modules/typeorm/cli.js migration:create",
+    "prettier:check": "prettier --check \"apps/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "prettier:write": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "private": true,
   "dependencies": {

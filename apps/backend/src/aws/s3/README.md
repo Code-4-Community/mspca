@@ -48,11 +48,7 @@ export enum S3Buckets {
 **3. Add the env var name to `REQUIRED_ENV_VARS_WHEN_ENABLED`** (`aws-s3.module.ts`), so a missing value is reported at startup when `S3_ENABLED=true`:
 
 ```typescript
-const REQUIRED_ENV_VARS_WHEN_ENABLED = [
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
-  'AWS_MY_BUCKET_NAME',
-] as const;
+const REQUIRED_ENV_VARS_WHEN_ENABLED = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_MY_BUCKET_NAME'] as const;
 ```
 
 No change to `aws-s3.service.ts` is needed: its constructor resolves `process.env['AWS_' + bucket + '_BUCKET_NAME']` for every member of `S3Buckets`. A bucket whose env var is missing resolves to `''`, and any `upload()` to it throws `Missing required environment variable for S3 bucket: MY_BUCKET`.
@@ -61,9 +57,9 @@ No change to `aws-s3.service.ts` is needed: its constructor resolves `process.en
 
 The credentials supplied via `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` must have:
 
-| Permission | Required by |
-|---|---|
-| `s3:PutObject` | `upload()` |
+| Permission     | Required by      |
+| -------------- | ---------------- |
+| `s3:PutObject` | `upload()`       |
 | `s3:GetObject` | `getImageData()` |
 
 Scope permissions to only the buckets this application uses:
@@ -75,9 +71,7 @@ Scope permissions to only the buckets this application uses:
     {
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:GetObject"],
-      "Resource": [
-        "arn:aws:s3:::your-bucket-name/*"
-      ]
+      "Resource": ["arn:aws:s3:::your-bucket-name/*"]
     }
   ]
 }

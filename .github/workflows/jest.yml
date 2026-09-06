@@ -2,13 +2,12 @@ name: Jest run
 
 on:
   push:
-    branches: ['main']
+    branches: ['**']
   pull_request:
-    branches: ['main']
+    branches: ['**']
 
 jobs:
-  build:
-    
+  jest-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,14 +21,13 @@ jobs:
 
     - name: Create .env file
       run: |
-
         echo "AWS_BUCKET_NAME=dummy" >> .env
         echo "AWS_SECRET_ACCESS_KEY=dummy" >> .env
         echo "AWS_ACCESS_KEY_ID=dummy" >> .env
         echo "AWS_REGION=us-east-2" >> .env
 
     - name: Install Dependencies
-      run: yarn install
+      run: yarn install --frozen-lockfile
 
-    - name: Run Jest tests 
+    - name: Run Jest tests
       run: yarn test
