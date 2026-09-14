@@ -89,6 +89,38 @@ To run both the frontend and backend with one command:
 nx run-many -t serve -p frontend backend
 ```
 
+## CI (GitHub Actions)
+
+On every push and pull request, GitHub Actions runs:
+
+- Prettier — checks formatting
+- Lint - checks the linter
+- Backend tests — runs Jest test suites
+
+### Local commands
+
+Prettier:
+
+```
+yarn prettier:check   # verify formatting
+yarn prettier:write   # fix formatting
+```
+
+Lint:
+
+```
+yarn lint:check       # runs linter
+yarn lint             # fixes linting issues
+```
+
+Backend tests:
+
+```
+yarn test
+```
+
+The locally hosted frontend and backend will update live as you make changes to the code. Happy coding!
+
 ## Swagger
 
 The backend can expose [Swagger UI](https://github.com/swagger-api/swagger-ui) (built from an OpenAPI document via [`@nestjs/swagger`](https://docs.nestjs.com/openapi/introduction)) so you can browse and try HTTP routes without reading controller code first.
