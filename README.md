@@ -27,7 +27,7 @@ docker run --name scaffolding-db \
 
 **Option B — pgAdmin / existing Postgres install:**
 
-Create a new database (e.g. `jumpstart`) through pgAdmin or `psql`.
+Create a new database (e.g. `mspca`) through pgAdmin or `psql`.
 
 **Configure connection strings:**
 
