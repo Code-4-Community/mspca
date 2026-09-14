@@ -6,11 +6,11 @@ import 'pg';
 
 const config = {
   type: 'postgres',
-  host: `${process.env.DATABASE_HOST}`,
-  port: parseInt(`${process.env.DATABASE_PORT}`, 10),
-  database: `${process.env.DATABASE_NAME}`,
-  username: `${process.env.DATABASE_USERNAME}`,
-  password: `${process.env.DATABASE_PASSWORD}`,
+  host: `${process.env.NX_DB_HOST}`,
+  port: parseInt(`${process.env.NX_DB_PORT}`, 10),
+  database: `${process.env.NX_DB_DATABASE}`,
+  username: `${process.env.NX_DB_USERNAME}`,
+  password: `${process.env.NX_DB_PASSWORD}`,
   autoLoadEntities: true,
   synchronize: false,
   namingStrategy: new PluralNamingStrategy(),
