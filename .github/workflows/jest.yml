@@ -9,25 +9,16 @@ on:
 jobs:
   jest-tests:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Use NodeJS 24.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: 24.x
-        cache: 'yarn'
-
-    - name: Create .env file
-      run: |
-        echo "AWS_BUCKET_NAME=dummy" >> .env
-        echo "AWS_SECRET_ACCESS_KEY=dummy" >> .env
-        echo "AWS_ACCESS_KEY_ID=dummy" >> .env
-        echo "AWS_REGION=us-east-2" >> .env
-
-    - name: Install Dependencies
-      run: yarn install --frozen-lockfile
-
-    - name: Run Jest tests
-      run: yarn test
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn test
+        env:
+          AWS_BUCKET_NAME: dummy
+          AWS_SECRET_ACCESS_KEY: dummy
+          AWS_ACCESS_KEY_ID: dummy
+          AWS_REGION: us-east-2
