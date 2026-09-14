@@ -97,10 +97,6 @@ The backend can expose [Swagger UI](https://github.com/swagger-api/swagger-ui) (
 
 **Turn it off:** Unset `SWAGGER_ENABLED` or set it to `false`.
 
-**TL TODOS:** 
-1. In [`apps/backend/src/main.ts`](apps/backend/src/main.ts), replace `[YOUR_APP_NAME]` and other `[TL]` strings, adjust `.addTag()` entries to match your controllers, 
-2. Add `@ApiBearerAuth()` onto the controller or handler for specifically protected routes. `addBearerAuth()` only states that the application supports authentication via HTTP Bearer in the Authorization header, it doesn't mark specific routes as protected. [Learn more](https://docs.nestjs.com/openapi/security#bearer-authentication)
-
 **Decorators to know as you add routes!** 
 (import from `@nestjs/swagger`):
 - `@ApiProperty()` / `@ApiPropertyOptional()`: on top of DTO fields
