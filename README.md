@@ -94,7 +94,7 @@ nx run-many -t serve -p frontend backend
 On every push and pull request, GitHub Actions runs:
 
 - Prettier — checks formatting
-- Lint - checks the linter
+- Lint — checks the linter
 - Backend tests — runs Jest test suites
 
 ### Local commands
