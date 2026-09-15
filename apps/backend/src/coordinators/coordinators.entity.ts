@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Homebase } from '../types';
+import { FosterVolunteer } from '../volunteers/volunteers.entity';
 
 @Entity('foster_coordinators')
 export class FosterCoordinator {
@@ -31,4 +32,10 @@ export class FosterCoordinator {
 
   @Column({ type: 'boolean' })
   active!: boolean;
+
+  @OneToMany(
+    () => FosterVolunteer,
+    (volunteer) => volunteer.assignedCoordinator,
+  )
+  assignedVolunteers!: FosterVolunteer[];
 }

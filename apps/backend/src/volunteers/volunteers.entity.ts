@@ -1,6 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Homebase } from '../types';
 import { FosterType } from './volunteers.types';
+import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 @Entity('foster_volunteers')
 export class FosterVolunteer {
@@ -60,4 +67,12 @@ export class FosterVolunteer {
 
   @Column({ type: 'boolean' })
   active!: boolean;
+
+  @ManyToOne(
+    () => FosterCoordinator,
+    (coordinator) => coordinator.assignedVolunteers,
+    { nullable: true },
+  )
+  @JoinColumn({ name: 'assigned_coordinator_id' })
+  assignedCoordinator!: FosterCoordinator | null;
 }
