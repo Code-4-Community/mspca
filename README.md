@@ -14,19 +14,6 @@ You can optionally install `nx` globally with `npm install -g nx` - if you don't
 
 This project uses PostgreSQL. You'll need a running Postgres instance before starting the backend.
 
-**Option A — Docker (recommended for local dev):**
-
-```bash
-docker run --name scaffolding-db \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=[DB NAME HERE] \
-  -p 5432:5432 \
-  -d postgres:15
-```
-
-**Option B — pgAdmin / existing Postgres install:**
-
 Create a new database (e.g. `mspca`) through pgAdmin or `psql`.
 
 **Configure connection strings:**
@@ -41,7 +28,7 @@ cp example.env .env
 NX_DB_HOST=localhost
 NX_DB_PORT=5432
 NX_DB_USERNAME=postgres
-NX_DB_PASSWORD=postgres
+NX_DB_PASSWORD=postgres (replace this with your actual PGAdmin4 password)
 NX_DB_DATABASE=[DB NAME HERE]
 ```
 
