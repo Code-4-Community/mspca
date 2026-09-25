@@ -32,6 +32,10 @@ export class VolunteersService {
   //   return this.repo.save(user);
   // }
 
+  async getVolunteerById(id: number) {
+  return this.repo.findOneBy({ volunteerId: id });
+
+  }
   async updateVolunteerbyId(id: number, dto: UpdateVolunteerDto) {
 
     const volunteer = await this.repo.findOneBy({ volunteerId: id });
