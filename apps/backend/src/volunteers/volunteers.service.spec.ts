@@ -84,6 +84,26 @@ describe('VolunteersService', () => {
       expect(result.firstName).toBe('Jane');
       expect(mockRepo.save).toHaveBeenCalled();
     });
+    it('should update multiple allowed fields at once', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ ...mockVolunteer });
+      mockRepo.save.mockImplementation((v) => Promise.resolve(v));
+
+      const dto = {
+        address: '123 Main St',
+        city: 'Boston',
+        zipcode: '02115',
+      };
+
+      const result = await service.updateVolunteerbyId(1, dto);
+
+      if (!result) {
+        throw new Error('Expected a volunteer, got null');
+      }
+
+      expect(result.address).toBe('123 Main St');
+      expect(result.city).toBe('Boston');
+      expect(result.zipcode).toBe('02115');
+    });
 
     it('should return null when volunteer does not exist', async () => {
       mockRepo.findOneBy.mockResolvedValue(null);
