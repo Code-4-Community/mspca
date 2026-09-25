@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { UpdateVolunteerDto } from './update-volunteer.dto';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class VolunteersService {
@@ -43,8 +44,7 @@ export class VolunteersService {
     if (assignedCoordinatorId !== undefined) {
       const coordinator = await this.coordinatorRepo.findOneBy({ coordinatorId: assignedCoordinatorId });
       if (!coordinator) {
-        // throw new NotFoundException('Coordinator not found');
-        return null;
+        throw new NotFoundException('Coordinator not found');
       }
       volunteer.assignedCoordinator = coordinator;
     }
