@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import typeorm from './config/typeorm';
 import { CognitoModule } from './aws/cognito/cognito.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CognitoModule } from './aws/cognito/cognito.module';
         configService.getOrThrow('typeorm'),
     }),
     CognitoModule,
+    RecommendationsModule,
   ],
 })
 export class AppModule {}
