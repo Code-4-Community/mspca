@@ -14,7 +14,7 @@ export class VolunteersController {
   // }
 
   @Get()
-    async getAllVolunteers() {
-      return this.volunteersService.getAllVolunteers();
+  async getAllVolunteers() {
+    return this.volunteersService.getAllVolunteers();
   }
 }

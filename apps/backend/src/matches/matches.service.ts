@@ -31,5 +31,4 @@ export class MatchesService {
     match.deniedReason = deniedReason;
     return this.repo.save(match);
   }
-  
 }
