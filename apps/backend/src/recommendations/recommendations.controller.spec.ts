@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
+import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { RecommendationsController } from './recommendations.controller';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
@@ -94,5 +99,15 @@ describe('RecommendationsController', () => {
       expect(volunteersService.existsById).not.toHaveBeenCalled();
       expect(recommendationsService.create).not.toHaveBeenCalled();
     });
+  });
+
+  // The ticket specifies 200, not Nest's default 201 for POST.
+  it('responds 200 rather than the default 201 for a POST', () => {
+    expect(
+      Reflect.getMetadata(
+        HTTP_CODE_METADATA,
+        RecommendationsController.prototype.createRecommendation,
+      ),
+    ).toBe(HttpStatus.OK);
   });
 });

@@ -5,12 +5,18 @@ import { Recommendation } from './recommendations.entity';
 
 describe('RecommendationsService', () => {
   let service: RecommendationsService;
-  let repo: { create: jest.Mock; save: jest.Mock };
+  let repo: { upsert: jest.Mock; findOneByOrFail: jest.Mock };
+
+  const saved = {
+    volunteerId: 7,
+    chameleonAnimalId: 42,
+    isActive: true,
+  } as Recommendation;
 
   beforeEach(async () => {
     repo = {
-      create: jest.fn((entity) => entity),
-      save: jest.fn((entity) => Promise.resolve(entity)),
+      upsert: jest.fn().mockResolvedValue({ identifiers: [] }),
+      findOneByOrFail: jest.fn().mockResolvedValue(saved),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -31,52 +37,48 @@ describe('RecommendationsService', () => {
   });
 
   describe('create', () => {
-    it('saves a recommendation for the volunteer and animal', async () => {
-      const result = await service.create({
-        volunteerId: 7,
-        chameleonAnimalId: 42,
-      });
+    it('upserts the recommendation as active on the composite key', async () => {
+      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
 
-      expect(repo.create).toHaveBeenCalledWith({
-        volunteerId: 7,
-        chameleonAnimalId: 42,
-        isActive: true,
-      });
-      expect(repo.save).toHaveBeenCalledWith({
-        volunteerId: 7,
-        chameleonAnimalId: 42,
-        isActive: true,
-      });
-      expect(result).toEqual({
-        volunteerId: 7,
-        chameleonAnimalId: 42,
-        isActive: true,
-      });
+      expect(repo.upsert).toHaveBeenCalledWith(
+        { volunteerId: 7, chameleonAnimalId: 42, isActive: true },
+        ['volunteerId', 'chameleonAnimalId'],
+      );
     });
 
     it('defaults new recommendations to active', async () => {
-      const result = await service.create({
-        volunteerId: 1,
-        chameleonAnimalId: 2,
-      });
+      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
 
-      expect(result.isActive).toBe(true);
+      const [values] = repo.upsert.mock.calls[0];
+      expect(values.isActive).toBe(true);
     });
 
-    it('returns the saved entity from the repository', async () => {
-      const saved = {
-        volunteerId: 7,
-        chameleonAnimalId: 42,
-        isActive: true,
-      } as Recommendation;
-      repo.save.mockResolvedValue(saved);
-
+    it('returns the persisted recommendation', async () => {
       const result = await service.create({
         volunteerId: 7,
         chameleonAnimalId: 42,
       });
 
       expect(result).toBe(saved);
+      expect(repo.findOneByOrFail).toHaveBeenCalledWith({
+        volunteerId: 7,
+        chameleonAnimalId: 42,
+      });
+    });
+
+    it('reads the row back only after the upsert has resolved', async () => {
+      const order: string[] = [];
+      repo.upsert.mockImplementation(async () => {
+        order.push('upsert');
+      });
+      repo.findOneByOrFail.mockImplementation(async () => {
+        order.push('read');
+        return saved;
+      });
+
+      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
+
+      expect(order).toEqual(['upsert', 'read']);
     });
   });
 });
