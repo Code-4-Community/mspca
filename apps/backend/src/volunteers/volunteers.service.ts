@@ -33,26 +33,25 @@ export class VolunteersService {
   // }
 
   async getVolunteerById(id: number) {
-  return this.repo.findOneBy({ volunteerId: id });
-
+    return this.repo.findOneBy({ volunteerId: id });
   }
   async updateVolunteerbyId(id: number, dto: UpdateVolunteerDto) {
-
     const volunteer = await this.repo.findOneBy({ volunteerId: id });
     if (!volunteer) {
       return null;
     }
 
-    const{assignedCoordinatorId, ...rest} = dto;
+    const { assignedCoordinatorId, ...rest } = dto;
 
     if (assignedCoordinatorId !== undefined) {
-      const coordinator = await this.coordinatorRepo.findOneBy({ coordinatorId: assignedCoordinatorId });
+      const coordinator = await this.coordinatorRepo.findOneBy({
+        coordinatorId: assignedCoordinatorId,
+      });
       if (!coordinator) {
         throw new NotFoundException('Coordinator not found');
       }
       volunteer.assignedCoordinator = coordinator;
     }
-
 
     Object.assign(volunteer, rest);
     return await this.repo.save(volunteer);

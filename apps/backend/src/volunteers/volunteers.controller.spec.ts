@@ -56,7 +56,9 @@ describe('VolunteersController', () => {
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
-      await expect(controller.getVolunteerById('0')).rejects.toThrow(BadRequestException);
+      await expect(controller.getVolunteerById('0')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -64,12 +66,17 @@ describe('VolunteersController', () => {
     it('should update and return the volunteer when found', async () => {
       const dto = { notes: 'updated notes' };
       const updatedVolunteer = { ...mockVolunteer, ...dto };
-      mockVolunteersService.updateVolunteerbyId.mockResolvedValue(updatedVolunteer);
+      mockVolunteersService.updateVolunteerbyId.mockResolvedValue(
+        updatedVolunteer,
+      );
 
       const result = await controller.updateVolunteerbyId('1', dto);
 
       expect(result).toEqual(updatedVolunteer);
-      expect(mockVolunteersService.updateVolunteerbyId).toHaveBeenCalledWith(1, dto);
+      expect(mockVolunteersService.updateVolunteerbyId).toHaveBeenCalledWith(
+        1,
+        dto,
+      );
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {

@@ -19,7 +19,9 @@ export class VolunteersController {
   @Get('/:volunteerId')
   async getVolunteerById(@Param('volunteerId') volunteerId: string) {
     validateId(Number(volunteerId), 'FosterVolunteer');
-    const volunteer = await this.volunteersService.getVolunteerById(Number(volunteerId));
+    const volunteer = await this.volunteersService.getVolunteerById(
+      Number(volunteerId),
+    );
     if (!volunteer) {
       throw new NotFoundException('Volunteer not found');
     }
@@ -27,13 +29,18 @@ export class VolunteersController {
   }
 
   @Patch('/:volunteerId')
-  async updateVolunteerbyId(@Param('volunteerId') volunteerId: string, @Body() dto: UpdateVolunteerDto) {
+  async updateVolunteerbyId(
+    @Param('volunteerId') volunteerId: string,
+    @Body() dto: UpdateVolunteerDto,
+  ) {
     validateId(Number(volunteerId), 'FosterVolunteer');
-    const volunteer = await this.volunteersService.updateVolunteerbyId(Number(volunteerId), dto);
+    const volunteer = await this.volunteersService.updateVolunteerbyId(
+      Number(volunteerId),
+      dto,
+    );
     if (!volunteer) {
       throw new NotFoundException('Volunteer not found');
     }
     return volunteer;
   }
-
 }

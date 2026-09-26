@@ -35,7 +35,10 @@ describe('VolunteersService', () => {
       providers: [
         VolunteersService,
         { provide: getRepositoryToken(FosterVolunteer), useValue: mockRepo },
-        { provide: getRepositoryToken(FosterCoordinator), useValue: mockCoordinatorRepo },
+        {
+          provide: getRepositoryToken(FosterCoordinator),
+          useValue: mockCoordinatorRepo,
+        },
       ],
     }).compile();
 
@@ -119,12 +122,16 @@ describe('VolunteersService', () => {
       mockCoordinatorRepo.findOneBy.mockResolvedValue(mockCoordinator);
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
-      const result = await service.updateVolunteerbyId(1, { assignedCoordinatorId: 5 });
+      const result = await service.updateVolunteerbyId(1, {
+        assignedCoordinatorId: 5,
+      });
       if (!result) {
         throw new Error('Expected a volunteer, got null');
       }
 
-      expect(mockCoordinatorRepo.findOneBy).toHaveBeenCalledWith({ coordinatorId: 5 });
+      expect(mockCoordinatorRepo.findOneBy).toHaveBeenCalledWith({
+        coordinatorId: 5,
+      });
       expect(result.assignedCoordinator).toEqual(mockCoordinator);
     });
 
