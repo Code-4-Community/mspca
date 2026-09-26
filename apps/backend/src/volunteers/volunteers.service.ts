@@ -26,4 +26,8 @@ export class VolunteersService {
 
   //   return this.repo.save(user);
   // }
+
+  async getAllVolunteers() {
+    return this.repo.find();
+  }
 }

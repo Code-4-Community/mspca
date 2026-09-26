@@ -1,4 +1,4 @@
-import { Controller } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { VolunteersService } from './volunteers.service';
 
 // @ApiTags('Volunteers')
@@ -12,4 +12,9 @@ export class VolunteersController {
   // async getUser(@Param('userId', ParseIntPipe) userId: number): Promise<User> {
   //   return this.usersService.findOne(userId);
   // }
+
+  @Get()
+    async getAllVolunteers() {
+      return this.volunteersService.getAllVolunteers();
+  }
 }
