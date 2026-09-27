@@ -13,6 +13,12 @@ export class VolunteersController {
     private matchesService: MatchesService,
   ) {}
 
+  // Example endpoint
+  // @Get('/:userId')
+  // async getUser(@Param('userId', ParseIntPipe) userId: number): Promise<User> {
+  //   return this.usersService.findOne(userId);
+  // }
+
   @Get('/:volunteerId/matches')
   async getVolunteerMatches(
     @Param('volunteerId') volunteerId: string,

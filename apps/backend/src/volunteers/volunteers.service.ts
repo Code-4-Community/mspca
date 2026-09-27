@@ -10,6 +10,23 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
+  // Example service functions
+  // find(email: string) {
+  //   return this.repo.find({ where: { email } });
+  // }
+
+  // async update(id: number, attrs: Partial<User>) {
+  //   const user = await this.findOne(id);
+
+  //   if (!user) {
+  //     throw new NotFoundException('User not found');
+  //   }
+
+  //   Object.assign(user, attrs);
+
+  //   return this.repo.save(user);
+  // }
+
   existsById(id: number): Promise<boolean> {
     return this.repo.existsBy({ volunteerId: id });
   }
