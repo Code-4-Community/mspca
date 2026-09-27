@@ -9,4 +9,8 @@ export class MatchesService {
     @InjectRepository(Match)
     private repo: Repository<Match>,
   ) {}
+
+  findByVolunteerId(volunteerId: number): Promise<Match[]> {
+    return this.repo.find({ where: { volunteerId } });
+  }
 }
