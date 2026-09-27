@@ -11,14 +11,6 @@ export class RecommendationsService {
     private repo: Repository<Recommendation>,
   ) {}
 
-  /**
-   * Creates a recommendation for the given volunteer and Chameleon animal.
-   * (volunteer_id, chameleon_animal_id) is the primary key, so recommending
-   * the same animal again reactivates the existing row rather than
-   * duplicating it. This upserts rather than save()-ing so that two
-   * coordinators recommending the same animal at once can't race into a
-   * primary key violation.
-   */
   async create({
     volunteerId,
     chameleonAnimalId,

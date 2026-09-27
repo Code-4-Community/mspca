@@ -6,9 +6,6 @@ import { VolunteersService } from './volunteers.service';
 import { CoordinatorsModule } from '../coordinators/coordinators.module';
 
 @Module({
-  // FosterVolunteer relates to FosterCoordinator, so CoordinatorsModule has to
-  // be registered too or autoLoadEntities leaves TypeORM unable to build that
-  // relation's metadata.
   imports: [TypeOrmModule.forFeature([FosterVolunteer]), CoordinatorsModule],
   controllers: [VolunteersController],
   providers: [VolunteersService],

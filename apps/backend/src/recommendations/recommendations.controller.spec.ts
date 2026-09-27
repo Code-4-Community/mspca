@@ -101,7 +101,6 @@ describe('RecommendationsController', () => {
     });
   });
 
-  // The ticket specifies 200, not Nest's default 201 for POST.
   it('responds 200 rather than the default 201 for a POST', () => {
     expect(
       Reflect.getMetadata(
