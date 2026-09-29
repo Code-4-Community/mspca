@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
@@ -156,6 +156,19 @@ describe('MatchesService', () => {
       matchRepo.findOneBy.mockResolvedValue(null);
 
       await expect(service.withdraw(999)).rejects.toThrow(NotFoundException);
+      expect(matchRepo.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      MatchStatus.ACTIVE,
+      MatchStatus.COMPLETE,
+      MatchStatus.DENIED,
+      MatchStatus.WITHDRAWN,
+      MatchStatus.CANCELED,
+    ])('throws when the match is %s rather than pending', async (status) => {
+      matchRepo.findOneBy.mockResolvedValue({ matchId: 10, status });
+
+      await expect(service.withdraw(10)).rejects.toThrow(BadRequestException);
       expect(matchRepo.save).not.toHaveBeenCalled();
     });
   });

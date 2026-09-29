@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Match } from './matches.entity';
@@ -59,15 +64,25 @@ export class MatchesService {
    * Withdraws a match by setting its status to WITHDRAWN. The record is kept so
    * volunteers can still see their withdrawn applications.
    *
+   * Only PENDING matches can be withdrawn - once a coordinator has acted on an
+   * application, taking it back is their call, not the volunteer's.
+   *
    * @param matchId the match to withdraw
    * @returns the updated match
    * @throws NotFoundException if the match does not exist
+   * @throws BadRequestException if the match is not PENDING
    */
   async withdraw(matchId: number): Promise<Match> {
     const match = await this.repo.findOneBy({ matchId });
 
     if (!match) {
       throw new NotFoundException('Match not found');
+    }
+
+    if (match.status !== MatchStatus.PENDING) {
+      throw new BadRequestException(
+        `Only pending matches can be withdrawn; match ${matchId} is ${match.status}`,
+      );
     }
 
     match.status = MatchStatus.WITHDRAWN;
