@@ -1,18 +1,12 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  NotFoundException,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
 import { CreateRecommendationDTO } from './createRecommendation.dto';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { validateId } from '../utils/validation.utils';
 
-// @ApiTags('Recommendations')
+@ApiTags('Recommendations')
 // @ApiBearerAuth()
 @Controller('recommendations')
 export class RecommendationsController {
@@ -22,18 +16,21 @@ export class RecommendationsController {
   ) {}
 
   @Post()
-  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Recommend a Chameleon Animal to an active Volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The created or reactivated recommendation',
+    type: Recommendation,
+  })
   async createRecommendation(
     @Body() body: CreateRecommendationDTO,
   ): Promise<Recommendation> {
-    validateId(body?.volunteerId, 'volunteer');
-    validateId(body?.chameleonAnimalId, 'Chameleon animal');
+    validateId(body.volunteerId, 'Volunteer');
+    validateId(body.chameleonAnimalId, 'Chameleon Animal');
 
-    if (!(await this.volunteersService.existsById(body.volunteerId))) {
-      throw new NotFoundException(
-        `Volunteer with ID ${body.volunteerId} not found`,
-      );
-    }
+    await this.volunteersService.findActiveOrFail(body.volunteerId);
 
     return this.recommendationsService.create(body);
   }

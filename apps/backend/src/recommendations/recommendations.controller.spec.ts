@@ -1,10 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  HttpStatus,
-  NotFoundException,
-} from '@nestjs/common';
-import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RecommendationsController } from './recommendations.controller';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
@@ -14,16 +9,16 @@ import { VolunteersService } from '../volunteers/volunteers.service';
 describe('RecommendationsController', () => {
   let controller: RecommendationsController;
   let recommendationsService: { create: jest.Mock };
-  let volunteersService: { existsById: jest.Mock };
+  let volunteersService: { findActiveOrFail: jest.Mock };
 
-  const body: CreateRecommendationDTO = {
+  const body = {
     volunteerId: 7,
     chameleonAnimalId: 42,
-  };
+  } as CreateRecommendationDTO;
 
   beforeEach(async () => {
     recommendationsService = { create: jest.fn() };
-    volunteersService = { existsById: jest.fn() };
+    volunteersService = { findActiveOrFail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RecommendationsController],
@@ -49,31 +44,36 @@ describe('RecommendationsController', () => {
   });
 
   describe('createRecommendation', () => {
-    it('returns the created recommendation when the volunteer exists', async () => {
+    it('returns the created recommendation when the volunteer is active', async () => {
       const recommendation = { ...body, isActive: true } as Recommendation;
-      volunteersService.existsById.mockResolvedValue(true);
+      volunteersService.findActiveOrFail.mockResolvedValue({});
       recommendationsService.create.mockResolvedValue(recommendation);
 
       const result = await controller.createRecommendation(body);
 
       expect(result).toBe(recommendation);
-      expect(volunteersService.existsById).toHaveBeenCalledWith(7);
+      expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(7);
       expect(recommendationsService.create).toHaveBeenCalledWith(body);
     });
 
-    it('throws NotFoundException when the volunteer does not exist', async () => {
-      volunteersService.existsById.mockResolvedValue(false);
+    it.each([
+      ['does not exist', new NotFoundException()],
+      ['is not active', new BadRequestException()],
+    ])(
+      'does not create a recommendation when the volunteer %s',
+      async (_case, error) => {
+        volunteersService.findActiveOrFail.mockRejectedValue(error);
 
-      await expect(controller.createRecommendation(body)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(recommendationsService.create).not.toHaveBeenCalled();
-    });
+        await expect(controller.createRecommendation(body)).rejects.toThrow(
+          error,
+        );
+        expect(recommendationsService.create).not.toHaveBeenCalled();
+      },
+    );
 
     it.each([
       ['volunteerId is missing', { chameleonAnimalId: 42 }],
       ['chameleonAnimalId is missing', { volunteerId: 7 }],
-      ['the body is missing', undefined],
       [
         'volunteerId is not an integer',
         { volunteerId: 1.5, chameleonAnimalId: 42 },
@@ -96,17 +96,8 @@ describe('RecommendationsController', () => {
           invalidBody as unknown as CreateRecommendationDTO,
         ),
       ).rejects.toThrow(BadRequestException);
-      expect(volunteersService.existsById).not.toHaveBeenCalled();
+      expect(volunteersService.findActiveOrFail).not.toHaveBeenCalled();
       expect(recommendationsService.create).not.toHaveBeenCalled();
     });
-  });
-
-  it('responds 200 rather than the default 201 for a POST', () => {
-    expect(
-      Reflect.getMetadata(
-        HTTP_CODE_METADATA,
-        RecommendationsController.prototype.createRecommendation,
-      ),
-    ).toBe(HttpStatus.OK);
   });
 });

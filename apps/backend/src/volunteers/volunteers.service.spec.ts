@@ -1,14 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
-  let repo: { existsBy: jest.Mock };
+  let repo: { findOneBy: jest.Mock };
 
   beforeEach(async () => {
-    repo = { existsBy: jest.fn() };
+    repo = { findOneBy: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,22 +28,31 @@ describe('VolunteersService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('existsById', () => {
-    it('returns true when a volunteer with the id exists', async () => {
-      repo.existsBy.mockResolvedValue(true);
+  describe('findActiveOrFail', () => {
+    it('returns the volunteer when they are active', async () => {
+      const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
+      repo.findOneBy.mockResolvedValue(volunteer);
 
-      const result = await service.existsById(7);
+      const result = await service.findActiveOrFail(7);
 
-      expect(result).toBe(true);
-      expect(repo.existsBy).toHaveBeenCalledWith({ volunteerId: 7 });
+      expect(result).toBe(volunteer);
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
 
-    it('returns false when no volunteer with the id exists', async () => {
-      repo.existsBy.mockResolvedValue(false);
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      repo.findOneBy.mockResolvedValue(null);
 
-      const result = await service.existsById(7);
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
 
-      expect(result).toBe(false);
+    it('throws BadRequestException when the volunteer is not active', async () => {
+      repo.findOneBy.mockResolvedValue({ volunteerId: 7, active: false });
+
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });
