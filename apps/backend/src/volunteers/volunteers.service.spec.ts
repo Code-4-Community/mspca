@@ -1,14 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
-  let repo: { existsBy: jest.Mock };
+  let repo: { findOneBy: jest.Mock };
 
   beforeEach(async () => {
-    repo = { existsBy: jest.fn() };
+    repo = { findOneBy: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,22 +28,24 @@ describe('VolunteersService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('existsById', () => {
-    it('returns true when a volunteer with the id exists', async () => {
-      repo.existsBy.mockResolvedValue(true);
+  describe('findByIdOrFail', () => {
+    it('returns the volunteer when one with the id exists', async () => {
+      const volunteer = { volunteerId: 7 } as FosterVolunteer;
+      repo.findOneBy.mockResolvedValue(volunteer);
 
-      const result = await service.existsById(7);
+      const result = await service.findByIdOrFail(7);
 
-      expect(result).toBe(true);
-      expect(repo.existsBy).toHaveBeenCalledWith({ volunteerId: 7 });
+      expect(result).toBe(volunteer);
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
 
-    it('returns false when no volunteer with the id exists', async () => {
-      repo.existsBy.mockResolvedValue(false);
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      repo.findOneBy.mockResolvedValue(null);
 
-      const result = await service.existsById(7);
-
-      expect(result).toBe(false);
+      await expect(service.findByIdOrFail(7)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 7 not found'),
+      );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
   });
 });

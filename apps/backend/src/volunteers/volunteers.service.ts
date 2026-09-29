@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
@@ -10,24 +10,13 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
-  // Example service functions
-  // find(email: string) {
-  //   return this.repo.find({ where: { email } });
-  // }
+  async findByIdOrFail(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOneBy({ volunteerId: id });
 
-  // async update(id: number, attrs: Partial<User>) {
-  //   const user = await this.findOne(id);
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
 
-  //   if (!user) {
-  //     throw new NotFoundException('User not found');
-  //   }
-
-  //   Object.assign(user, attrs);
-
-  //   return this.repo.save(user);
-  // }
-
-  existsById(id: number): Promise<boolean> {
-    return this.repo.existsBy({ volunteerId: id });
+    return volunteer;
   }
 }

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
@@ -8,11 +8,11 @@ import { MatchStatus } from '../matches/matches.types';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let volunteersService: { existsById: jest.Mock };
+  let volunteersService: { findByIdOrFail: jest.Mock };
   let matchesService: { findByVolunteerId: jest.Mock };
 
   beforeEach(async () => {
-    volunteersService = { existsById: jest.fn() };
+    volunteersService = { findByIdOrFail: jest.fn() };
     matchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -47,41 +47,32 @@ describe('VolunteersController', () => {
           deniedReason: 'Schedule conflict',
         },
       ] as Match[];
-      volunteersService.existsById.mockResolvedValue(true);
+      volunteersService.findByIdOrFail.mockResolvedValue({});
       matchesService.findByVolunteerId.mockResolvedValue(matches);
 
-      const result = await controller.getVolunteerMatches('7');
+      const result = await controller.getVolunteerMatches(7);
 
       expect(result).toBe(matches);
-      expect(volunteersService.existsById).toHaveBeenCalledWith(7);
+      expect(volunteersService.findByIdOrFail).toHaveBeenCalledWith(7);
       expect(matchesService.findByVolunteerId).toHaveBeenCalledWith(7);
     });
 
     it('returns an empty array when the volunteer exists but has no matches', async () => {
-      volunteersService.existsById.mockResolvedValue(true);
+      volunteersService.findByIdOrFail.mockResolvedValue({});
       matchesService.findByVolunteerId.mockResolvedValue([]);
 
-      await expect(controller.getVolunteerMatches('7')).resolves.toEqual([]);
+      await expect(controller.getVolunteerMatches(7)).resolves.toEqual([]);
     });
 
     it('throws NotFoundException when the volunteer does not exist', async () => {
-      volunteersService.existsById.mockResolvedValue(false);
+      volunteersService.findByIdOrFail.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
 
-      await expect(controller.getVolunteerMatches('999')).rejects.toThrow(
+      await expect(controller.getVolunteerMatches(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(matchesService.findByVolunteerId).not.toHaveBeenCalled();
     });
-
-    it.each(['abc', '0', '-3', ''])(
-      'throws BadRequestException for invalid id %p',
-      async (invalidId) => {
-        await expect(controller.getVolunteerMatches(invalidId)).rejects.toThrow(
-          BadRequestException,
-        );
-        expect(volunteersService.existsById).not.toHaveBeenCalled();
-        expect(matchesService.findByVolunteerId).not.toHaveBeenCalled();
-      },
-    );
   });
 });

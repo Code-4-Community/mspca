@@ -1,10 +1,17 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 
-// @ApiTags('Volunteers')
+@ApiTags('Volunteers')
 // @ApiBearerAuth()
 @Controller('volunteers')
 export class VolunteersController {
@@ -13,23 +20,25 @@ export class VolunteersController {
     private matchesService: MatchesService,
   ) {}
 
-  // Example endpoint
-  // @Get('/:userId')
-  // async getUser(@Param('userId', ParseIntPipe) userId: number): Promise<User> {
-  //   return this.usersService.findOne(userId);
-  // }
-
   @Get('/:volunteerId/matches')
+  @ApiOperation({ summary: 'Get all Matches for a Volunteer' })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the Volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The Volunteer's Matches",
+    type: [Match],
+  })
   async getVolunteerMatches(
-    @Param('volunteerId') volunteerId: string,
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<Match[]> {
-    const id = Number(volunteerId);
-    validateId(id, 'volunteer');
+    validateId(volunteerId, 'Volunteer');
 
-    if (!(await this.volunteersService.existsById(id))) {
-      throw new NotFoundException(`Volunteer with ID ${id} not found`);
-    }
+    await this.volunteersService.findByIdOrFail(volunteerId);
 
-    return this.matchesService.findByVolunteerId(id);
+    return this.matchesService.findByVolunteerId(volunteerId);
   }
 }
