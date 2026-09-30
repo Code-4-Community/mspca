@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
+import { FosterVolunteer } from './volunteers.entity';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -11,11 +12,11 @@ describe('VolunteersController', () => {
     firstName: 'Jane',
     lastName: 'Doe',
     notes: 'likes cats',
-  };
+  } as FosterVolunteer;
 
   const mockVolunteersService = {
     getVolunteerById: jest.fn(),
-    updateVolunteerbyId: jest.fn(),
+    updateVolunteerById: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -41,56 +42,76 @@ describe('VolunteersController', () => {
     it('should return a volunteer when found', async () => {
       mockVolunteersService.getVolunteerById.mockResolvedValue(mockVolunteer);
 
-      const result = await controller.getVolunteerById('1');
+      const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
       expect(mockVolunteersService.getVolunteerById).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
-      mockVolunteersService.getVolunteerById.mockResolvedValue(null);
+      mockVolunteersService.getVolunteerById.mockRejectedValue(
+        new NotFoundException('Volunteer with id 999 not found'),
+      );
 
-      await expect(controller.getVolunteerById('999')).rejects.toThrow(
+      await expect(controller.getVolunteerById(999)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
-      await expect(controller.getVolunteerById('0')).rejects.toThrow(
+      await expect(controller.getVolunteerById(0)).rejects.toThrow(
         BadRequestException,
       );
+      expect(mockVolunteersService.getVolunteerById).not.toHaveBeenCalled();
     });
   });
 
-  describe('updateVolunteerbyId', () => {
+  describe('updateVolunteerById', () => {
     it('should update and return the volunteer when found', async () => {
-      const dto = { notes: 'updated notes' };
-      const updatedVolunteer = { ...mockVolunteer, ...dto };
-      mockVolunteersService.updateVolunteerbyId.mockResolvedValue(
+      const dto = { volunteerId: 1, notes: 'updated notes' };
+      const updatedVolunteer = { ...mockVolunteer, ...dto } as FosterVolunteer;
+      mockVolunteersService.updateVolunteerById.mockResolvedValue(
         updatedVolunteer,
       );
 
-      const result = await controller.updateVolunteerbyId('1', dto);
+      const result = await controller.updateVolunteerById(1, dto);
 
       expect(result).toEqual(updatedVolunteer);
-      expect(mockVolunteersService.updateVolunteerbyId).toHaveBeenCalledWith(
+      expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
         1,
         dto,
       );
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
-      mockVolunteersService.updateVolunteerbyId.mockResolvedValue(null);
+      mockVolunteersService.updateVolunteerById.mockRejectedValue(
+        new NotFoundException('Volunteer with id 999 not found'),
+      );
 
       await expect(
-        controller.updateVolunteerbyId('999', { notes: 'x' }),
+        controller.updateVolunteerById(999, { volunteerId: 999, notes: 'x' }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
       await expect(
-        controller.updateVolunteerbyId('0', { notes: 'x' }),
+        controller.updateVolunteerById(0, { volunteerId: 0, notes: 'x' }),
       ).rejects.toThrow(BadRequestException);
+      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when path and body ids do not match', async () => {
+      await expect(
+        controller.updateVolunteerById(1, { volunteerId: 2, notes: 'x' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when no fields besides volunteerId are provided', async () => {
+      await expect(
+        controller.updateVolunteerById(1, { volunteerId: 1 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
   });
 });
