@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
-import { UpdateVolunteerDto } from './update-volunteer.dto';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { NotFoundException } from '@nestjs/common';
 

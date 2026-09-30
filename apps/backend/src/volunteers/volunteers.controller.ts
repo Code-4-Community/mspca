@@ -2,7 +2,7 @@ import { Controller, Patch, Get, Param, Body } from '@nestjs/common';
 import { VolunteersService } from './volunteers.service';
 import { validateId } from '../utils/validation.utils';
 import { NotFoundException } from '@nestjs/common';
-import { UpdateVolunteerDto } from './update-volunteer.dto';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 
 // @ApiTags('Volunteers')
 // @ApiBearerAuth()
