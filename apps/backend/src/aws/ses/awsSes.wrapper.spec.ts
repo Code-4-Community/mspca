@@ -29,8 +29,13 @@ describe('AmazonSESWrapper', () => {
     mockClient.send.mock.calls[0][0] as SendEmailCommand;
 
   /** The composed MIME message, decoded so headers can be inspected. */
-  const sentRawMessage = (): string =>
-    Buffer.from(sentCommand().input.Content!.Raw!.Data!).toString('utf8');
+  const sentRawMessage = (): string => {
+    const data = sentCommand().input.Content?.Raw?.Data;
+    if (!data) {
+      throw new Error('Expected the sent command to carry a raw MIME message');
+    }
+    return Buffer.from(data).toString('utf8');
+  };
 
   beforeEach(async () => {
     mockClient = { send: jest.fn().mockResolvedValue(successOutput) };
@@ -66,6 +71,7 @@ describe('AmazonSESWrapper', () => {
     it('addresses the recipient in Destination and in the MIME headers', async () => {
       await wrapper.sendEmail(validDto);
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       expect(sentCommand().input.Destination).toEqual({
         ToAddresses: ['recipient@example.com'],
       });
@@ -81,6 +87,7 @@ describe('AmazonSESWrapper', () => {
 
       await wrapper.sendEmail(validDto);
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       expect(sentRawMessage()).toContain('From: noreply@mspca.org');
     });
 
@@ -90,6 +97,7 @@ describe('AmazonSESWrapper', () => {
         ccEmails: ['cc1@example.com', 'cc2@example.com'],
       });
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       expect(sentCommand().input.Destination?.CcAddresses).toEqual([
         'cc1@example.com',
         'cc2@example.com',
@@ -105,6 +113,7 @@ describe('AmazonSESWrapper', () => {
         bccEmails: ['bcc@example.com'],
       });
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       expect(sentCommand().input.Destination?.BccAddresses).toEqual([
         'bcc@example.com',
       ]);
@@ -122,6 +131,7 @@ describe('AmazonSESWrapper', () => {
     it('omits CcAddresses and BccAddresses when the lists are absent or empty', async () => {
       await wrapper.sendEmail({ ...validDto, ccEmails: [], bccEmails: [] });
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       expect(sentCommand().input.Destination).toEqual({
         ToAddresses: ['recipient@example.com'],
       });
@@ -135,6 +145,7 @@ describe('AmazonSESWrapper', () => {
         ],
       });
 
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
       const raw = sentRawMessage();
       expect(raw).toContain('filename=notes.txt');
       expect(raw).toContain(Buffer.from('hello attachment').toString('base64'));
@@ -146,12 +157,14 @@ describe('AmazonSESWrapper', () => {
       await expect(wrapper.sendEmail(validDto)).rejects.toThrow(
         'SES rejected: throttled',
       );
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
     });
 
     it('wraps non-Error rejections in an Error', async () => {
       mockClient.send.mockRejectedValue('throttled');
 
       await expect(wrapper.sendEmail(validDto)).rejects.toThrow('throttled');
+      expect(mockClient.send).toHaveBeenCalledTimes(1);
     });
   });
 });
