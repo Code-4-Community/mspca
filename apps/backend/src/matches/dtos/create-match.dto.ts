@@ -1,11 +1,11 @@
-import { IsInt, Min } from 'class-validator';
+import { IsInt, IsPositive } from 'class-validator';
 
 export class CreateMatchDto {
   @IsInt()
-  @Min(1)
+  @IsPositive()
   volunteerId!: number;
 
   @IsInt()
-  @Min(1)
+  @IsPositive()
   chameleonAnimalId!: number;
 }
