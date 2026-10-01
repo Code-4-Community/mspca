@@ -32,74 +32,68 @@ describe('CoordinatorsService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('deactivate', () => {
-    it('should set active to false and save the coordinator', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: true,
-      } as FosterCoordinator;
-      repo.findOne.mockResolvedValue(coordinator);
-      repo.save.mockResolvedValue({ ...coordinator, active: false });
+  describe('setActive', () => {
+    describe('deactivating', () => {
+      it('sets active to false, saves, and does not delete the coordinator', async () => {
+        const coordinator = {
+          coordinatorId: 1,
+          active: true,
+        } as FosterCoordinator;
+        repo.findOne.mockResolvedValue(coordinator);
+        repo.save.mockResolvedValue({ ...coordinator, active: false });
 
-      const result = await service.deactivate(1);
+        const result = await service.setActive(1, false);
 
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 1 },
+        expect(repo.findOne).toHaveBeenCalledWith({
+          where: { coordinatorId: 1 },
+        });
+        expect(repo.save).toHaveBeenCalledWith({
+          ...coordinator,
+          active: false,
+        });
+        expect(result.active).toBe(false);
+        expect(repo.delete).not.toHaveBeenCalled();
       });
-      expect(repo.save).toHaveBeenCalledWith({
-        ...coordinator,
-        active: false,
+
+      it('throws NotFoundException if coordinator does not exist', async () => {
+        repo.findOne.mockResolvedValue(null);
+
+        await expect(service.setActive(999, false)).rejects.toThrow(
+          new NotFoundException('Coordinator with ID 999 not found'),
+        );
+        expect(repo.save).not.toHaveBeenCalled();
       });
-      expect(result.active).toBe(false);
     });
 
-    it('should throw NotFoundException if coordinator does not exist', async () => {
-      repo.findOne.mockResolvedValue(null);
+    describe('activating', () => {
+      it('sets active to true and saves the coordinator', async () => {
+        const coordinator = {
+          coordinatorId: 1,
+          active: false,
+        } as FosterCoordinator;
+        repo.findOne.mockResolvedValue(coordinator);
+        repo.save.mockResolvedValue({ ...coordinator, active: true });
 
-      await expect(service.deactivate(999)).rejects.toThrow(
-        new NotFoundException('Coordinator with ID 999 not found'),
-      );
-      expect(repo.save).not.toHaveBeenCalled();
-    });
-    it('should not delete the coordinator record', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: true,
-      } as FosterCoordinator;
-      repo.findOne.mockResolvedValue(coordinator);
-      repo.save.mockResolvedValue({ ...coordinator, active: false });
+        const result = await service.setActive(1, true);
 
-      await service.deactivate(1);
-
-      expect(repo.delete).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('activate', () => {
-    it('should set active to true and save the coordinator', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: false,
-      } as FosterCoordinator;
-      repo.findOne.mockResolvedValue(coordinator);
-      repo.save.mockResolvedValue({ ...coordinator, active: true });
-
-      const result = await service.activate(1);
-
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 1 },
+        expect(repo.findOne).toHaveBeenCalledWith({
+          where: { coordinatorId: 1 },
+        });
+        expect(repo.save).toHaveBeenCalledWith({
+          ...coordinator,
+          active: true,
+        });
+        expect(result.active).toBe(true);
       });
-      expect(repo.save).toHaveBeenCalledWith({ ...coordinator, active: true });
-      expect(result.active).toBe(true);
-    });
 
-    it('should throw NotFoundException if coordinator does not exist', async () => {
-      repo.findOne.mockResolvedValue(null);
+      it('throws NotFoundException if coordinator does not exist', async () => {
+        repo.findOne.mockResolvedValue(null);
 
-      await expect(service.activate(999)).rejects.toThrow(
-        new NotFoundException('Coordinator with ID 999 not found'),
-      );
-      expect(repo.save).not.toHaveBeenCalled();
+        await expect(service.setActive(999, true)).rejects.toThrow(
+          new NotFoundException('Coordinator with ID 999 not found'),
+        );
+        expect(repo.save).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -1,26 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
+import { FosterVolunteer } from './volunteers.entity';
+import { VolunteerStatus } from './volunteers.types';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let service: { deactivate: jest.Mock; activate: jest.Mock };
+  let service: { setStatus: jest.Mock };
 
   beforeEach(async () => {
-    service = {
-      deactivate: jest.fn(),
-      activate: jest.fn(),
-    };
+    service = { setStatus: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
-      providers: [
-        {
-          provide: VolunteersService,
-          useValue: service,
-        },
-      ],
+      providers: [{ provide: VolunteersService, useValue: service }],
     }).compile();
 
     controller = module.get<VolunteersController>(VolunteersController);
@@ -31,38 +24,35 @@ describe('VolunteersController', () => {
   });
 
   describe('deactivate', () => {
-    it('should call service.deactivate with the parsed id', async () => {
-      const volunteer = { volunteerId: 1, active: false };
-      service.deactivate.mockResolvedValue(volunteer);
+    it('should call service.setStatus(id, Inactive) with the parsed id', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.INACTIVE,
+      } as FosterVolunteer;
+      service.setStatus.mockResolvedValue(volunteer);
 
       const result = await controller.deactivate(1);
 
-      expect(service.deactivate).toHaveBeenCalledWith(1);
-      expect(result).toEqual(volunteer);
-    });
-
-    it('should throw BadRequestException for an invalid id', async () => {
-      await expect(controller.deactivate(0)).rejects.toThrow(
-        BadRequestException,
+      expect(service.setStatus).toHaveBeenCalledWith(
+        1,
+        VolunteerStatus.INACTIVE,
       );
-      expect(service.deactivate).not.toHaveBeenCalled();
+      expect(result).toEqual(volunteer);
     });
   });
 
   describe('activate', () => {
-    it('should call service.activate with the parsed id', async () => {
-      const volunteer = { volunteerId: 1, active: true };
-      service.activate.mockResolvedValue(volunteer);
+    it('should call service.setStatus(id, Active) with the parsed id', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
+      service.setStatus.mockResolvedValue(volunteer);
 
       const result = await controller.activate(1);
 
-      expect(service.activate).toHaveBeenCalledWith(1);
+      expect(service.setStatus).toHaveBeenCalledWith(1, VolunteerStatus.ACTIVE);
       expect(result).toEqual(volunteer);
-    });
-
-    it('should throw BadRequestException for an invalid id', async () => {
-      await expect(controller.activate(0)).rejects.toThrow(BadRequestException);
-      expect(service.activate).not.toHaveBeenCalled();
     });
   });
 });

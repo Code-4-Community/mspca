@@ -10,7 +10,7 @@ export class CoordinatorsService {
     private repo: Repository<FosterCoordinator>,
   ) {}
 
-  async deactivate(id: number): Promise<FosterCoordinator> {
+  async setActive(id: number, active: boolean): Promise<FosterCoordinator> {
     const coordinator = await this.repo.findOne({
       where: { coordinatorId: id },
     });
@@ -19,21 +19,7 @@ export class CoordinatorsService {
       throw new NotFoundException(`Coordinator with ID ${id} not found`);
     }
 
-    coordinator.active = false;
-
-    return this.repo.save(coordinator);
-  }
-
-  async activate(id: number): Promise<FosterCoordinator> {
-    const coordinator = await this.repo.findOne({
-      where: { coordinatorId: id },
-    });
-
-    if (!coordinator) {
-      throw new NotFoundException(`Coordinator with ID ${id} not found`);
-    }
-
-    coordinator.active = true;
+    coordinator.active = active;
 
     return this.repo.save(coordinator);
   }
