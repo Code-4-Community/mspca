@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { PluralNamingStrategy } from '../strategies/plural-naming.strategy';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import schemaMigrations from './migrations';
 import 'pg';
@@ -12,6 +13,7 @@ const config = {
   password: `${process.env.NX_DB_PASSWORD}`,
   autoLoadEntities: true,
   synchronize: false,
+  namingStrategy: new PluralNamingStrategy(),
   migrations: [...schemaMigrations],
   ssl:
     process.env.NODE_ENV === 'production'
