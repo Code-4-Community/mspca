@@ -1,5 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
+import { FosterVolunteer } from './volunteers.entity';
 
 // @ApiTags('Volunteers')
 // @ApiBearerAuth()
@@ -7,14 +9,14 @@ import { VolunteersService } from './volunteers.service';
 export class VolunteersController {
   constructor(private volunteersService: VolunteersService) {}
 
-  // Example endpoint
-  // @Get('/:userId')
-  // async getUser(@Param('userId', ParseIntPipe) userId: number): Promise<User> {
-  //   return this.usersService.findOne(userId);
-  // }
-
   @Get()
-  async getAllVolunteers() {
+  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiResponse({
+    status: 200,
+    description: 'All volunteers, regardless of match status',
+    type: [FosterVolunteer],
+  })
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.volunteersService.getAllVolunteers();
   }
 }
