@@ -1,8 +1,20 @@
+import {
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Request } from 'express';
+import {
+  CognitoIdentityProviderClient,
+  AdminCreateUserCommand,
+  AdminAddUserToGroupCommand,
+  AdminRemoveUserFromGroupCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
 
 import { AuthConfigurationError } from './cognito.config';
 import { CognitoService } from './cognito.service';
-import { AccessTokenPayload } from './cognito.types';
+import { AccessTokenPayload, CognitoRole } from './cognito.types';
 
 type TestRequest = Request & { user?: AccessTokenPayload };
 
@@ -119,6 +131,207 @@ describe('CognitoService', () => {
 
     it('returns null when auth is active and user is not on the request', () => {
       expect(service.getUser({ headers: {} } as TestRequest)).toBeNull();
+    });
+  });
+
+  describe('user management', () => {
+    let service: CognitoService;
+    let sendSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      delete process.env.AUTH_DISABLED;
+      process.env.COGNITO_USER_POOL_ID = 'us-east-2_TestPool';
+      process.env.COGNITO_CLIENT_ID = '4h57k9lmno1pqrstuv2wxyz3ab';
+      process.env.COGNITO_REGION = 'us-east-2';
+      service = new CognitoService();
+
+      // Force the lazy client to initialize, then spy on send
+      const mockClient = { send: jest.fn().mockResolvedValue({}) };
+      service['providerClient'] =
+        mockClient as unknown as CognitoIdentityProviderClient;
+      sendSpy = mockClient.send;
+    });
+
+    afterEach(() => {
+      restoreEnv();
+      jest.restoreAllMocks();
+    });
+
+    describe('createUser', () => {
+      it('creates a user and adds them to a group', async () => {
+        sendSpy
+          .mockResolvedValueOnce({
+            User: {
+              Attributes: [{ Name: 'sub', Value: 'test-sub-123' }],
+            },
+          })
+          .mockResolvedValueOnce({}); // addUserToGroup
+
+        const sub = await service.createUser({
+          firstName: 'Jane',
+          lastName: 'Doe',
+          email: 'jane@example.com',
+          role: CognitoRole.FosterVolunteer,
+        });
+
+        expect(sub).toBe('test-sub-123');
+        expect(sendSpy).toHaveBeenCalledTimes(2);
+
+        const createCmd = sendSpy.mock.calls[0][0];
+        expect(createCmd).toBeInstanceOf(AdminCreateUserCommand);
+        expect(createCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          UserAttributes: [
+            { Name: 'name', Value: 'Jane Doe' },
+            { Name: 'email', Value: 'jane@example.com' },
+            { Name: 'email_verified', Value: 'true' },
+          ],
+          DesiredDeliveryMediums: ['EMAIL'],
+        });
+
+        const groupCmd = sendSpy.mock.calls[1][0];
+        expect(groupCmd).toBeInstanceOf(AdminAddUserToGroupCommand);
+        expect(groupCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          GroupName: CognitoRole.FosterVolunteer,
+        });
+      });
+
+      it('throws ConflictException when user already exists', async () => {
+        const error = new Error('User already exists');
+        error.name = 'UsernameExistsException';
+        sendSpy.mockRejectedValueOnce(error);
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it('throws InternalServerErrorException on unknown error', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+
+      it('throws when auth is disabled', async () => {
+        process.env.AUTH_DISABLED = 'true';
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('addUserToGroup', () => {
+      it('sends AdminAddUserToGroupCommand', async () => {
+        await service.addUserToGroup('jane@example.com', CognitoRole.Admin);
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminAddUserToGroupCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          GroupName: CognitoRole.Admin,
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('fail'));
+
+        await expect(
+          service.addUserToGroup('jane@example.com', CognitoRole.Admin),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('removeUserFromGroup', () => {
+      it('sends AdminRemoveUserFromGroupCommand', async () => {
+        await service.removeUserFromGroup(
+          'jane@example.com',
+          CognitoRole.Admin,
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminRemoveUserFromGroupCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          GroupName: CognitoRole.Admin,
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('fail'));
+
+        await expect(
+          service.removeUserFromGroup('jane@example.com', CognitoRole.Admin),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('disableUser', () => {
+      it('sends AdminDisableUserCommand', async () => {
+        await service.disableUser('jane@example.com');
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminDisableUserCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+
+        await expect(service.disableUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+      });
+    });
+
+    describe('enableUser', () => {
+      it('sends AdminEnableUserCommand', async () => {
+        await service.enableUser('jane@example.com');
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminEnableUserCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+
+        await expect(service.enableUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+      });
     });
   });
 });
