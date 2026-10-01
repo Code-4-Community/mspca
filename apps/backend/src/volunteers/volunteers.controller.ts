@@ -55,9 +55,6 @@ export class VolunteersController {
     @Body() dto: UpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'FosterVolunteer');
-    if (dto.volunteerId !== volunteerId) {
-      throw new BadRequestException('volunteerId in path and body must match');
-    }
     const fields = Object.keys(dto).filter((key) => key !== 'volunteerId');
     if (fields.length === 0) {
       throw new BadRequestException('At least one field must be provided');
