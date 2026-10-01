@@ -90,6 +90,16 @@ export class MatchesService {
     return this.repo.save(match);
   }
 
+  /**
+   * Emails the volunteer's assigned foster coordinator about a new match.
+   *
+   * Never throws: the match is already committed by the time this runs, so a
+   * missing coordinator is logged as a warning and a failed send as an error
+   * rather than failing the request.
+   *
+   * @param match the match that was just created
+   * @param volunteer the matched volunteer, with assignedCoordinator loaded
+   */
   private async notifyCoordinator(
     match: Match,
     volunteer: FosterVolunteer,
