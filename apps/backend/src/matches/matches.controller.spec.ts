@@ -3,7 +3,8 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
-import { DenyMatchDto } from './deny-match.dto';
+import { DenyMatchDto } from './dto/deny-match.dto';
+import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 
 describe('MatchesController', () => {
@@ -11,9 +12,9 @@ describe('MatchesController', () => {
 
   const mockMatch = {
     matchId: 1,
-    status: MatchStatus.COMPLETE,
+    status: MatchStatus.ACTIVE,
     deniedReason: null,
-  };
+  } as Match;
 
   const mockMatchesService = {
     approveMatch: jest.fn(),
@@ -41,24 +42,27 @@ describe('MatchesController', () => {
     it('should approve and return the match when found', async () => {
       mockMatchesService.approveMatch.mockResolvedValue(mockMatch);
 
-      const result = await controller.approveMatch('1');
+      const result = await controller.approveMatch(1);
 
       expect(result).toEqual(mockMatch);
       expect(mockMatchesService.approveMatch).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException when match does not exist', async () => {
-      mockMatchesService.approveMatch.mockResolvedValue(null);
+      mockMatchesService.approveMatch.mockRejectedValue(
+        new NotFoundException('Match with id 999 not found'),
+      );
 
-      await expect(controller.approveMatch('999')).rejects.toThrow(
+      await expect(controller.approveMatch(999)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
-      await expect(controller.approveMatch('0')).rejects.toThrow(
+      await expect(controller.approveMatch(0)).rejects.toThrow(
         BadRequestException,
       );
+      expect(mockMatchesService.approveMatch).not.toHaveBeenCalled();
     });
   });
 
@@ -68,11 +72,11 @@ describe('MatchesController', () => {
         ...mockMatch,
         status: MatchStatus.DENIED,
         deniedReason: 'Not enough space',
-      };
+      } as Match;
       mockMatchesService.denyMatch.mockResolvedValue(deniedMatch);
 
       const dto: DenyMatchDto = { deniedReason: 'Not enough space' };
-      const result = await controller.denyMatch('1', dto);
+      const result = await controller.denyMatch(1, dto);
 
       expect(result).toEqual(deniedMatch);
       expect(mockMatchesService.denyMatch).toHaveBeenCalledWith(
@@ -82,19 +86,22 @@ describe('MatchesController', () => {
     });
 
     it('should throw NotFoundException when match does not exist', async () => {
-      mockMatchesService.denyMatch.mockResolvedValue(null);
+      mockMatchesService.denyMatch.mockRejectedValue(
+        new NotFoundException('Match with id 999 not found'),
+      );
 
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
-      await expect(controller.denyMatch('999', dto)).rejects.toThrow(
+      await expect(controller.denyMatch(999, dto)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
-      await expect(controller.denyMatch('0', dto)).rejects.toThrow(
+      await expect(controller.denyMatch(0, dto)).rejects.toThrow(
         BadRequestException,
       );
+      expect(mockMatchesService.denyMatch).not.toHaveBeenCalled();
     });
   });
 
