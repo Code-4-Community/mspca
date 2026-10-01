@@ -13,10 +13,6 @@ import {
 } from 'class-validator';
 
 export class UpdateVolunteerDto {
-  @IsNumber()
-  @IsPositive()
-  volunteerId?: number;
-
   @IsOptional()
   @IsString()
   @IsNotEmpty()
@@ -32,19 +28,16 @@ export class UpdateVolunteerDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(20)
   @IsPhoneNumber('US')
   phone?: string;
 
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(20)
   @IsPhoneNumber('US')
   secondaryPhone?: string;
 
   @IsOptional()
-  @IsString()
   @IsNotEmpty()
   @MaxLength(255)
   @IsEmail()
