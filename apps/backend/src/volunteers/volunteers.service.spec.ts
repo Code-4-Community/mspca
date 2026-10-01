@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -55,6 +56,7 @@ describe('VolunteersService', () => {
       await expect(service.getVolunteerById(999)).rejects.toThrow(
         new NotFoundException('Volunteer with id 999 not found'),
       );
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 999 });
     });
   });
 
@@ -63,12 +65,16 @@ describe('VolunteersService', () => {
       mockRepo.findOneBy.mockResolvedValue({ ...mockVolunteer });
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
-      const dto = { volunteerId: 1, notes: 'updated notes' };
+      const dto = { notes: 'updated notes' } as UpdateVolunteerDto;
       const result = await service.updateVolunteerById(1, dto);
 
       expect(result.notes).toBe('updated notes');
       expect(result.firstName).toBe('Jane');
-      expect(mockRepo.save).toHaveBeenCalled();
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
+        notes: 'updated notes',
+      });
     });
 
     it('should update multiple allowed fields at once', async () => {
@@ -76,24 +82,30 @@ describe('VolunteersService', () => {
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
       const dto = {
-        volunteerId: 1,
         address: '123 Main St',
         city: 'Boston',
         zipcode: '02115',
-      };
+      } as UpdateVolunteerDto;
 
       const result = await service.updateVolunteerById(1, dto);
 
       expect(result.address).toBe('123 Main St');
       expect(result.city).toBe('Boston');
       expect(result.zipcode).toBe('02115');
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
+        address: '123 Main St',
+        city: 'Boston',
+        zipcode: '02115',
+      });
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
       mockRepo.findOneBy.mockResolvedValue(null);
 
       await expect(
-        service.updateVolunteerById(999, { volunteerId: 999, notes: 'x' }),
+        service.updateVolunteerById(999, { notes: 'x' }),
       ).rejects.toThrow(
         new NotFoundException('Volunteer with id 999 not found'),
       );

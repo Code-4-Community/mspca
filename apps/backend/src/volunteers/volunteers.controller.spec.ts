@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -68,7 +69,7 @@ describe('VolunteersController', () => {
 
   describe('updateVolunteerById', () => {
     it('should update and return the volunteer when found', async () => {
-      const dto = { volunteerId: 1, notes: 'updated notes' };
+      const dto = { notes: 'updated notes' } as UpdateVolunteerDto;
       const updatedVolunteer = { ...mockVolunteer, ...dto } as FosterVolunteer;
       mockVolunteersService.updateVolunteerById.mockResolvedValue(
         updatedVolunteer,
@@ -89,28 +90,21 @@ describe('VolunteersController', () => {
       );
 
       await expect(
-        controller.updateVolunteerById(999, { volunteerId: 999, notes: 'x' }),
+        controller.updateVolunteerById(999, { notes: 'x' }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException when id is invalid', async () => {
       await expect(
-        controller.updateVolunteerById(0, { volunteerId: 0, notes: 'x' }),
+        controller.updateVolunteerById(0, { notes: 'x' }),
       ).rejects.toThrow(BadRequestException);
       expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException when path and body ids do not match', async () => {
-      await expect(
-        controller.updateVolunteerById(1, { volunteerId: 2, notes: 'x' }),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException when no fields besides volunteerId are provided', async () => {
-      await expect(
-        controller.updateVolunteerById(1, { volunteerId: 1 }),
-      ).rejects.toThrow(BadRequestException);
+    it('should throw BadRequestException when no fields are provided', async () => {
+      await expect(controller.updateVolunteerById(1, {})).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
   });
