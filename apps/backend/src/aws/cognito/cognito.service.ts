@@ -1,11 +1,54 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { Request } from 'express';
-import { AccessTokenPayload } from './cognito.types';
-import { isAuthDisabled } from './cognito.config';
+import {
+  CognitoIdentityProviderClient,
+  AdminCreateUserCommand,
+  AdminAddUserToGroupCommand,
+  AdminRemoveUserFromGroupCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
+
+import { AccessTokenPayload, CognitoConfig } from './cognito.types';
+import { getCognitoConfig, isAuthDisabled } from './cognito.config';
+import { CreateCognitoUserDto } from './dtos/create-cognito-user.dto';
 
 @Injectable()
 export class CognitoService {
   private readonly logger = new Logger(CognitoService.name);
+  private providerClient: CognitoIdentityProviderClient | null = null;
+
+  /**
+   * Lazily initializes and returns the Cognito admin client.
+   * Only available when auth is enabled (Cognito is configured).
+   */
+  private getProviderClient(): CognitoIdentityProviderClient {
+    if (this.providerClient) return this.providerClient;
+
+    const config = this.requireConfig();
+    this.providerClient = new CognitoIdentityProviderClient({
+      region: config.region,
+    });
+    return this.providerClient;
+  }
+
+  /**
+   * Returns the resolved Cognito config or throws if auth is disabled.
+   */
+  private requireConfig(): CognitoConfig {
+    const config = getCognitoConfig();
+    if (!config) {
+      throw new InternalServerErrorException(
+        'Cognito user management is unavailable: authentication is disabled.',
+      );
+    }
+    return config;
+  }
 
   /**
    * Retrieves the authenticated user's verified access token payload from the request.
@@ -43,5 +86,136 @@ export class CognitoService {
       return null;
     }
     return authenticatedRequest.user;
+  }
+
+  /**
+   * Creates a user in the Cognito user pool and assigns them to a group (role).
+   * Cognito sends a temporary-password email to the user automatically.
+   *
+   * @returns The Cognito `sub` (unique user ID) for the newly created user.
+   */
+  async createUser({
+    firstName,
+    lastName,
+    email,
+    role,
+  }: CreateCognitoUserDto): Promise<string> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminCreateUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+      UserAttributes: [
+        { Name: 'name', Value: `${firstName} ${lastName}` },
+        { Name: 'email', Value: email },
+        { Name: 'email_verified', Value: 'true' },
+      ],
+      DesiredDeliveryMediums: ['EMAIL'],
+    });
+
+    try {
+      const response = await client.send(command);
+      const sub = response.User?.Attributes?.find(
+        (attr) => attr.Name === 'sub',
+      )?.Value;
+
+      await this.addUserToGroup(email, role);
+
+      return sub ?? '';
+    } catch (error) {
+      if (error instanceof Error && error.name === 'UsernameExistsException') {
+        throw new ConflictException('A user with this email already exists');
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to create user: ${reason}`,
+      );
+    }
+  }
+
+  async addUserToGroup(username: string, groupName: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminAddUserToGroupCommand({
+      UserPoolId: config.userPoolId,
+      Username: username,
+      GroupName: groupName,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      this.logger.error(
+        `Failed to add user ${username} to group ${groupName}`,
+        error,
+      );
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to add user to group ${groupName}: ${reason}`,
+      );
+    }
+  }
+
+  async removeUserFromGroup(
+    username: string,
+    groupName: string,
+  ): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminRemoveUserFromGroupCommand({
+      UserPoolId: config.userPoolId,
+      Username: username,
+      GroupName: groupName,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to remove user from group ${groupName}: ${reason}`,
+      );
+    }
+  }
+
+  async disableUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminDisableUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to disable user: ${reason}`,
+      );
+    }
+  }
+
+  async enableUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminEnableUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to enable user: ${reason}`,
+      );
+    }
   }
 }
