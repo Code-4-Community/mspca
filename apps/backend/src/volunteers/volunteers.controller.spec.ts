@@ -102,9 +102,9 @@ describe('VolunteersController', () => {
     });
 
     it('should throw BadRequestException when no fields are provided', async () => {
-      await expect(controller.updateVolunteerById(1, {})).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.updateVolunteerById(1, {} as UpdateVolunteerDto),
+      ).rejects.toThrow(BadRequestException);
       expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
   });

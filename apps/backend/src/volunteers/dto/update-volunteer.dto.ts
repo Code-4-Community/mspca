@@ -3,9 +3,7 @@ import { FosterType } from '../volunteers.types';
 import {
   IsOptional,
   IsString,
-  IsNumber,
   IsEnum,
-  IsPositive,
   IsNotEmpty,
   MaxLength,
   IsPhoneNumber,
