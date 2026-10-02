@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 
 @Injectable()
 export class VolunteersService {
@@ -10,20 +11,23 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
-  // Example service functions
-  // find(email: string) {
-  //   return this.repo.find({ where: { email } });
-  // }
+  async getVolunteerById(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with id ${id} not found`);
+    }
+    return volunteer;
+  }
 
-  // async update(id: number, attrs: Partial<User>) {
-  //   const user = await this.findOne(id);
-
-  //   if (!user) {
-  //     throw new NotFoundException('User not found');
-  //   }
-
-  //   Object.assign(user, attrs);
-
-  //   return this.repo.save(user);
-  // }
+  async updateVolunteerById(
+    id: number,
+    dto: UpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with id ${id} not found`);
+    }
+    Object.assign(volunteer, dto);
+    return this.repo.save(volunteer);
+  }
 }
