@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
@@ -44,6 +44,36 @@ describe('VolunteersService', () => {
 
       await expect(service.findByIdOrFail(7)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 7 not found'),
+      );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+  });
+
+  describe('findActiveOrFail', () => {
+    it('returns the volunteer when they are active', async () => {
+      const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
+      repo.findOneBy.mockResolvedValue(volunteer);
+
+      const result = await service.findActiveOrFail(7);
+
+      expect(result).toBe(volunteer);
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 7 not found'),
+      );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+
+    it('throws BadRequestException when the volunteer is not active', async () => {
+      repo.findOneBy.mockResolvedValue({ volunteerId: 7, active: false });
+
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 7 is not active'),
       );
       expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
