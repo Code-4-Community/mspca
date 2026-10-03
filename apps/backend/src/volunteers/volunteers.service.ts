@@ -10,6 +10,15 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
+  /**
+   * Fetches a Volunteer by ID.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOneBy({ volunteerId: id });
 
