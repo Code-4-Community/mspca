@@ -68,6 +68,9 @@ export class FosterVolunteer {
   @Column({ type: 'enum', enum: VolunteerStatus })
   status!: VolunteerStatus;
 
+  @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
+  cognitoSub!: string;
+
   @ManyToOne(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,

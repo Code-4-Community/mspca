@@ -1,10 +1,12 @@
 import {
+  Body,
   Controller,
   Get,
   HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
+  Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
@@ -12,6 +14,8 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { FosterVolunteer } from './volunteers.entity';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
 // @ApiBearerAuth()
@@ -21,6 +25,27 @@ export class VolunteersController {
     private volunteersService: VolunteersService,
     private matchesService: MatchesService,
   ) {}
+
+  // Public: volunteers sign up before they have an account to authenticate with.
+  @Public()
+  @Post()
+  @ApiOperation({ summary: 'Create a foster volunteer account' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The volunteer was created and is pending approval',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'A required field is missing or invalid',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'A volunteer with this email already exists',
+  })
+  async create(@Body() dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+    return this.volunteersService.create(dto);
+  }
 
   @Get('/:volunteerId/matches')
   @ApiOperation({ summary: 'Get all Matches for a Volunteer' })
