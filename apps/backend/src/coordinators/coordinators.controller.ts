@@ -21,7 +21,7 @@ export class CoordinatorsController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterCoordinator> {
     validateId(id, 'Coordinator');
-    return this.coordinatorsService.setActive(id, false);
+    return this.coordinatorsService.deactivate(id);
   }
 
   @ApiOperation({ summary: 'Activate a foster coordinator' })
@@ -36,6 +36,6 @@ export class CoordinatorsController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterCoordinator> {
     validateId(id, 'Coordinator');
-    return this.coordinatorsService.setActive(id, true);
+    return this.coordinatorsService.activate(id);
   }
 }

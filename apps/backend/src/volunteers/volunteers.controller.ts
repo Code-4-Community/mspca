@@ -3,7 +3,6 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
 import { validateId } from '../utils/validation.utils';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -22,7 +21,7 @@ export class VolunteersController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
-    return this.volunteersService.setStatus(id, VolunteerStatus.INACTIVE);
+    return this.volunteersService.deactivate(id);
   }
 
   @ApiOperation({ summary: 'Activate a foster volunteer' })
@@ -37,6 +36,6 @@ export class VolunteersController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
-    return this.volunteersService.setStatus(id, VolunteerStatus.ACTIVE);
+    return this.volunteersService.activate(id);
   }
 }

@@ -11,17 +11,26 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
-  async setStatus(
-    id: number,
-    status: VolunteerStatus,
-  ): Promise<FosterVolunteer> {
+  async deactivate(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
 
     if (!volunteer) {
       throw new NotFoundException(`Volunteer with ID ${id} not found`);
     }
 
-    volunteer.status = status;
+    volunteer.status = VolunteerStatus.INACTIVE;
+
+    return this.repo.save(volunteer);
+  }
+
+  async activate(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    volunteer.status = VolunteerStatus.ACTIVE;
 
     return this.repo.save(volunteer);
   }
