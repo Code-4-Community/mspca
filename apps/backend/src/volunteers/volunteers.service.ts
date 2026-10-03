@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
+import { VolunteerStatus } from './volunteers.types';
 
 @Injectable()
 export class VolunteersService {
@@ -10,20 +11,27 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
-  // Example service functions
-  // find(email: string) {
-  //   return this.repo.find({ where: { email } });
-  // }
+  async deactivate(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
 
-  // async update(id: number, attrs: Partial<User>) {
-  //   const user = await this.findOne(id);
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
 
-  //   if (!user) {
-  //     throw new NotFoundException('User not found');
-  //   }
+    volunteer.status = VolunteerStatus.INACTIVE;
 
-  //   Object.assign(user, attrs);
+    return this.repo.save(volunteer);
+  }
 
-  //   return this.repo.save(user);
-  // }
+  async activate(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    volunteer.status = VolunteerStatus.ACTIVE;
+
+    return this.repo.save(volunteer);
+  }
 }
