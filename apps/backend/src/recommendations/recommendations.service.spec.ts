@@ -46,11 +46,19 @@ describe('RecommendationsService', () => {
       );
     });
 
-    it('defaults new recommendations to active', async () => {
-      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
+    it('reactivates an inactive recommendation for the same pair', async () => {
+      // The existing (7, 42) row is inactive. Upserting on the composite key
+      // overwrites it with isActive: true rather than inserting a duplicate.
+      const result = await service.create({
+        volunteerId: 7,
+        chameleonAnimalId: 42,
+      });
 
-      const [values] = repo.upsert.mock.calls[0];
-      expect(values.isActive).toBe(true);
+      expect(repo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true }),
+        ['volunteerId', 'chameleonAnimalId'],
+      );
+      expect(result.isActive).toBe(true);
     });
 
     it('returns the persisted recommendation', async () => {

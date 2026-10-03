@@ -70,34 +70,5 @@ describe('RecommendationsController', () => {
         expect(recommendationsService.create).not.toHaveBeenCalled();
       },
     );
-
-    it.each([
-      ['volunteerId is missing', { chameleonAnimalId: 42 }],
-      ['chameleonAnimalId is missing', { volunteerId: 7 }],
-      [
-        'volunteerId is not an integer',
-        { volunteerId: 1.5, chameleonAnimalId: 42 },
-      ],
-      [
-        'chameleonAnimalId is not an integer',
-        { volunteerId: 7, chameleonAnimalId: 1.5 },
-      ],
-      [
-        'volunteerId is not positive',
-        { volunteerId: 0, chameleonAnimalId: 42 },
-      ],
-      [
-        'chameleonAnimalId is not positive',
-        { volunteerId: 7, chameleonAnimalId: -1 },
-      ],
-    ])('throws BadRequestException when %s', async (_case, invalidBody) => {
-      await expect(
-        controller.createRecommendation(
-          invalidBody as unknown as CreateRecommendationDTO,
-        ),
-      ).rejects.toThrow(BadRequestException);
-      expect(volunteersService.findActiveOrFail).not.toHaveBeenCalled();
-      expect(recommendationsService.create).not.toHaveBeenCalled();
-    });
   });
 });

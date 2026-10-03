@@ -11,6 +11,19 @@ export class RecommendationsService {
     private repo: Repository<Recommendation>,
   ) {}
 
+  /**
+   * Recommends a Chameleon Animal to a Volunteer.
+   *
+   * (volunteerId, chameleonAnimalId) is the primary key, so recommending the
+   * same animal again reactivates the existing row instead of duplicating it.
+   * This upserts rather than save()-ing so that two concurrent requests for
+   * the same pair can't race into a primary key violation. Does not check
+   * that the Volunteer exists or is active; callers are expected to.
+   *
+   * @param dto - The Volunteer and Chameleon Animal IDs to link.
+   * @returns The active recommendation as persisted.
+   * @throws {EntityNotFoundError} If the row can't be read back after the upsert.
+   */
   async create({
     volunteerId,
     chameleonAnimalId,

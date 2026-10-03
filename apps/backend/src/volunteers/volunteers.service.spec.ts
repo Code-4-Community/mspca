@@ -45,6 +45,7 @@ describe('VolunteersService', () => {
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
         NotFoundException,
       );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
 
     it('throws BadRequestException when the volunteer is not active', async () => {
@@ -53,6 +54,7 @@ describe('VolunteersService', () => {
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
         BadRequestException,
       );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
   });
 });
