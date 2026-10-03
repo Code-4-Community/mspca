@@ -28,6 +28,27 @@ describe('VolunteersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('findByIdOrFail', () => {
+    it('returns the volunteer when one with the id exists', async () => {
+      const volunteer = { volunteerId: 7 } as FosterVolunteer;
+      repo.findOneBy.mockResolvedValue(volunteer);
+
+      const result = await service.findByIdOrFail(7);
+
+      expect(result).toBe(volunteer);
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+
+      await expect(service.findByIdOrFail(7)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 7 not found'),
+      );
+      expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+  });
+
   describe('findActiveOrFail', () => {
     it('returns the volunteer when they are active', async () => {
       const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
@@ -43,7 +64,7 @@ describe('VolunteersService', () => {
       repo.findOneBy.mockResolvedValue(null);
 
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
-        NotFoundException,
+        new NotFoundException('Volunteer with ID 7 not found'),
       );
       expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });
@@ -52,7 +73,7 @@ describe('VolunteersService', () => {
       repo.findOneBy.mockResolvedValue({ volunteerId: 7, active: false });
 
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
-        BadRequestException,
+        new BadRequestException('Volunteer with ID 7 is not active'),
       );
       expect(repo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
     });

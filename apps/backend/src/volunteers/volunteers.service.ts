@@ -15,6 +15,25 @@ export class VolunteersService {
   ) {}
 
   /**
+   * Fetches a Volunteer by ID.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async findByIdOrFail(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    return volunteer;
+  }
+
+  /**
    * Fetches a Volunteer by ID, requiring that they are active.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
@@ -25,11 +44,7 @@ export class VolunteersService {
    * @throws {BadRequestException} If the Volunteer is not active.
    */
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
-
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with ID ${id} not found`);
-    }
+    const volunteer = await this.findByIdOrFail(id);
 
     if (!volunteer.active) {
       throw new BadRequestException(`Volunteer with ID ${id} is not active`);
