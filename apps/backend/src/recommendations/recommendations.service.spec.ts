@@ -47,8 +47,6 @@ describe('RecommendationsService', () => {
     });
 
     it('reactivates an inactive recommendation for the same pair', async () => {
-      // The existing (7, 42) row is inactive. Upserting on the composite key
-      // overwrites it with isActive: true rather than inserting a duplicate.
       const result = await service.create({
         volunteerId: 7,
         chameleonAnimalId: 42,
