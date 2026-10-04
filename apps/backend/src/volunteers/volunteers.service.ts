@@ -11,8 +11,6 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
-  async deactivate(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
   /**
    * Fetches a Volunteer by ID.
    *
@@ -29,21 +27,22 @@ export class VolunteersService {
       throw new NotFoundException(`Volunteer with ID ${id} not found`);
     }
 
+    return volunteer;
+  }
+
+  async deactivate(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
     volunteer.status = VolunteerStatus.INACTIVE;
 
     return this.repo.save(volunteer);
   }
 
   async activate(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
-
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with ID ${id} not found`);
-    }
+    const volunteer = await this.findByIdOrFail(id);
 
     volunteer.status = VolunteerStatus.ACTIVE;
 
     return this.repo.save(volunteer);
-    return volunteer;
   }
 }

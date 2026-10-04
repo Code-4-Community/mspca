@@ -65,7 +65,11 @@ export class FosterVolunteer {
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
 
-  @Column({ type: 'enum', enum: VolunteerStatus })
+  @Column({
+    type: 'enum',
+    enum: VolunteerStatus,
+    default: VolunteerStatus.PENDING,
+  })
   status!: VolunteerStatus;
 
   @ManyToOne(
