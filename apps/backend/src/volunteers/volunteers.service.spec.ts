@@ -40,6 +40,27 @@ describe('VolunteersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('findByIdOrFail', () => {
+    it('returns the volunteer when one with the id exists', async () => {
+      const volunteer = { volunteerId: 7 } as FosterVolunteer;
+      mockRepo.findOneBy.mockResolvedValue(volunteer);
+
+      const result = await service.findByIdOrFail(7);
+
+      expect(result).toBe(volunteer);
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      mockRepo.findOneBy.mockResolvedValue(null);
+
+      await expect(service.findByIdOrFail(7)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 7 not found'),
+      );
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+    });
+  });
+
   describe('getVolunteerById', () => {
     it('should return a volunteer when found', async () => {
       mockRepo.findOneBy.mockResolvedValue(mockVolunteer);

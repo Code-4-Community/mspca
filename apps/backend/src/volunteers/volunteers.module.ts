@@ -3,10 +3,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
-import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { CoordinatorsModule } from '../coordinators/coordinators.module';
+import { MatchesModule } from '../matches/matches.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([FosterVolunteer, FosterCoordinator])],
+  imports: [
+    TypeOrmModule.forFeature([FosterVolunteer]),
+    CoordinatorsModule,
+    MatchesModule,
+  ],
   controllers: [VolunteersController],
   providers: [VolunteersService],
   exports: [VolunteersService],
