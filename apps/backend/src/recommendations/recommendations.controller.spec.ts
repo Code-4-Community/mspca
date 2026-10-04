@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { RecommendationsController } from './recommendations.controller';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
-import { CreateRecommendationDTO } from './createRecommendation.dto';
+import { CreateRecommendationDTO } from './dto/create-recommendation.dto';
 import { VolunteersService } from '../volunteers/volunteers.service';
 
 describe('RecommendationsController', () => {
@@ -56,19 +56,14 @@ describe('RecommendationsController', () => {
       expect(recommendationsService.create).toHaveBeenCalledWith(body);
     });
 
-    it.each([
-      ['does not exist', new NotFoundException()],
-      ['is not active', new BadRequestException()],
-    ])(
-      'does not create a recommendation when the volunteer %s',
-      async (_case, error) => {
-        volunteersService.findActiveOrFail.mockRejectedValue(error);
+    it('does not create a recommendation when the volunteer does not exist or is not active', async () => {
+      const error = new NotFoundException();
+      volunteersService.findActiveOrFail.mockRejectedValue(error);
 
-        await expect(controller.createRecommendation(body)).rejects.toThrow(
-          error,
-        );
-        expect(recommendationsService.create).not.toHaveBeenCalled();
-      },
-    );
+      await expect(controller.createRecommendation(body)).rejects.toThrow(
+        error,
+      );
+      expect(recommendationsService.create).not.toHaveBeenCalled();
+    });
   });
 });

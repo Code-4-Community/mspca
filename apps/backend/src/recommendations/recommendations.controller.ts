@@ -2,7 +2,7 @@ import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
-import { CreateRecommendationDTO } from './createRecommendation.dto';
+import { CreateRecommendationDTO } from './dto/create-recommendation.dto';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { validateId } from '../utils/validation.utils';
 
