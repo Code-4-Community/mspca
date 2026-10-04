@@ -11,6 +11,13 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
   ) {}
 
+  /**
+   * Gets a single foster volunteer by ID.
+   * Looks up the volunteer in the database and throws if no volunteer has that ID.
+   * @param id - ID of the volunteer to get
+   * @returns The volunteer with the given ID
+   * @throws NotFoundException if no volunteer exists with the given ID
+   */
   async getVolunteerById(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOneBy({ volunteerId: id });
     if (!volunteer) {
@@ -19,6 +26,14 @@ export class VolunteersService {
     return volunteer;
   }
 
+  /**
+   * Updates a foster volunteer by ID.
+   * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * @param id - ID of the volunteer to update
+   * @param dto - The fields to update
+   * @returns The updated volunteer
+   * @throws NotFoundException if no volunteer exists with the given ID
+   */
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
