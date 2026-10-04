@@ -1,3 +1,10 @@
+// Cognito user pool group names that map to application roles.
+export enum CognitoRole {
+  FosterVolunteer = 'FosterVolunteer',
+  FosterCoordinator = 'FosterCoordinator',
+  Admin = 'Admin',
+}
+
 // Resolved Cognito configuration derived from environment variables.
 export interface CognitoConfig {
   region: string; // AWS region (ex: us-east-1)
