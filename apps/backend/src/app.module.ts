@@ -5,6 +5,7 @@ import typeorm from './config/typeorm';
 import { CognitoModule } from './aws/cognito/cognito.module';
 import { MatchesModule } from './matches/matches.module';
 import { CoordinatorsModule } from './coordinators/coordinators.module';
+import { VolunteersModule } from './volunteers/volunteers.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CoordinatorsModule } from './coordinators/coordinators.module';
     CognitoModule,
     MatchesModule,
     CoordinatorsModule,
+    VolunteersModule,
   ],
 })
 export class AppModule {}

@@ -34,6 +34,7 @@ describe('MatchesService', () => {
     create: jest.Mock;
     save: jest.Mock;
     findOneBy: jest.Mock;
+    find: jest.Mock;
   };
   let volunteerRepo: { findOne: jest.Mock };
   let emailsService: { sendEmail: jest.Mock };
@@ -50,11 +51,29 @@ describe('MatchesService', () => {
     );
   };
 
+  const matches = [
+    {
+      matchId: 1,
+      volunteerId: 7,
+      chameleonAnimalId: 42,
+      status: MatchStatus.PENDING,
+      deniedReason: null,
+    },
+    {
+      matchId: 2,
+      volunteerId: 7,
+      chameleonAnimalId: 43,
+      status: MatchStatus.DENIED,
+      deniedReason: 'Resident dog is not cat-friendly',
+    },
+  ] as Match[];
+
   beforeEach(async () => {
     matchRepo = {
       create: jest.fn(),
       save: jest.fn(),
       findOneBy: jest.fn(),
+      find: jest.fn(),
     };
     volunteerRepo = { findOne: jest.fn() };
     emailsService = { sendEmail: jest.fn() };
@@ -226,6 +245,28 @@ describe('MatchesService', () => {
 
       await expect(service.withdraw(10)).rejects.toThrow(BadRequestException);
       expect(matchRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findByVolunteerId', () => {
+    it('returns the matches for the volunteer', async () => {
+      matchRepo.find.mockResolvedValue(matches);
+
+      const result = await service.findByVolunteerId(7);
+
+      expect(result).toBe(matches);
+      expect(matchRepo.find).toHaveBeenCalledWith({
+        where: { volunteerId: 7 },
+      });
+    });
+
+    it('returns an empty array when the volunteer has no matches', async () => {
+      matchRepo.find.mockResolvedValue([]);
+
+      await expect(service.findByVolunteerId(7)).resolves.toEqual([]);
+      expect(matchRepo.find).toHaveBeenCalledWith({
+        where: { volunteerId: 7 },
+      });
     });
   });
 });
