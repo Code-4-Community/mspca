@@ -55,14 +55,14 @@ export class VolunteersController {
     description: 'ID of the volunteer',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The volunteer was found',
     type: FosterVolunteer,
   })
   async getVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<FosterVolunteer> {
-    validateId(volunteerId, 'FosterVolunteer');
+    validateId(volunteerId, 'Volunteer');
     return this.volunteersService.getVolunteerById(volunteerId);
   }
 
@@ -74,7 +74,7 @@ export class VolunteersController {
     description: 'ID of the volunteer',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The volunteer was updated',
     type: FosterVolunteer,
   })
@@ -82,7 +82,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
-    validateId(volunteerId, 'FosterVolunteer');
+    validateId(volunteerId, 'Volunteer');
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
     }

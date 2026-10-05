@@ -18,17 +18,21 @@ describe('VolunteersController', () => {
     notes: 'likes cats',
   } as FosterVolunteer;
 
-  const mockVolunteersService = {
-    findByIdOrFail: jest.fn(),
-    getVolunteerById: jest.fn(),
-    updateVolunteerById: jest.fn(),
+  let mockVolunteersService: {
+    findByIdOrFail: jest.Mock;
+    getVolunteerById: jest.Mock;
+    updateVolunteerById: jest.Mock;
   };
-
-  const mockMatchesService = {
-    findByVolunteerId: jest.fn(),
-  };
+  let mockMatchesService: { findByVolunteerId: jest.Mock };
 
   beforeEach(async () => {
+    mockVolunteersService = {
+      findByIdOrFail: jest.fn(),
+      getVolunteerById: jest.fn(),
+      updateVolunteerById: jest.fn(),
+    };
+    mockMatchesService = { findByVolunteerId: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
@@ -38,10 +42,6 @@ describe('VolunteersController', () => {
     }).compile();
 
     controller = module.get<VolunteersController>(VolunteersController);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 
   it('should be defined', () => {

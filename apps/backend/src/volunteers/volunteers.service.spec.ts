@@ -16,12 +16,11 @@ describe('VolunteersService', () => {
     assignedCoordinator: null,
   } as FosterVolunteer;
 
-  const mockRepo = {
-    findOneBy: jest.fn(),
-    save: jest.fn(),
-  };
+  let mockRepo: { findOneBy: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
+    mockRepo = { findOneBy: jest.fn(), save: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VolunteersService,
@@ -30,10 +29,6 @@ describe('VolunteersService', () => {
     }).compile();
 
     service = module.get<VolunteersService>(VolunteersService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
