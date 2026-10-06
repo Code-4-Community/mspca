@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -23,7 +24,7 @@ export class VolunteersService {
   ) {}
 
   /**
-   * Fetches a Volunteer by ID.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -32,7 +33,10 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinator'],
+    });
 
     if (!volunteer) {
       throw new NotFoundException(`Volunteer with ID ${id} not found`);
@@ -83,11 +87,19 @@ export class VolunteersService {
     }
   }
 
+  /**
+   * Deactivates a currently Active Volunteer.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The updated Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not currently Active.
+   */
   async deactivate(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
+    const volunteer = await this.findByIdOrFail(id);
 
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
     }
 
     volunteer.status = VolunteerStatus.INACTIVE;
@@ -95,15 +107,46 @@ export class VolunteersService {
     return this.repo.save(volunteer);
   }
 
-  async activate(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOne({ where: { volunteerId: id } });
+  /**
+   * Reactivates a currently Inactive Volunteer.
+   *
+   * Does not apply to Pending Volunteers; those are moved to Active through
+   * the approval flow instead.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The updated Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not currently Inactive.
+   */
+  async reactivate(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
 
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    if (volunteer.status !== VolunteerStatus.INACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not inactive`);
     }
 
     volunteer.status = VolunteerStatus.ACTIVE;
 
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Fetches a Volunteer by ID, requiring that they are active.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The active Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not active.
+   */
+  async findActiveOrFail(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
+    }
+
+    return volunteer;
   }
 }

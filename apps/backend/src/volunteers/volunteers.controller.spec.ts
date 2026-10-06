@@ -17,7 +17,7 @@ describe('VolunteersController', () => {
     create: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
-    activate: jest.Mock;
+    reactivate: jest.Mock;
   };
   let matchesService: { findByVolunteerId: jest.Mock };
 
@@ -26,21 +26,15 @@ describe('VolunteersController', () => {
       create: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
-      activate: jest.fn(),
+      reactivate: jest.fn(),
     };
     matchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
-        {
-          provide: VolunteersService,
-          useValue: volunteersService,
-        },
-        {
-          provide: MatchesService,
-          useValue: matchesService,
-        },
+        { provide: VolunteersService, useValue: volunteersService },
+        { provide: MatchesService, useValue: matchesService },
       ],
     }).compile();
 
@@ -152,7 +146,7 @@ describe('VolunteersController', () => {
       expect(result).toEqual(volunteer);
     });
 
-    it('propagates NotFoundException thrown by the service', async () => {
+    it('propagates errors thrown by the service', async () => {
       volunteersService.deactivate.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
@@ -163,26 +157,26 @@ describe('VolunteersController', () => {
     });
   });
 
-  describe('activate', () => {
-    it('should call service.activate with the parsed id', async () => {
+  describe('reactivate', () => {
+    it('should call service.reactivate with the parsed id', async () => {
       const volunteer = {
         volunteerId: 1,
         status: VolunteerStatus.ACTIVE,
       } as FosterVolunteer;
-      volunteersService.activate.mockResolvedValue(volunteer);
+      volunteersService.reactivate.mockResolvedValue(volunteer);
 
-      const result = await controller.activate(1);
+      const result = await controller.reactivate(1);
 
-      expect(volunteersService.activate).toHaveBeenCalledWith(1);
+      expect(volunteersService.reactivate).toHaveBeenCalledWith(1);
       expect(result).toEqual(volunteer);
     });
 
-    it('propagates NotFoundException thrown by the service', async () => {
-      volunteersService.activate.mockRejectedValue(
+    it('propagates errors thrown by the service', async () => {
+      volunteersService.reactivate.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
 
-      await expect(controller.activate(999)).rejects.toThrow(
+      await expect(controller.reactivate(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
     });

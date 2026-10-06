@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterCoordinator } from './coordinators.entity';
@@ -10,7 +14,14 @@ export class CoordinatorsService {
     private repo: Repository<FosterCoordinator>,
   ) {}
 
-  async deactivate(id: number): Promise<FosterCoordinator> {
+  /**
+   * Fetches a Coordinator by ID.
+   *
+   * @param id - The Coordinator's ID.
+   * @returns The Coordinator.
+   * @throws {NotFoundException} If no Coordinator with the ID exists.
+   */
+  async findByIdOrFail(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.repo.findOne({
       where: { coordinatorId: id },
     });
@@ -19,18 +30,46 @@ export class CoordinatorsService {
       throw new NotFoundException(`Coordinator with ID ${id} not found`);
     }
 
+    return coordinator;
+  }
+
+  /**
+   * Deactivates a Coordinator.
+   *
+   * @param id - The Coordinator's ID.
+   * @returns The updated Coordinator.
+   * @throws {NotFoundException} If no Coordinator with the ID exists.
+   * @throws {BadRequestException} If the Coordinator is already inactive.
+   */
+  async deactivate(id: number): Promise<FosterCoordinator> {
+    const coordinator = await this.findByIdOrFail(id);
+
+    if (!coordinator.active) {
+      throw new BadRequestException(
+        `Coordinator with ID ${id} is already inactive`,
+      );
+    }
+
     coordinator.active = false;
 
     return this.repo.save(coordinator);
   }
 
+  /**
+   * Activates a Coordinator.
+   *
+   * @param id - The Coordinator's ID.
+   * @returns The updated Coordinator.
+   * @throws {NotFoundException} If no Coordinator with the ID exists.
+   * @throws {BadRequestException} If the Coordinator is already active.
+   */
   async activate(id: number): Promise<FosterCoordinator> {
-    const coordinator = await this.repo.findOne({
-      where: { coordinatorId: id },
-    });
+    const coordinator = await this.findByIdOrFail(id);
 
-    if (!coordinator) {
-      throw new NotFoundException(`Coordinator with ID ${id} not found`);
+    if (coordinator.active) {
+      throw new BadRequestException(
+        `Coordinator with ID ${id} is already active`,
+      );
     }
 
     coordinator.active = true;

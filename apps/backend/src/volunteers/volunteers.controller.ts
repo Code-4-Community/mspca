@@ -18,7 +18,6 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
-// @ApiBearerAuth()
 @Controller('volunteers')
 export class VolunteersController {
   constructor(
@@ -69,10 +68,10 @@ export class VolunteersController {
     return this.matchesService.findByVolunteerId(volunteerId);
   }
 
-  @ApiOperation({ summary: 'Deactivate a foster volunteer' })
+  @ApiOperation({ summary: 'Deactivate an active foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The volunteer was deactivated',
     type: FosterVolunteer,
   })
@@ -84,18 +83,18 @@ export class VolunteersController {
     return this.volunteersService.deactivate(id);
   }
 
-  @ApiOperation({ summary: 'Activate a foster volunteer' })
+  @ApiOperation({ summary: 'Reactivate an inactive foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
-    status: 200,
-    description: 'The volunteer was activated',
+    status: HttpStatus.OK,
+    description: 'The volunteer was reactivated',
     type: FosterVolunteer,
   })
-  @Patch('/:id/activate')
-  async activate(
+  @Patch('/:id/reactivate')
+  async reactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
-    return this.volunteersService.activate(id);
+    return this.volunteersService.reactivate(id);
   }
 }
