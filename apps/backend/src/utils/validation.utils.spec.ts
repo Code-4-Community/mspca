@@ -17,7 +17,7 @@ describe('validateId', () => {
 
 describe('checkVolunteerActive', () => {
   const makeVolunteer = (status: VolunteerStatus) =>
-    ({ volunteerId: 1, status }) as FosterVolunteer;
+    ({ volunteerId: 1, status } as FosterVolunteer);
 
   it('should not throw an error for an active volunteer', () => {
     expect(() =>
