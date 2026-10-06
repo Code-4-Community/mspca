@@ -15,7 +15,7 @@ export class VolunteersService {
   ) {}
 
   /**
-   * Fetches a Volunteer by ID.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -24,7 +24,10 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinator'],
+    });
 
     if (!volunteer) {
       throw new NotFoundException(`Volunteer with ID ${id} not found`);

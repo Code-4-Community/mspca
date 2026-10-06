@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import typeorm from './config/typeorm';
 import { CognitoModule } from './aws/cognito/cognito.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { MatchesModule } from './matches/matches.module';
+import { CoordinatorsModule } from './coordinators/coordinators.module';
 import { VolunteersModule } from './volunteers/volunteers.module';
 
 @Module({
@@ -19,6 +21,8 @@ import { VolunteersModule } from './volunteers/volunteers.module';
     }),
     CognitoModule,
     RecommendationsModule,
+    MatchesModule,
+    CoordinatorsModule,
     VolunteersModule,
   ],
 })
