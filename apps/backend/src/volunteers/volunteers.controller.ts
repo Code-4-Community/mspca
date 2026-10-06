@@ -4,15 +4,16 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
+import { FosterVolunteer } from './volunteers.entity';
 
 @ApiTags('Volunteers')
-// @ApiBearerAuth()
 @Controller('volunteers')
 export class VolunteersController {
   constructor(
@@ -40,5 +41,62 @@ export class VolunteersController {
     await this.volunteersService.findByIdOrFail(volunteerId);
 
     return this.matchesService.findByVolunteerId(volunteerId);
+  }
+
+  @ApiOperation({ summary: 'Deactivate a foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was deactivated',
+    type: FosterVolunteer,
+  })
+  @Patch('/:id/deactivate')
+  async deactivate(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.deactivate(id);
+  }
+
+  @ApiOperation({ summary: 'Activate a foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was activated',
+    type: FosterVolunteer,
+  })
+  @Patch('/:id/activate')
+  async activate(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.activate(id);
+  }
+
+  @ApiOperation({ summary: 'Approve a pending foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was approved and emailed',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID, or the volunteer is not pending',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'The volunteer is already active',
+  })
+  @Patch('/:id/approve')
+  async approve(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.approve(id);
   }
 }

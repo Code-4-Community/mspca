@@ -1,31 +1,41 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
+import { FosterVolunteer } from './volunteers.entity';
+import { VolunteerStatus } from './volunteers.types';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let volunteersService: { findByIdOrFail: jest.Mock };
+  let volunteersService: {
+    findByIdOrFail: jest.Mock;
+    deactivate: jest.Mock;
+    activate: jest.Mock;
+    approve: jest.Mock;
+  };
   let matchesService: { findByVolunteerId: jest.Mock };
 
   beforeEach(async () => {
-    volunteersService = { findByIdOrFail: jest.fn() };
+    volunteersService = {
+      findByIdOrFail: jest.fn(),
+      deactivate: jest.fn(),
+      activate: jest.fn(),
+      approve: jest.fn(),
+    };
     matchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
-        {
-          provide: VolunteersService,
-          useValue: volunteersService,
-        },
-        {
-          provide: MatchesService,
-          useValue: matchesService,
-        },
+        { provide: VolunteersService, useValue: volunteersService },
+        { provide: MatchesService, useValue: matchesService },
       ],
     }).compile();
 
@@ -73,6 +83,98 @@ describe('VolunteersController', () => {
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(matchesService.findByVolunteerId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deactivate', () => {
+    it('should call service.deactivate with the parsed id', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.INACTIVE,
+      } as FosterVolunteer;
+      volunteersService.deactivate.mockResolvedValue(volunteer);
+
+      const result = await controller.deactivate(1);
+
+      expect(volunteersService.deactivate).toHaveBeenCalledWith(1);
+      expect(result).toEqual(volunteer);
+    });
+
+    it('propagates NotFoundException thrown by the service', async () => {
+      volunteersService.deactivate.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(controller.deactivate(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+  });
+
+  describe('activate', () => {
+    it('should call service.activate with the parsed id', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
+      volunteersService.activate.mockResolvedValue(volunteer);
+
+      const result = await controller.activate(1);
+
+      expect(volunteersService.activate).toHaveBeenCalledWith(1);
+      expect(result).toEqual(volunteer);
+    });
+
+    it('propagates NotFoundException thrown by the service', async () => {
+      volunteersService.activate.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(controller.activate(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+  });
+
+  describe('approve', () => {
+    it('should call service.approve with the parsed id', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
+      volunteersService.approve.mockResolvedValue(volunteer);
+
+      const result = await controller.approve(1);
+
+      expect(volunteersService.approve).toHaveBeenCalledWith(1);
+      expect(result).toEqual(volunteer);
+    });
+
+    it('throws BadRequestException for an invalid id without calling the service', async () => {
+      await expect(controller.approve(0)).rejects.toThrow(
+        new BadRequestException('Invalid Volunteer ID'),
+      );
+      expect(volunteersService.approve).not.toHaveBeenCalled();
+    });
+
+    it('propagates NotFoundException thrown by the service', async () => {
+      volunteersService.approve.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(controller.approve(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+
+    it('propagates ConflictException thrown by the service', async () => {
+      volunteersService.approve.mockRejectedValue(
+        new ConflictException('Volunteer with ID 1 is already active'),
+      );
+
+      await expect(controller.approve(1)).rejects.toThrow(
+        new ConflictException('Volunteer with ID 1 is already active'),
+      );
     });
   });
 });
