@@ -4,10 +4,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
+import { EmailsService } from '../aws/ses/email.service';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
   let repo: { findOneBy: jest.Mock; save: jest.Mock; delete: jest.Mock };
+  let emailsService: { sendEmail: jest.Mock };
 
   beforeEach(async () => {
     repo = {
@@ -15,6 +17,7 @@ describe('VolunteersService', () => {
       save: jest.fn(),
       delete: jest.fn(),
     };
+    emailsService = { sendEmail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,6 +26,7 @@ describe('VolunteersService', () => {
           provide: getRepositoryToken(FosterVolunteer),
           useValue: repo,
         },
+        { provide: EmailsService, useValue: emailsService },
       ],
     }).compile();
 
