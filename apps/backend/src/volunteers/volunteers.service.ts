@@ -79,7 +79,7 @@ export class VolunteersService {
 
     return this.repo.save(volunteer);
   }
-  
+
   /**
    * Fetches a Volunteer by ID, requiring that they are active.
    *
