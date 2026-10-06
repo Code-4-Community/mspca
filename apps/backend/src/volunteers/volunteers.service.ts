@@ -78,9 +78,7 @@ export class VolunteersService {
     }
 
     if (volunteer.status !== VolunteerStatus.PENDING) {
-      throw new BadRequestException(
-        `Only pending Volunteers can be approved`,
-      );
+      throw new BadRequestException(`Only pending Volunteers can be approved`);
     }
 
     volunteer.status = VolunteerStatus.ACTIVE;

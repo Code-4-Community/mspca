@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
@@ -120,6 +124,80 @@ describe('VolunteersService', () => {
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(repo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('approve', () => {
+    const pendingVolunteer = () =>
+      ({
+        volunteerId: 1,
+        firstName: 'Jane',
+        email: 'jane@example.com',
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer);
+
+    it('sets status to Active, saves, and emails the volunteer', async () => {
+      repo.findOneBy.mockResolvedValue(pendingVolunteer());
+      repo.save.mockImplementation(async (v) => v);
+
+      const result = await service.approve(1);
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: VolunteerStatus.ACTIVE }),
+      );
+      expect(result.status).toBe(VolunteerStatus.ACTIVE);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith({
+        toEmail: 'jane@example.com',
+        subject: expect.any(String),
+        bodyHtml: expect.stringContaining('Jane'),
+      });
+    });
+
+    it('throws ConflictException and does not resend the email if already active', async () => {
+      repo.findOneBy.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.ACTIVE,
+      });
+
+      await expect(service.approve(1)).rejects.toThrow(ConflictException);
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the volunteer is inactive', async () => {
+      repo.findOneBy.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.INACTIVE,
+      });
+
+      await expect(service.approve(1)).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if volunteer does not exist', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+
+      await expect(service.approve(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('still approves the volunteer if the email fails to send', async () => {
+      repo.findOneBy.mockResolvedValue(pendingVolunteer());
+      repo.save.mockImplementation(async (v) => v);
+      emailsService.sendEmail.mockRejectedValue(new Error('SES down'));
+      const loggerSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => undefined);
+
+      const result = await service.approve(1);
+
+      expect(result.status).toBe(VolunteerStatus.ACTIVE);
+      expect(loggerSpy).toHaveBeenCalled();
     });
   });
 });
