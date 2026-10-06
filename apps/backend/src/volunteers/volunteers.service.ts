@@ -16,7 +16,7 @@ export class VolunteersService {
   ) {}
 
   /**
-   * Fetches a Volunteer by ID.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -25,7 +25,10 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinator'],
+    });
 
     if (!volunteer) {
       throw new NotFoundException(`Volunteer with ID ${id} not found`);
@@ -75,5 +78,25 @@ export class VolunteersService {
     volunteer.status = VolunteerStatus.ACTIVE;
 
     return this.repo.save(volunteer);
+  }
+  
+  /**
+   * Fetches a Volunteer by ID, requiring that they are active.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The active Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not active.
+   */
+  async findActiveOrFail(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
+    }
+
+    return volunteer;
   }
 }
