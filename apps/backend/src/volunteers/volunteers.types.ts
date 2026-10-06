@@ -4,3 +4,9 @@ export enum FosterType {
   SMALL_ANIMALS = 'Small Animals',
   BABY_BOTTLE_ANIMALS = 'Baby Bottle Animals',
 }
+
+export enum VolunteerStatus {
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  PENDING = 'Pending',
+}

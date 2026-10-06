@@ -9,6 +9,7 @@ import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
+import { VolunteerStatus } from '../volunteers/volunteers.types';
 
 const coordinator = {
   coordinatorId: 7,
@@ -19,7 +20,7 @@ const volunteerWithCoordinator = {
   volunteerId: 1,
   firstName: 'Ada',
   lastName: 'Lovelace',
-  active: true,
+  status: VolunteerStatus.ACTIVE,
   assignedCoordinator: coordinator,
 } as FosterVolunteer;
 
