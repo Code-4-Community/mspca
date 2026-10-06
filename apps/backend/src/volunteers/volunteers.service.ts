@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
@@ -30,16 +34,43 @@ export class VolunteersService {
     return volunteer;
   }
 
+  /**
+   * Deactivates a currently Active Volunteer.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The updated Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not currently Active.
+   */
   async deactivate(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
+    }
 
     volunteer.status = VolunteerStatus.INACTIVE;
 
     return this.repo.save(volunteer);
   }
 
-  async activate(id: number): Promise<FosterVolunteer> {
+  /**
+   * Reactivates a currently Inactive Volunteer.
+   *
+   * Does not apply to Pending Volunteers; those are moved to Active through
+   * the approval flow instead.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The updated Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not currently Inactive.
+   */
+  async reactivate(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.INACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is not inactive`);
+    }
 
     volunteer.status = VolunteerStatus.ACTIVE;
 

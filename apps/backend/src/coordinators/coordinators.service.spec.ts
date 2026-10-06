@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
 
@@ -30,6 +30,31 @@ describe('CoordinatorsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('findByIdOrFail', () => {
+    it('returns the coordinator when one with the id exists', async () => {
+      const coordinator = { coordinatorId: 7 } as FosterCoordinator;
+      repo.findOne.mockResolvedValue(coordinator);
+
+      const result = await service.findByIdOrFail(7);
+
+      expect(result).toBe(coordinator);
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { coordinatorId: 7 },
+      });
+    });
+
+    it('throws NotFoundException when no coordinator with the id exists', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.findByIdOrFail(7)).rejects.toThrow(
+        new NotFoundException('Coordinator with ID 7 not found'),
+      );
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { coordinatorId: 7 },
+      });
+    });
   });
 
   describe('deactivate', () => {
@@ -62,6 +87,19 @@ describe('CoordinatorsService', () => {
       );
       expect(repo.save).not.toHaveBeenCalled();
     });
+
+    it('throws BadRequestException if the coordinator is already inactive', async () => {
+      const coordinator = {
+        coordinatorId: 1,
+        active: false,
+      } as FosterCoordinator;
+      repo.findOne.mockResolvedValue(coordinator);
+
+      await expect(service.deactivate(1)).rejects.toThrow(
+        new BadRequestException('Coordinator with ID 1 is already inactive'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('activate', () => {
@@ -87,6 +125,19 @@ describe('CoordinatorsService', () => {
 
       await expect(service.activate(999)).rejects.toThrow(
         new NotFoundException('Coordinator with ID 999 not found'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the coordinator is already active', async () => {
+      const coordinator = {
+        coordinatorId: 1,
+        active: true,
+      } as FosterCoordinator;
+      repo.findOne.mockResolvedValue(coordinator);
+
+      await expect(service.activate(1)).rejects.toThrow(
+        new BadRequestException('Coordinator with ID 1 is already active'),
       );
       expect(repo.save).not.toHaveBeenCalled();
     });
