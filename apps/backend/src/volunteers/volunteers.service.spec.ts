@@ -23,7 +23,7 @@ describe('VolunteersService', () => {
     save: jest.Mock;
     delete: jest.Mock;
   };
-  let cognitoService: { createUser: jest.Mock };
+  let cognitoService: { createUser: jest.Mock; deleteUser: jest.Mock };
 
   beforeEach(async () => {
     repo = {
@@ -32,7 +32,7 @@ describe('VolunteersService', () => {
       save: jest.fn(),
       delete: jest.fn(),
     };
-    cognitoService = { createUser: jest.fn() };
+    cognitoService = { createUser: jest.fn(), deleteUser: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -195,12 +195,38 @@ describe('VolunteersService', () => {
       },
     );
 
-    it('logs the orphaned Cognito sub and rethrows when the Postgres save fails', async () => {
+    it('lowercases the email before checking for duplicates and creating the user', async () => {
+      await service.create({ ...dto, email: 'Jane@Example.com' });
+
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        email: 'jane@example.com',
+      });
+      expect(cognitoService.createUser).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jane@example.com' }),
+      );
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jane@example.com' }),
+      );
+    });
+
+    it('deletes the Cognito user and rethrows when the Postgres save fails', async () => {
+      const dbError = new Error('connection lost');
+      repo.save.mockRejectedValue(dbError);
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+
+      await expect(service.create(dto)).rejects.toBe(dbError);
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+    });
+
+    it('logs the orphaned Cognito sub and rethrows the save error when the cleanup also fails', async () => {
       const logError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
       const dbError = new Error('connection lost');
       repo.save.mockRejectedValue(dbError);
+      cognitoService.deleteUser.mockRejectedValue(new Error('Cognito down'));
 
       await expect(service.create(dto)).rejects.toBe(dbError);
       expect(logError).toHaveBeenCalledWith(

@@ -50,6 +50,7 @@ export class VolunteersService {
    *
    * The Cognito user is created first; the Postgres row is only saved once that
    * succeeds, so a Cognito failure never leaves a Volunteer without a login.
+   * If the save fails, the Cognito user is deleted so the email can be reused.
    * New Volunteers are pending until a coordinator approves them.
    *
    * @param dto - The Volunteer's profile fields.
@@ -58,7 +59,9 @@ export class VolunteersService {
    * @throws {InternalServerErrorException} If the Cognito user could not be created.
    */
   async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
-    const existing = await this.repo.findOneBy({ email: dto.email });
+    const email = dto.email.toLowerCase();
+
+    const existing = await this.repo.findOneBy({ email });
     if (existing) {
       throw new ConflictException('A volunteer with this email already exists');
     }
@@ -66,23 +69,26 @@ export class VolunteersService {
     const cognitoSub = await this.cognitoService.createUser({
       firstName: dto.firstName,
       lastName: dto.lastName,
-      email: dto.email,
+      email,
       role: CognitoRole.FosterVolunteer,
     });
 
     try {
       return await this.repo.save({
         ...dto,
+        email,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
       });
     } catch (error) {
-      // The Cognito user now exists without a matching Volunteer row and must
-      // be cleaned up manually.
-      this.logger.error(
-        `Created Cognito user ${cognitoSub} for ${dto.email} but failed to save the Volunteer`,
-      );
+      await this.cognitoService
+        .deleteUser(email)
+        .catch(() =>
+          this.logger.error(
+            `Created Cognito user ${cognitoSub} for ${email} but failed to save the Volunteer or delete the Cognito user`,
+          ),
+        );
       throw error;
     }
   }

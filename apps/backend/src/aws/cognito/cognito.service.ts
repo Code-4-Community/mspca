@@ -12,6 +12,7 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AccessTokenPayload, CognitoConfig } from './cognito.types';
@@ -114,15 +115,12 @@ export class CognitoService {
       DesiredDeliveryMediums: ['EMAIL'],
     });
 
+    let sub: string | undefined;
     try {
       const response = await client.send(command);
-      const sub = response.User?.Attributes?.find(
+      sub = response.User?.Attributes?.find(
         (attr) => attr.Name === 'sub',
       )?.Value;
-
-      await this.addUserToGroup(email, role);
-
-      return sub ?? '';
     } catch (error) {
       if (error instanceof Error && error.name === 'UsernameExistsException') {
         throw new ConflictException('A user with this email already exists');
@@ -131,6 +129,21 @@ export class CognitoService {
       throw new InternalServerErrorException(
         `Failed to create user: ${reason}`,
       );
+    }
+
+    try {
+      if (!sub) {
+        throw new InternalServerErrorException(
+          'Failed to create user: Cognito returned no sub',
+        );
+      }
+      await this.addUserToGroup(email, role);
+      return sub;
+    } catch (error) {
+      await this.deleteUser(email).catch(() =>
+        this.logger.error(`Failed to delete partially created user ${email}`),
+      );
+      throw error;
     }
   }
 
@@ -215,6 +228,25 @@ export class CognitoService {
       const reason = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(
         `Failed to enable user: ${reason}`,
+      );
+    }
+  }
+
+  async deleteUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminDeleteUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to delete user: ${reason}`,
       );
     }
   }
