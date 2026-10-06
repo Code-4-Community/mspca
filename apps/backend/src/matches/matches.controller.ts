@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -24,9 +25,18 @@ export class MatchesController {
       "Creates a PENDING match between a volunteer and a Chameleon animal and emails the volunteer's assigned foster coordinator.",
   })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'The created match, with a PENDING status.',
     type: Match,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The request body is invalid or the volunteer is not active, so a match cannot be made.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No volunteer exists with the given ID.',
   })
   async createMatch(@Body() body: CreateMatchDto): Promise<Match> {
     return this.matchesService.create(body);
@@ -45,9 +55,18 @@ export class MatchesController {
     example: 10,
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The updated match, with a WITHDRAWN status.',
     type: Match,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The match ID is not a positive integer, or the match is not PENDING and so cannot be withdrawn.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No match exists with the given ID.',
   })
   async withdrawMatch(
     @Param('matchId', ParseIntPipe) matchId: number,

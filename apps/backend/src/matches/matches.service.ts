@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +12,7 @@ import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 
 @Injectable()
@@ -19,8 +22,8 @@ export class MatchesService {
   constructor(
     @InjectRepository(Match)
     private repo: Repository<Match>,
-    @InjectRepository(FosterVolunteer)
-    private volunteerRepo: Repository<FosterVolunteer>,
+    @Inject(forwardRef(() => VolunteersService))
+    private volunteersService: VolunteersService,
     private emailsService: EmailsService,
   ) {}
 
@@ -35,16 +38,12 @@ export class MatchesService {
    * @param dto the volunteer and Chameleon animal to match
    * @returns the created match
    * @throws NotFoundException if the volunteer does not exist
+   * @throws BadRequestException if the volunteer is not active
    */
   async create(dto: CreateMatchDto): Promise<Match> {
-    const volunteer = await this.volunteerRepo.findOne({
-      where: { volunteerId: dto.volunteerId },
-      relations: ['assignedCoordinator'],
-    });
-
-    if (!volunteer) {
-      throw new NotFoundException('Volunteer not found');
-    }
+    const volunteer = await this.volunteersService.findActiveOrFail(
+      dto.volunteerId,
+    );
 
     const match = await this.repo.save(
       this.repo.create({
