@@ -10,7 +10,6 @@ import {
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 
-// Max lengths mirror the varchar column lengths on FosterVolunteer.
 export class CreateVolunteerDto {
   @IsString()
   @IsNotEmpty()

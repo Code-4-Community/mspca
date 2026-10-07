@@ -25,7 +25,6 @@ export class VolunteersController {
     private matchesService: MatchesService,
   ) {}
 
-  // Public: volunteers sign up before they have an account to authenticate with.
   @Public()
   @Post()
   @ApiOperation({ summary: 'Create a foster volunteer account' })
