@@ -33,6 +33,9 @@ export class FosterCoordinator {
   @Column({ type: 'boolean' })
   active!: boolean;
 
+  @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
+  cognitoSub!: string;
+
   @OneToMany(
     () => FosterVolunteer,
     (volunteer) => volunteer.assignedCoordinator,
