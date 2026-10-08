@@ -65,7 +65,7 @@ describe('VolunteersService', () => {
   describe('findActiveOrFail', () => {
     it('returns the volunteer when they are active', async () => {
       const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
-      repo.findOne.mockResolvedValue(volunteer);
+      mockRepo.findOne.mockResolvedValue(volunteer);
 
       const result = await service.findActiveOrFail(7);
 
@@ -73,7 +73,7 @@ describe('VolunteersService', () => {
     });
 
     it('throws BadRequestException when the volunteer is not active', async () => {
-      repo.findOne.mockResolvedValue({
+      mockRepo.findOne.mockResolvedValue({
         volunteerId: 7,
         active: false,
       } as FosterVolunteer);
@@ -84,7 +84,7 @@ describe('VolunteersService', () => {
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
-      repo.findOne.mockResolvedValue(null);
+      mockRepo.findOne.mockResolvedValue(null);
 
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 7 not found'),
@@ -94,27 +94,33 @@ describe('VolunteersService', () => {
 
   describe('getVolunteerById', () => {
     it('should return a volunteer when found', async () => {
-      mockRepo.findOneBy.mockResolvedValue(mockVolunteer);
+      mockRepo.findOne.mockResolvedValue(mockVolunteer);
 
       const result = await service.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
-      mockRepo.findOneBy.mockResolvedValue(null);
+      mockRepo.findOne.mockResolvedValue(null);
 
       await expect(service.getVolunteerById(999)).rejects.toThrow(
-        new NotFoundException('Volunteer with id 999 not found'),
+        new NotFoundException('Volunteer with ID 999 not found'),
       );
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 999 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 999 },
+        relations: ['assignedCoordinator'],
+      });
     });
   });
 
   describe('updateVolunteerById', () => {
     it('should update and return the volunteer with only the given fields changed', async () => {
-      mockRepo.findOneBy.mockResolvedValue({ ...mockVolunteer });
+      mockRepo.findOne.mockResolvedValue({ ...mockVolunteer });
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
       const dto = { notes: 'updated notes' } as UpdateVolunteerDto;
@@ -122,7 +128,10 @@ describe('VolunteersService', () => {
 
       expect(result.notes).toBe('updated notes');
       expect(result.firstName).toBe('Jane');
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,
         notes: 'updated notes',
@@ -130,7 +139,7 @@ describe('VolunteersService', () => {
     });
 
     it('should update multiple allowed fields at once', async () => {
-      mockRepo.findOneBy.mockResolvedValue({ ...mockVolunteer });
+      mockRepo.findOne.mockResolvedValue({ ...mockVolunteer });
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
       const dto = {
@@ -144,7 +153,10 @@ describe('VolunteersService', () => {
       expect(result.address).toBe('123 Main St');
       expect(result.city).toBe('Boston');
       expect(result.zipcode).toBe('02115');
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,
         address: '123 Main St',
@@ -154,12 +166,12 @@ describe('VolunteersService', () => {
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
-      mockRepo.findOneBy.mockResolvedValue(null);
+      mockRepo.findOne.mockResolvedValue(null);
 
       await expect(
         service.updateVolunteerById(999, { notes: 'x' }),
       ).rejects.toThrow(
-        new NotFoundException('Volunteer with id 999 not found'),
+        new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });

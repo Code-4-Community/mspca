@@ -59,17 +59,13 @@ export class VolunteersService {
 
   /**
    * Gets a single foster volunteer by ID.
-   * Looks up the volunteer in the database and throws if no volunteer has that ID.
+   * Includes the volunteer's assigned coordinator.
    * @param id - ID of the volunteer to get
    * @returns The volunteer with the given ID
    * @throws NotFoundException if no volunteer exists with the given ID
    */
   async getVolunteerById(id: number): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with id ${id} not found`);
-    }
-    return volunteer;
+    return this.findByIdOrFail(id);
   }
 
   /**
@@ -84,10 +80,7 @@ export class VolunteersService {
     id: number,
     dto: UpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
-    const volunteer = await this.repo.findOneBy({ volunteerId: id });
-    if (!volunteer) {
-      throw new NotFoundException(`Volunteer with id ${id} not found`);
-    }
+    const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
   }
