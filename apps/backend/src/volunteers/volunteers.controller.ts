@@ -1,22 +1,46 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+  Controller, Get,
+  Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
+import { MatchesService } from '../matches/matches.service';
+import { Match } from '../matches/matches.entity';
+import { validateId } from '../utils/validation.utils';
 import { FosterVolunteer } from './volunteers.entity';
 
-// @ApiTags('Volunteers')
+@ApiTags('Volunteers')
 // @ApiBearerAuth()
 @Controller('volunteers')
 export class VolunteersController {
-  constructor(private volunteersService: VolunteersService) {}
+  constructor(
+    private volunteersService: VolunteersService,
+    private matchesService: MatchesService,
+  ) {}
 
-  @Get()
-  @ApiOperation({ summary: 'Get all volunteers' })
-  @ApiResponse({
-    status: 200,
-    description: 'All volunteers, regardless of match status',
-    type: [FosterVolunteer],
+  @Get('/:volunteerId/matches')
+  @ApiOperation({ summary: 'Get all Matches for a Volunteer' })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the Volunteer',
   })
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.volunteersService.getAllVolunteers();
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The Volunteer's Matches",
+    type: [Match],
+  })
+  async getVolunteerMatches(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+  ): Promise<Match[]> {
+    validateId(volunteerId, 'Volunteer');
+
+    await this.volunteersService.findByIdOrFail(volunteerId);
+
+    return this.matchesService.findByVolunteerId(volunteerId);
   }
 }
