@@ -1,12 +1,11 @@
 import {
-  Controller, Get,
+  Controller,
   Get,
   HttpStatus,
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
@@ -42,5 +41,16 @@ export class VolunteersController {
     await this.volunteersService.findByIdOrFail(volunteerId);
 
     return this.matchesService.findByVolunteerId(volunteerId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All volunteers, regardless of match status',
+    type: [FosterVolunteer],
+  })
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.volunteersService.getAllVolunteers();
   }
 }

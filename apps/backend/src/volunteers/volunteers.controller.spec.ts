@@ -9,7 +9,10 @@ import { FosterVolunteer } from './volunteers.entity';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let volunteersService: { findByIdOrFail: jest.Mock };
+  let volunteersService: {
+    findByIdOrFail: jest.Mock;
+    getAllVolunteers: jest.Mock;
+  };
   let matchesService: { findByVolunteerId: jest.Mock };
 
   const mockVolunteers = [
@@ -17,12 +20,11 @@ describe('VolunteersController', () => {
     { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
   ] as FosterVolunteer[];
 
-  const mockVolunteersService = {
-    getAllVolunteers: jest.fn(),
-  };
-
   beforeEach(async () => {
-    volunteersService = { findByIdOrFail: jest.fn() };
+    volunteersService = {
+      findByIdOrFail: jest.fn(),
+      getAllVolunteers: jest.fn(),
+    };
     matchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -92,16 +94,16 @@ describe('VolunteersController', () => {
 
   describe('getAllVolunteers', () => {
     it('should return all volunteers', async () => {
-      mockVolunteersService.getAllVolunteers.mockResolvedValue(mockVolunteers);
+      volunteersService.getAllVolunteers.mockResolvedValue(mockVolunteers);
 
       const result = await controller.getAllVolunteers();
 
       expect(result).toEqual(mockVolunteers);
-      expect(mockVolunteersService.getAllVolunteers).toHaveBeenCalled();
+      expect(volunteersService.getAllVolunteers).toHaveBeenCalled();
     });
 
     it('should return an empty array when there are no volunteers', async () => {
-      mockVolunteersService.getAllVolunteers.mockResolvedValue([]);
+      volunteersService.getAllVolunteers.mockResolvedValue([]);
 
       const result = await controller.getAllVolunteers();
 

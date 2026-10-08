@@ -12,9 +12,7 @@ import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
-import { validateId } from '../utils/validation.utils';
 import { DenyMatchDto } from './dto/deny-match.dto';
-import { Match } from './matches.entity';
 
 @ApiTags('Matches')
 @Controller('matches')
@@ -83,7 +81,7 @@ export class MatchesController {
   @ApiOperation({ summary: 'Approve a pending match' })
   @ApiParam({ name: 'matchId', type: Number, description: 'ID of the match' })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The match was approved and is now Active',
     type: Match,
   })
@@ -98,7 +96,7 @@ export class MatchesController {
   @ApiOperation({ summary: 'Deny a pending match with a reason' })
   @ApiParam({ name: 'matchId', type: Number, description: 'ID of the match' })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'The match was denied and the reason was saved',
     type: Match,
   })

@@ -55,4 +55,13 @@ export class VolunteersService {
 
     return volunteer;
   }
+
+  /**
+   * Gets all foster volunteers.
+   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * @returns A list of all volunteers
+   */
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.repo.find();
+  }
 }

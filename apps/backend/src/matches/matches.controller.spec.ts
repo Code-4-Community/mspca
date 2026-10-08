@@ -4,7 +4,6 @@ import {
   NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
@@ -12,12 +11,15 @@ import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { DenyMatchDto } from './dto/deny-match.dto';
-import { Match } from './matches.entity';
-import { MatchStatus } from './matches.types';
 
 describe('MatchesController', () => {
   let controller: MatchesController;
-  let service: { create: jest.Mock; withdraw: jest.Mock };
+  let service: {
+    create: jest.Mock;
+    withdraw: jest.Mock;
+    approveMatch: jest.Mock;
+    denyMatch: jest.Mock;
+  };
 
   const mockMatch = {
     matchId: 1,
@@ -25,20 +27,17 @@ describe('MatchesController', () => {
     deniedReason: null,
   } as Match;
 
-  const mockMatchesService = {
-    approveMatch: jest.fn(),
-    denyMatch: jest.fn(),
-  };
-
   beforeEach(async () => {
     service = {
       create: jest.fn(),
       withdraw: jest.fn(),
+      approveMatch: jest.fn(),
+      denyMatch: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MatchesController],
-      providers: [{ provide: MatchesService, useValue: mockMatchesService }],
+      providers: [{ provide: MatchesService, useValue: service }],
     }).compile();
 
     controller = module.get<MatchesController>(MatchesController);
@@ -130,16 +129,16 @@ describe('MatchesController', () => {
 
   describe('approveMatch', () => {
     it('should approve and return the match when found', async () => {
-      mockMatchesService.approveMatch.mockResolvedValue(mockMatch);
+      service.approveMatch.mockResolvedValue(mockMatch);
 
       const result = await controller.approveMatch(1);
 
       expect(result).toEqual(mockMatch);
-      expect(mockMatchesService.approveMatch).toHaveBeenCalledWith(1);
+      expect(service.approveMatch).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException when match does not exist', async () => {
-      mockMatchesService.approveMatch.mockRejectedValue(
+      service.approveMatch.mockRejectedValue(
         new NotFoundException('Match with id 999 not found'),
       );
 
@@ -152,7 +151,7 @@ describe('MatchesController', () => {
       await expect(controller.approveMatch(0)).rejects.toThrow(
         BadRequestException,
       );
-      expect(mockMatchesService.approveMatch).not.toHaveBeenCalled();
+      expect(service.approveMatch).not.toHaveBeenCalled();
     });
   });
 
@@ -163,20 +162,17 @@ describe('MatchesController', () => {
         status: MatchStatus.DENIED,
         deniedReason: 'Not enough space',
       } as Match;
-      mockMatchesService.denyMatch.mockResolvedValue(deniedMatch);
+      service.denyMatch.mockResolvedValue(deniedMatch);
 
       const dto: DenyMatchDto = { deniedReason: 'Not enough space' };
       const result = await controller.denyMatch(1, dto);
 
       expect(result).toEqual(deniedMatch);
-      expect(mockMatchesService.denyMatch).toHaveBeenCalledWith(
-        1,
-        'Not enough space',
-      );
+      expect(service.denyMatch).toHaveBeenCalledWith(1, 'Not enough space');
     });
 
     it('should throw NotFoundException when match does not exist', async () => {
-      mockMatchesService.denyMatch.mockRejectedValue(
+      service.denyMatch.mockRejectedValue(
         new NotFoundException('Match with id 999 not found'),
       );
 
@@ -191,7 +187,7 @@ describe('MatchesController', () => {
       await expect(controller.denyMatch(0, dto)).rejects.toThrow(
         BadRequestException,
       );
-      expect(mockMatchesService.denyMatch).not.toHaveBeenCalled();
+      expect(service.denyMatch).not.toHaveBeenCalled();
     });
   });
 
