@@ -9,6 +9,8 @@ import {
 } from 'class-validator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
+import { ArrayNotEmpty } from 'class-validator';
+import { IsArray } from 'class-validator';
 
 export class CreateVolunteerDto {
   @IsString()
@@ -61,8 +63,10 @@ export class CreateVolunteerDto {
   @IsString()
   notes?: string;
 
-  @IsEnum(FosterType)
-  fosterType!: FosterType;
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(FosterType, { each: true })
+  fosterType!: FosterType[];
 
   @IsOptional()
   @IsBoolean()

@@ -52,8 +52,11 @@ export class FosterVolunteer {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ name: 'foster_type', type: 'enum', enum: FosterType })
-  fosterType!: FosterType;
+  @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
+  fosterType!: FosterType[];
+
+  @Column({ name: 'animal_updates', type: 'boolean', default: true })
+  animalUpdates!: boolean;
 
   @Column({
     name: 'completed_canine_training',
