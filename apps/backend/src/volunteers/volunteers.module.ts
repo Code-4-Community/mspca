@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteersController } from './volunteers.controller';
@@ -10,7 +10,7 @@ import { MatchesModule } from '../matches/matches.module';
   imports: [
     TypeOrmModule.forFeature([FosterVolunteer]),
     CoordinatorsModule,
-    MatchesModule,
+    forwardRef(() => MatchesModule),
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],

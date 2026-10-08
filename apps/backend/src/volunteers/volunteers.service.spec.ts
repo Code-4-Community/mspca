@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
@@ -16,10 +16,10 @@ describe('VolunteersService', () => {
     assignedCoordinator: null,
   } as FosterVolunteer;
 
-  let mockRepo: { findOneBy: jest.Mock; save: jest.Mock };
+  let mockRepo: { findOne: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
-    mockRepo = { findOneBy: jest.fn(), save: jest.fn() };
+    mockRepo = { findOne: jest.fn(), save: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,21 +38,57 @@ describe('VolunteersService', () => {
   describe('findByIdOrFail', () => {
     it('returns the volunteer when one with the id exists', async () => {
       const volunteer = { volunteerId: 7 } as FosterVolunteer;
-      mockRepo.findOneBy.mockResolvedValue(volunteer);
+      mockRepo.findOne.mockResolvedValue(volunteer);
 
       const result = await service.findByIdOrFail(7);
 
       expect(result).toBe(volunteer);
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 7 },
+        relations: ['assignedCoordinator'],
+      });
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
-      mockRepo.findOneBy.mockResolvedValue(null);
+      mockRepo.findOne.mockResolvedValue(null);
 
       await expect(service.findByIdOrFail(7)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 7 not found'),
       );
-      expect(mockRepo.findOneBy).toHaveBeenCalledWith({ volunteerId: 7 });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 7 },
+        relations: ['assignedCoordinator'],
+      });
+    });
+  });
+
+  describe('findActiveOrFail', () => {
+    it('returns the volunteer when they are active', async () => {
+      const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
+      repo.findOne.mockResolvedValue(volunteer);
+
+      const result = await service.findActiveOrFail(7);
+
+      expect(result).toBe(volunteer);
+    });
+
+    it('throws BadRequestException when the volunteer is not active', async () => {
+      repo.findOne.mockResolvedValue({
+        volunteerId: 7,
+        active: false,
+      } as FosterVolunteer);
+
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 7 is not active'),
+      );
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.findActiveOrFail(7)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 7 not found'),
+      );
     });
   });
 
