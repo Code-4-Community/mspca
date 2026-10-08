@@ -56,7 +56,7 @@ describe('VolunteersController', () => {
       zipcode: '02130',
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
-      fosterType: FosterType.CAT,
+      fosterType: [FosterType.CAT],
     };
 
     it('is public so volunteers can sign up without a token', () => {

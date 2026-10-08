@@ -128,7 +128,7 @@ describe('VolunteersService', () => {
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
       notes: 'Prefers kittens',
-      fosterType: FosterType.CAT,
+      fosterType: [FosterType.CAT],
     };
 
     beforeEach(() => {

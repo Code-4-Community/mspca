@@ -16,6 +16,7 @@ import { validateId } from '../utils/validation.utils';
 import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
+import { UpdateAnimalUpdatesDto } from './dtos/update-animal-updates.dto';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -95,5 +96,31 @@ export class VolunteersController {
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
     return this.volunteersService.reactivate(id);
+  }
+
+  @ApiOperation({
+    summary: 'Opt a foster volunteer in or out of animal updates',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was updated',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'The ID is malformed or the body is not a boolean',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No volunteer with this ID exists',
+  })
+  @Patch('/:id/animal-updates')
+  async updateAnimalUpdates(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAnimalUpdatesDto,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.updateAnimalUpdates(id, dto);
   }
 }
