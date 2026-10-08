@@ -5,14 +5,26 @@ import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
+import { FosterVolunteer } from './volunteers.entity';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let volunteersService: { findByIdOrFail: jest.Mock };
+  let volunteersService: {
+    findByIdOrFail: jest.Mock;
+    getAllVolunteers: jest.Mock;
+  };
   let matchesService: { findByVolunteerId: jest.Mock };
 
+  const mockVolunteers = [
+    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
+    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
+  ] as FosterVolunteer[];
+
   beforeEach(async () => {
-    volunteersService = { findByIdOrFail: jest.fn() };
+    volunteersService = {
+      findByIdOrFail: jest.fn(),
+      getAllVolunteers: jest.fn(),
+    };
     matchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -30,6 +42,10 @@ describe('VolunteersController', () => {
     }).compile();
 
     controller = module.get<VolunteersController>(VolunteersController);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -73,6 +89,25 @@ describe('VolunteersController', () => {
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(matchesService.findByVolunteerId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllVolunteers', () => {
+    it('should return all volunteers', async () => {
+      volunteersService.getAllVolunteers.mockResolvedValue(mockVolunteers);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual(mockVolunteers);
+      expect(volunteersService.getAllVolunteers).toHaveBeenCalled();
+    });
+
+    it('should return an empty array when there are no volunteers', async () => {
+      volunteersService.getAllVolunteers.mockResolvedValue([]);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual([]);
     });
   });
 });

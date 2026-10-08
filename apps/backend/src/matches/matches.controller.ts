@@ -12,6 +12,7 @@ import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
+import { DenyMatchDto } from './dto/deny-match.dto';
 
 @ApiTags('Matches')
 @Controller('matches')
@@ -74,5 +75,36 @@ export class MatchesController {
     validateId(matchId, 'Match');
 
     return this.matchesService.withdraw(matchId);
+  }
+
+  @Patch(':matchId/approve')
+  @ApiOperation({ summary: 'Approve a pending match' })
+  @ApiParam({ name: 'matchId', type: Number, description: 'ID of the match' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The match was approved and is now Active',
+    type: Match,
+  })
+  async approveMatch(
+    @Param('matchId', ParseIntPipe) matchId: number,
+  ): Promise<Match> {
+    validateId(matchId, 'Match');
+    return this.matchesService.approveMatch(matchId);
+  }
+
+  @Patch(':matchId/deny')
+  @ApiOperation({ summary: 'Deny a pending match with a reason' })
+  @ApiParam({ name: 'matchId', type: Number, description: 'ID of the match' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The match was denied and the reason was saved',
+    type: Match,
+  })
+  async denyMatch(
+    @Param('matchId', ParseIntPipe) matchId: number,
+    @Body() dto: DenyMatchDto,
+  ): Promise<Match> {
+    validateId(matchId, 'Match');
+    return this.matchesService.denyMatch(matchId, dto.deniedReason);
   }
 }
