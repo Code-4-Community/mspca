@@ -12,6 +12,7 @@ import { VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
+import { UpdateAnimalUpdatesDto } from './dtos/update-animal-updates.dto';
 
 @Injectable()
 export class VolunteersService {
@@ -132,6 +133,26 @@ export class VolunteersService {
     }
 
     volunteer.status = VolunteerStatus.ACTIVE;
+
+    return this.repo.save(volunteer);
+  }
+
+  /**
+   * Opts a Volunteer in or out of hearing what happens to an animal after it
+   * returns to MSPCA.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - Contains the new animalUpdates value.
+   * @returns The updated Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async updateAnimalUpdates(
+    id: number,
+    dto: UpdateAnimalUpdatesDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    volunteer.animalUpdates = dto.animalUpdates;
 
     return this.repo.save(volunteer);
   }
