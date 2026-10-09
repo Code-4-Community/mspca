@@ -5,6 +5,7 @@ import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { VolunteerStatus } from '../volunteers/volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
@@ -19,7 +20,7 @@ const volunteerWithCoordinator = {
   volunteerId: 1,
   firstName: 'Ada',
   lastName: 'Lovelace',
-  active: true,
+  status: VolunteerStatus.ACTIVE,
   assignedCoordinator: coordinator,
 } as FosterVolunteer;
 

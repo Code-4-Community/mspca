@@ -7,7 +7,6 @@ import {
   HttpStatus,
   ParseIntPipe,
   BadRequestException,
-  Patch,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
@@ -15,7 +14,6 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
-import { FosterVolunteer } from './volunteers.entity';
 import { FosterVolunteer } from './volunteers.entity';
 
 @ApiTags('Volunteers')

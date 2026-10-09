@@ -77,7 +77,10 @@ describe('VolunteersService', () => {
 
   describe('findActiveOrFail', () => {
     it('returns the volunteer when they are active', async () => {
-      const volunteer = { volunteerId: 7, active: true } as FosterVolunteer;
+      const volunteer = {
+        volunteerId: 7,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
 
       const result = await service.findActiveOrFail(7);
@@ -88,7 +91,7 @@ describe('VolunteersService', () => {
     it('throws BadRequestException when the volunteer is not active', async () => {
       mockRepo.findOne.mockResolvedValue({
         volunteerId: 7,
-        active: false,
+        status: VolunteerStatus.INACTIVE,
       } as FosterVolunteer);
 
       await expect(service.findActiveOrFail(7)).rejects.toThrow(

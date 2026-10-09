@@ -58,7 +58,7 @@ export class VolunteersService {
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
-    if (!volunteer.active) {
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
       throw new BadRequestException(`Volunteer with ID ${id} is not active`);
     }
 
