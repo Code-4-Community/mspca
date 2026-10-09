@@ -18,6 +18,7 @@ describe('VolunteersController', () => {
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
+    updateAnimalUpdates: jest.Mock;
   };
   let matchesService: { findByVolunteerId: jest.Mock };
 
@@ -27,6 +28,7 @@ describe('VolunteersController', () => {
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
+      updateAnimalUpdates: jest.fn(),
     };
     matchesService = { findByVolunteerId: jest.fn() };
 
@@ -177,6 +179,36 @@ describe('VolunteersController', () => {
       );
 
       await expect(controller.reactivate(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+  });
+  describe('updateAnimalUpdates', () => {
+    it('should call service.updateAnimalUpdates with the parsed id and body', async () => {
+      const dto = { animalUpdates: false };
+      const volunteer = {
+        volunteerId: 1,
+        animalUpdates: false,
+      } as FosterVolunteer;
+      volunteersService.updateAnimalUpdates.mockResolvedValue(volunteer);
+
+      const result = await controller.updateAnimalUpdates(1, dto);
+
+      expect(volunteersService.updateAnimalUpdates).toHaveBeenCalledWith(
+        1,
+        dto,
+      );
+      expect(result).toEqual(volunteer);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      volunteersService.updateAnimalUpdates.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(
+        controller.updateAnimalUpdates(999, { animalUpdates: true }),
+      ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
     });

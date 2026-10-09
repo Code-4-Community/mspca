@@ -299,6 +299,59 @@ describe('VolunteersService', () => {
     });
   });
 
+  describe('updateAnimalUpdates', () => {
+    it('opts the volunteer out and returns the updated volunteer', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        animalUpdates: true,
+      } as FosterVolunteer;
+      repo.findOne.mockResolvedValue(volunteer);
+      repo.save.mockImplementation(async (v) => v);
+
+      const result = await service.updateAnimalUpdates(1, {
+        animalUpdates: false,
+      });
+
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ volunteerId: 1, animalUpdates: false }),
+      );
+      expect(result.animalUpdates).toBe(false);
+    });
+
+    it('opts the volunteer back in', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        animalUpdates: false,
+      } as FosterVolunteer;
+      repo.findOne.mockResolvedValue(volunteer);
+      repo.save.mockImplementation(async (v) => v);
+
+      const result = await service.updateAnimalUpdates(1, {
+        animalUpdates: true,
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ volunteerId: 1, animalUpdates: true }),
+      );
+      expect(result.animalUpdates).toBe(true);
+    });
+
+    it('throws NotFoundException if volunteer does not exist', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateAnimalUpdates(999, { animalUpdates: false }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('reactivate', () => {
     it('sets status to Active and saves the volunteer', async () => {
       const volunteer = {
