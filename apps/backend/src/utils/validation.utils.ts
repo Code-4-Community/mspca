@@ -3,7 +3,7 @@ import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteerStatus } from '../volunteers/volunteers.types';
 
 export function validateId(id: number, entityName: string): void {
-  if (!id || id < 1) {
+  if (!Number.isInteger(id) || id < 1) {
     throw new BadRequestException(`Invalid ${entityName} ID`);
   }
 }
