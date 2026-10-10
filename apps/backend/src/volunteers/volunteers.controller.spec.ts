@@ -46,7 +46,7 @@ describe('VolunteersController', () => {
   });
 
   describe('create', () => {
-    const dto: CreateVolunteerDto = {
+    const dto = {
       firstName: 'Jane',
       lastName: 'Doe',
       phone: '617-555-0100',
@@ -57,7 +57,7 @@ describe('VolunteersController', () => {
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
       fosterType: FosterType.CAT,
-    };
+    } as CreateVolunteerDto;
 
     it('is public so volunteers can sign up without a token', () => {
       expect(
@@ -81,7 +81,7 @@ describe('VolunteersController', () => {
       expect(result).toBe(volunteer);
     });
 
-    it('propagates ConflictException thrown by the service', async () => {
+    it('propagates errors thrown by the service', async () => {
       volunteersService.create.mockRejectedValue(
         new ConflictException('A volunteer with this email already exists'),
       );

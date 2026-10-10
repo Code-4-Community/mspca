@@ -131,20 +131,31 @@ export class CognitoService {
       );
     }
 
-    try {
-      if (!sub) {
-        throw new InternalServerErrorException(
-          'Failed to create user: Cognito returned no sub',
-        );
-      }
-      await this.addUserToGroup(email, role);
-      return sub;
-    } catch (error) {
-      await this.deleteUser(email).catch(() =>
-        this.logger.error(`Failed to delete partially created user ${email}`),
+    // Cognito should always return a sub for a created user; a missing one would
+    // only come from an AWS outage or internal bug.
+    if (!sub) {
+      await this.deletePartiallyCreatedUser(email);
+      throw new InternalServerErrorException(
+        'Failed to create user: Cognito returned no sub',
       );
+    }
+
+    try {
+      await this.addUserToGroup(email, role);
+    } catch (error) {
+      // A user that exists but isn't in a group is in a broken state with no
+      // role, so delete it rather than leave a login that can't be used.
+      await this.deletePartiallyCreatedUser(email);
       throw error;
     }
+
+    return sub;
+  }
+
+  private async deletePartiallyCreatedUser(email: string): Promise<void> {
+    await this.deleteUser(email).catch(() =>
+      this.logger.error(`Failed to delete partially created user ${email}`),
+    );
   }
 
   async addUserToGroup(username: string, groupName: string): Promise<void> {

@@ -116,7 +116,7 @@ describe('VolunteersService', () => {
   });
 
   describe('create', () => {
-    const dto: CreateVolunteerDto = {
+    const dto = {
       firstName: 'Jane',
       lastName: 'Doe',
       phone: '617-555-0100',
@@ -129,7 +129,7 @@ describe('VolunteersService', () => {
       residentAnimals: 'One cat',
       notes: 'Prefers kittens',
       fosterType: FosterType.CAT,
-    };
+    } as CreateVolunteerDto;
 
     beforeEach(() => {
       repo.findOneBy.mockResolvedValue(null);
@@ -149,11 +149,15 @@ describe('VolunteersService', () => {
         email: 'jane@example.com',
         role: CognitoRole.FosterVolunteer,
       });
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
     });
 
     it('saves the volunteer as pending with a signed waiver and the Cognito sub', async () => {
       const result = await service.create(dto);
 
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
       expect(repo.save).toHaveBeenCalledWith({
         ...dto,
         status: VolunteerStatus.PENDING,
@@ -207,6 +211,8 @@ describe('VolunteersService', () => {
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({ email: 'jane@example.com' }),
       );
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
     });
 
     it('deletes the Cognito user and rethrows when the Postgres save fails', async () => {
@@ -215,6 +221,9 @@ describe('VolunteersService', () => {
       cognitoService.deleteUser.mockResolvedValue(undefined);
 
       await expect(service.create(dto)).rejects.toBe(dbError);
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledTimes(1);
       expect(cognitoService.deleteUser).toHaveBeenCalledWith(
         'jane@example.com',
       );
@@ -229,6 +238,9 @@ describe('VolunteersService', () => {
       cognitoService.deleteUser.mockRejectedValue(new Error('Cognito down'));
 
       await expect(service.create(dto)).rejects.toBe(dbError);
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledTimes(1);
       expect(logError).toHaveBeenCalledWith(
         expect.stringContaining('cognito-sub-123'),
       );

@@ -213,7 +213,12 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
-        ).rejects.toThrow(ConflictException);
+        ).rejects.toThrow(
+          new ConflictException('A user with this email already exists'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
       });
 
       it('throws InternalServerErrorException on unknown error', async () => {
@@ -226,7 +231,14 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
-        ).rejects.toThrow(InternalServerErrorException);
+        ).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to create user: Cognito down',
+          ),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
       });
 
       it('deletes the user and throws when Cognito returns no sub', async () => {
@@ -248,6 +260,7 @@ describe('CognitoService', () => {
         );
 
         expect(sendSpy).toHaveBeenCalledTimes(2);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
         const deleteCmd = sendSpy.mock.calls[1][0];
         expect(deleteCmd).toBeInstanceOf(AdminDeleteUserCommand);
         expect(deleteCmd.input).toEqual({
@@ -275,7 +288,20 @@ describe('CognitoService', () => {
         ).rejects.toThrow(InternalServerErrorException);
 
         expect(sendSpy).toHaveBeenCalledTimes(3);
-        expect(sendSpy.mock.calls[2][0]).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        const groupCmd = sendSpy.mock.calls[1][0];
+        expect(groupCmd).toBeInstanceOf(AdminAddUserToGroupCommand);
+        expect(groupCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          GroupName: CognitoRole.FosterVolunteer,
+        });
+        const deleteCmd = sendSpy.mock.calls[2][0];
+        expect(deleteCmd).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(deleteCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
       });
 
       it('throws the original error when cleanup also fails', async () => {
@@ -391,6 +417,7 @@ describe('CognitoService', () => {
       it('sends AdminDeleteUserCommand', async () => {
         await service.deleteUser('jane@example.com');
 
+        expect(sendSpy).toHaveBeenCalledTimes(1);
         const cmd = sendSpy.mock.calls[0][0];
         expect(cmd).toBeInstanceOf(AdminDeleteUserCommand);
         expect(cmd.input).toEqual({

@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsNotEmpty,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   MaxLength,
 } from 'class-validator';
@@ -23,11 +24,14 @@ export class CreateVolunteerDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsPhoneNumber('US')
   @MaxLength(20)
   phone!: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
   @MaxLength(20)
   secondaryPhone?: string;
 
@@ -59,6 +63,7 @@ export class CreateVolunteerDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   notes?: string;
 
   @IsEnum(FosterType)
