@@ -16,6 +16,8 @@ import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { Homebase } from '../types';
 import { EmailsService } from '../aws/ses/email.service';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -25,7 +27,7 @@ describe('VolunteersService', () => {
     firstName: 'Jane',
     lastName: 'Doe',
     notes: 'likes cats',
-    assignedCoordinator: null,
+    assignedCoordinators: [],
   } as FosterVolunteer;
 
   let mockRepo: {
@@ -40,6 +42,7 @@ describe('VolunteersService', () => {
     confirmUser: jest.Mock;
     deleteUser: jest.Mock;
   };
+  let mockCoordinatorsService: { findActiveByHomebase: jest.Mock };
   let emailsService: { sendEmail: jest.Mock };
 
   const mockVolunteers = [
@@ -61,6 +64,7 @@ describe('VolunteersService', () => {
       deleteUser: jest.fn(),
     };
     emailsService = { sendEmail: jest.fn() };
+    mockCoordinatorsService = { findActiveByHomebase: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +72,7 @@ describe('VolunteersService', () => {
         { provide: getRepositoryToken(FosterVolunteer), useValue: mockRepo },
         { provide: CognitoService, useValue: mockCognitoService },
         { provide: EmailsService, useValue: emailsService },
+        { provide: CoordinatorsService, useValue: mockCoordinatorsService },
       ],
     }).compile();
 
@@ -90,7 +95,7 @@ describe('VolunteersService', () => {
         where: { volunteerId: 7 },
         relations: ['assignedCoordinators'],
       });
-      expect(repo.findOne).toHaveBeenCalledTimes(1);
+      expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
@@ -163,8 +168,16 @@ describe('VolunteersService', () => {
 
     const { password, ...profile } = dto;
 
+    const bostonCoordinators = [
+      { coordinatorId: 3, email: 'c3@example.com', active: true },
+      { coordinatorId: 4, email: 'c4@example.com', active: true },
+    ] as FosterCoordinator[];
+
     beforeEach(() => {
       mockRepo.findOneBy.mockResolvedValue(null);
+      mockCoordinatorsService.findActiveByHomebase.mockResolvedValue(
+        bostonCoordinators,
+      );
       mockCognitoService.signUpUser.mockResolvedValue('cognito-sub-123');
       mockRepo.save.mockImplementation(async (volunteer) => ({
         volunteerId: 1,
@@ -196,6 +209,7 @@ describe('VolunteersService', () => {
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
+        assignedCoordinators: bostonCoordinators,
       });
     });
 
@@ -209,6 +223,7 @@ describe('VolunteersService', () => {
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
+        assignedCoordinators: bostonCoordinators,
       });
       expect(result).toEqual({
         volunteerId: 1,
@@ -216,8 +231,47 @@ describe('VolunteersService', () => {
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
+        assignedCoordinators: bostonCoordinators,
       });
       expect(result).not.toHaveProperty('password');
+    });
+
+    it("looks up the active coordinators at the volunteer's homebase", async () => {
+      await service.create(dto);
+
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).toHaveBeenCalledTimes(1);
+      expect(mockCoordinatorsService.findActiveByHomebase).toHaveBeenCalledWith(
+        Homebase.BOSTON,
+      );
+    });
+
+    it('saves an empty coordinator list when the homebase has no coordinators', async () => {
+      mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([]);
+
+      const result = await service.create(dto);
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedCoordinators: [] }),
+      );
+      expect(result.assignedCoordinators).toEqual([]);
+    });
+
+    it('does not create the Cognito user when the coordinator lookup fails', async () => {
+      const lookupError = new Error('connection lost');
+      mockCoordinatorsService.findActiveByHomebase.mockRejectedValue(
+        lookupError,
+      );
+
+      await expect(service.create(dto)).rejects.toBe(lookupError);
+      expect(mockRepo.findOneBy).toHaveBeenCalledTimes(1);
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.signUpUser).not.toHaveBeenCalled();
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
     it('throws ConflictException without calling Cognito when the email is already in Postgres', async () => {
@@ -232,6 +286,9 @@ describe('VolunteersService', () => {
         email: 'jane@example.com',
       });
       expect(mockCognitoService.signUpUser).not.toHaveBeenCalled();
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).not.toHaveBeenCalled();
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
@@ -513,7 +570,7 @@ describe('VolunteersService', () => {
       expect(result.firstName).toBe('Jane');
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinator'],
+        relations: ['assignedCoordinators'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,
@@ -538,7 +595,7 @@ describe('VolunteersService', () => {
       expect(result.zipcode).toBe('02115');
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinator'],
+        relations: ['assignedCoordinators'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,

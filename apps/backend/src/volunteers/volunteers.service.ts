@@ -17,6 +17,7 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
 
 @Injectable()
 export class VolunteersService {
@@ -27,6 +28,7 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
     private emailsService: EmailsService,
+    private coordinatorsService: CoordinatorsService,
   ) {}
 
   /**
@@ -59,6 +61,7 @@ export class VolunteersService {
    * If the save fails, the Cognito user is deleted so the email can be reused.
    * Cognito emails the Volunteer a verification code, which they pass to
    * {@link confirm}. New Volunteers are pending until a coordinator approves them.
+   * Assigns every active coordinator at the Volunteer's homebase.
    *
    * @param dto - The Volunteer's profile fields and chosen password.
    * @returns The saved Volunteer.
@@ -77,6 +80,10 @@ export class VolunteersService {
       throw new ConflictException('A volunteer with this email already exists');
     }
 
+    // Looked up before Cognito so a failure here leaves nothing to roll back.
+    const assignedCoordinators =
+      await this.coordinatorsService.findActiveByHomebase(profile.homebase);
+
     const cognitoSub = await this.cognitoService.signUpUser({
       firstName: profile.firstName,
       lastName: profile.lastName,
@@ -91,6 +98,7 @@ export class VolunteersService {
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
+        assignedCoordinators,
       });
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
