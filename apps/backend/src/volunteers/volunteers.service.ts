@@ -18,6 +18,13 @@ import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Homebase } from '../types';
+import {
+  CoordinatorEmail,
+  coordinatorGainedVolunteerEmail,
+  coordinatorLostVolunteerEmail,
+} from './volunteers.emails';
 
 @Injectable()
 export class VolunteersService {
@@ -182,6 +189,99 @@ export class VolunteersService {
     volunteer.status = VolunteerStatus.ACTIVE;
 
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Moves a Volunteer to a different homebase and reassigns their coordinators.
+   *
+   * @param id - The Volunteer's ID.
+   * @param homebase - The new homebase.
+   * @returns The updated Volunteer, with their new assigned coordinators.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is already at the homebase.
+   */
+  async changeHomebase(
+    id: number,
+    homebase: Homebase,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.homebase === homebase) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} is already assigned to the ${homebase} homebase`,
+      );
+    }
+
+    return this.reassignCoordinators(volunteer, homebase);
+  }
+
+  /**
+   * Sets a Volunteer's homebase, replaces their assigned coordinators with the
+   * active coordinators there, saves, then emails the coordinators who lost and
+   * gained the Volunteer.
+   *
+   * Emails are sent only after the save, and are best-effort: a failed send is
+   * logged rather than failing the request, since the reassignment is already
+   * committed. Coordinators in both the old and new lists are not emailed.
+   *
+   * @param volunteer - The Volunteer, with assignedCoordinators loaded.
+   * @param homebase - The new homebase.
+   * @returns The saved Volunteer.
+   */
+  private async reassignCoordinators(
+    volunteer: FosterVolunteer,
+    homebase: Homebase,
+  ): Promise<FosterVolunteer> {
+    const previous = volunteer.assignedCoordinators;
+    const next = await this.coordinatorsService.findActiveByHomebase(homebase);
+
+    volunteer.homebase = homebase;
+    volunteer.assignedCoordinators = next;
+    const saved = await this.repo.save(volunteer);
+
+    const previousIds = new Set(previous.map((c) => c.coordinatorId));
+    const nextIds = new Set(next.map((c) => c.coordinatorId));
+    const removed = previous.filter(
+      (c) => c.active && !nextIds.has(c.coordinatorId),
+    );
+    const added = next.filter((c) => !previousIds.has(c.coordinatorId));
+
+    await this.notifyCoordinators(
+      removed,
+      coordinatorLostVolunteerEmail(saved, homebase),
+      saved.volunteerId,
+    );
+    await this.notifyCoordinators(
+      added,
+      coordinatorGainedVolunteerEmail(saved),
+      saved.volunteerId,
+    );
+
+    return saved;
+  }
+
+  /**
+   * Sends the same email to each coordinator, logging failures without throwing
+   * so one failed send does not stop the rest.
+   */
+  private async notifyCoordinators(
+    coordinators: FosterCoordinator[],
+    email: CoordinatorEmail,
+    volunteerId: number,
+  ): Promise<void> {
+    for (const coordinator of coordinators) {
+      try {
+        await this.emailsService.sendEmail({
+          toEmail: coordinator.email,
+          ...email,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send reassignment email to coordinator ${coordinator.coordinatorId} for volunteer ${volunteerId}.`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
   }
 
   /**
