@@ -15,6 +15,9 @@ import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { Homebase } from '../types';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { UpdateHomebaseDto } from './dto/update-homebase.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -35,6 +38,7 @@ describe('VolunteersController', () => {
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
     getAllVolunteers: jest.Mock;
+    changeHomebase: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -53,6 +57,7 @@ describe('VolunteersController', () => {
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
       getAllVolunteers: jest.fn(),
+      changeHomebase: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -348,6 +353,66 @@ describe('VolunteersController', () => {
       const result = await controller.getAllVolunteers();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('updateHomebase', () => {
+    it('changes the homebase through the service and returns the volunteer', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        homebase: Homebase.SALEM,
+        assignedCoordinators: [],
+      } as FosterVolunteer;
+      mockVolunteersService.changeHomebase.mockResolvedValue(volunteer);
+
+      const result = await controller.updateHomebase(1, {
+        homebase: Homebase.SALEM,
+      } as UpdateHomebaseDto);
+
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledWith(
+        1,
+        Homebase.SALEM,
+      );
+      expect(result).toBe(volunteer);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      const error = new NotFoundException('Volunteer with ID 1 not found');
+      mockVolunteersService.changeHomebase.mockRejectedValue(error);
+
+      await expect(
+        controller.updateHomebase(1, {
+          homebase: Homebase.SALEM,
+        } as UpdateHomebaseDto),
+      ).rejects.toBe(error);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('UpdateHomebaseDto validation', () => {
+    const errorsFor = (body: object) =>
+      validate(plainToInstance(UpdateHomebaseDto, body));
+
+    it.each(Object.values(Homebase))('accepts %p', async (homebase) => {
+      expect(await errorsFor({ homebase })).toHaveLength(0);
+    });
+
+    it.each(['Narnia', 'boston', ' Boston', '', 42, null])(
+      'rejects %p',
+      async (homebase) => {
+        const errors = await errorsFor({ homebase });
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0].property).toBe('homebase');
+      },
+    );
+
+    it('rejects a missing homebase', async () => {
+      const errors = await errorsFor({});
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('homebase');
     });
   });
 });

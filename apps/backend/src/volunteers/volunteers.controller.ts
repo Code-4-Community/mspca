@@ -19,6 +19,7 @@ import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
+import { UpdateHomebaseDto } from './dto/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
@@ -218,5 +219,34 @@ export class VolunteersController {
   })
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.volunteersService.getAllVolunteers();
+  }
+
+  @ApiOperation({
+    summary:
+      "Change a foster volunteer's homebase and reassign their coordinators",
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'The homebase was changed and the volunteer was reassigned to its coordinators',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The homebase is missing, invalid, or the same as the current homebase',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No volunteer exists with the ID',
+  })
+  @Patch('/:id/homebase')
+  async updateHomebase(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateHomebaseDto,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.changeHomebase(id, dto.homebase);
   }
 }
