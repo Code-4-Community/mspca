@@ -12,6 +12,7 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AccessTokenPayload, CognitoConfig } from './cognito.types';
@@ -114,15 +115,12 @@ export class CognitoService {
       DesiredDeliveryMediums: ['EMAIL'],
     });
 
+    let sub: string | undefined;
     try {
       const response = await client.send(command);
-      const sub = response.User?.Attributes?.find(
+      sub = response.User?.Attributes?.find(
         (attr) => attr.Name === 'sub',
       )?.Value;
-
-      await this.addUserToGroup(email, role);
-
-      return sub ?? '';
     } catch (error) {
       if (error instanceof Error && error.name === 'UsernameExistsException') {
         throw new ConflictException('A user with this email already exists');
@@ -132,6 +130,32 @@ export class CognitoService {
         `Failed to create user: ${reason}`,
       );
     }
+
+    // Cognito should always return a sub for a created user; a missing one would
+    // only come from an AWS outage or internal bug.
+    if (!sub) {
+      await this.deletePartiallyCreatedUser(email);
+      throw new InternalServerErrorException(
+        'Failed to create user: Cognito returned no sub',
+      );
+    }
+
+    try {
+      await this.addUserToGroup(email, role);
+    } catch (error) {
+      // A user that exists but isn't in a group is in a broken state with no
+      // role, so delete it rather than leave a login that can't be used.
+      await this.deletePartiallyCreatedUser(email);
+      throw error;
+    }
+
+    return sub;
+  }
+
+  private async deletePartiallyCreatedUser(email: string): Promise<void> {
+    await this.deleteUser(email).catch(() =>
+      this.logger.error(`Failed to delete partially created user ${email}`),
+    );
   }
 
   async addUserToGroup(username: string, groupName: string): Promise<void> {
@@ -215,6 +239,25 @@ export class CognitoService {
       const reason = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(
         `Failed to enable user: ${reason}`,
+      );
+    }
+  }
+
+  async deleteUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminDeleteUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to delete user: ${reason}`,
       );
     }
   }

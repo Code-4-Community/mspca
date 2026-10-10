@@ -1,16 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { Homebase } from '../types';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
   let volunteersService: {
+    create: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
@@ -19,6 +22,7 @@ describe('VolunteersController', () => {
 
   beforeEach(async () => {
     volunteersService = {
+      create: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
@@ -38,6 +42,44 @@ describe('VolunteersController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('create', () => {
+    const dto = {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      phone: '617-555-0100',
+      email: 'jane@example.com',
+      address: '350 S Huntington Ave',
+      city: 'Boston',
+      zipcode: '02130',
+      homebase: Homebase.BOSTON,
+      residentAnimals: 'One cat',
+      fosterType: FosterType.CAT,
+    } as CreateVolunteerDto;
+
+    it('creates the volunteer through the service and returns it', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer;
+      volunteersService.create.mockResolvedValue(volunteer);
+
+      const result = await controller.create(dto);
+
+      expect(volunteersService.create).toHaveBeenCalledWith(dto);
+      expect(result).toBe(volunteer);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      volunteersService.create.mockRejectedValue(
+        new ConflictException('A volunteer with this email already exists'),
+      );
+
+      await expect(controller.create(dto)).rejects.toThrow(
+        new ConflictException('A volunteer with this email already exists'),
+      );
+    });
   });
 
   describe('getVolunteerMatches', () => {

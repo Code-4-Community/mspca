@@ -1,6 +1,7 @@
 import {
   ConflictException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import {
@@ -10,6 +11,7 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AuthConfigurationError } from './cognito.config';
@@ -211,7 +213,12 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
-        ).rejects.toThrow(ConflictException);
+        ).rejects.toThrow(
+          new ConflictException('A user with this email already exists'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
       });
 
       it('throws InternalServerErrorException on unknown error', async () => {
@@ -224,7 +231,101 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
+        ).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to create user: Cognito down',
+          ),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+      });
+
+      it('deletes the user and throws when Cognito returns no sub', async () => {
+        sendSpy
+          .mockResolvedValueOnce({ User: { Attributes: [] } })
+          .mockResolvedValueOnce({}); // deleteUser
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to create user: Cognito returned no sub',
+          ),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(2);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        const deleteCmd = sendSpy.mock.calls[1][0];
+        expect(deleteCmd).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(deleteCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('deletes the user and throws when adding to the group fails', async () => {
+        sendSpy
+          .mockResolvedValueOnce({
+            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
+          })
+          .mockRejectedValueOnce(new Error('Group not found'))
+          .mockResolvedValueOnce({}); // deleteUser
+        jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
         ).rejects.toThrow(InternalServerErrorException);
+
+        expect(sendSpy).toHaveBeenCalledTimes(3);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        const groupCmd = sendSpy.mock.calls[1][0];
+        expect(groupCmd).toBeInstanceOf(AdminAddUserToGroupCommand);
+        expect(groupCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+          GroupName: CognitoRole.FosterVolunteer,
+        });
+        const deleteCmd = sendSpy.mock.calls[2][0];
+        expect(deleteCmd).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(deleteCmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('throws the original error when cleanup also fails', async () => {
+        sendSpy
+          .mockResolvedValueOnce({
+            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
+          })
+          .mockRejectedValueOnce(new Error('Group not found'))
+          .mockRejectedValueOnce(new Error('Cognito down'));
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(/Failed to add user to group/);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to delete partially created user jane@example.com',
+        );
       });
 
       it('throws when auth is disabled', async () => {
@@ -307,6 +408,28 @@ describe('CognitoService', () => {
         sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
 
         await expect(service.disableUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+      });
+    });
+
+    describe('deleteUser', () => {
+      it('sends AdminDeleteUserCommand', async () => {
+        await service.deleteUser('jane@example.com');
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+
+        await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
           InternalServerErrorException,
         );
       });

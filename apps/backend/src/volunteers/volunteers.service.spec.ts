@@ -1,20 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
+import { CognitoService } from '../aws/cognito/cognito.service';
+import { CognitoRole } from '../aws/cognito/cognito.types';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { Homebase } from '../types';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
-  let repo: { findOne: jest.Mock; save: jest.Mock; delete: jest.Mock };
+  let repo: {
+    findOne: jest.Mock;
+    findOneBy: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
+  let cognitoService: { createUser: jest.Mock; deleteUser: jest.Mock };
 
   beforeEach(async () => {
     repo = {
       findOne: jest.fn(),
+      findOneBy: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
     };
+    cognitoService = { createUser: jest.fn(), deleteUser: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -22,6 +40,10 @@ describe('VolunteersService', () => {
         {
           provide: getRepositoryToken(FosterVolunteer),
           useValue: repo,
+        },
+        {
+          provide: CognitoService,
+          useValue: cognitoService,
         },
       ],
     }).compile();
@@ -90,6 +112,140 @@ describe('VolunteersService', () => {
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 7 not found'),
       );
+    });
+  });
+
+  describe('create', () => {
+    const dto = {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      phone: '617-555-0100',
+      secondaryPhone: '617-555-0199',
+      email: 'jane@example.com',
+      address: '350 S Huntington Ave',
+      city: 'Boston',
+      zipcode: '02130',
+      homebase: Homebase.BOSTON,
+      residentAnimals: 'One cat',
+      notes: 'Prefers kittens',
+      fosterType: FosterType.CAT,
+    } as CreateVolunteerDto;
+
+    beforeEach(() => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.createUser.mockResolvedValue('cognito-sub-123');
+      repo.save.mockImplementation(async (volunteer) => ({
+        volunteerId: 1,
+        ...volunteer,
+      }));
+    });
+
+    it('creates the Cognito user with the FosterVolunteer role', async () => {
+      await service.create(dto);
+
+      expect(cognitoService.createUser).toHaveBeenCalledWith({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: 'jane@example.com',
+        role: CognitoRole.FosterVolunteer,
+      });
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves the volunteer as pending with a signed waiver and the Cognito sub', async () => {
+      const result = await service.create(dto);
+
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledWith({
+        ...dto,
+        status: VolunteerStatus.PENDING,
+        mostRecentWaiverSigned: true,
+        cognitoSub: 'cognito-sub-123',
+      });
+      expect(result).toEqual({
+        volunteerId: 1,
+        ...dto,
+        status: VolunteerStatus.PENDING,
+        mostRecentWaiverSigned: true,
+        cognitoSub: 'cognito-sub-123',
+      });
+    });
+
+    it('throws ConflictException without calling Cognito when the email is already in Postgres', async () => {
+      repo.findOneBy.mockResolvedValue({ volunteerId: 5 } as FosterVolunteer);
+
+      await expect(service.create(dto)).rejects.toThrow(
+        new ConflictException('A volunteer with this email already exists'),
+      );
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        email: 'jane@example.com',
+      });
+      expect(cognitoService.createUser).not.toHaveBeenCalled();
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      new ConflictException('A user with this email already exists'),
+      new InternalServerErrorException('Failed to create user: boom'),
+    ])(
+      'propagates %p from Cognito without saving the volunteer',
+      async (error) => {
+        cognitoService.createUser.mockRejectedValue(error);
+
+        await expect(service.create(dto)).rejects.toBe(error);
+        expect(repo.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('lowercases the email before checking for duplicates and creating the user', async () => {
+      await service.create({ ...dto, email: 'Jane@Example.com' });
+
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        email: 'jane@example.com',
+      });
+      expect(cognitoService.createUser).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jane@example.com' }),
+      );
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jane@example.com' }),
+      );
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deletes the Cognito user and rethrows when the Postgres save fails', async () => {
+      const dbError = new Error('connection lost');
+      repo.save.mockRejectedValue(dbError);
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+
+      await expect(service.create(dto)).rejects.toBe(dbError);
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+    });
+
+    it('logs the orphaned Cognito sub and rethrows the save error when the cleanup also fails', async () => {
+      const logError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const dbError = new Error('connection lost');
+      repo.save.mockRejectedValue(dbError);
+      cognitoService.deleteUser.mockRejectedValue(new Error('Cognito down'));
+
+      await expect(service.create(dto)).rejects.toBe(dbError);
+      expect(cognitoService.createUser).toHaveBeenCalledTimes(1);
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(logError).toHaveBeenCalledWith(
+        expect.stringContaining('cognito-sub-123'),
+      );
+
+      logError.mockRestore();
     });
   });
 
