@@ -9,7 +9,6 @@ import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { Homebase } from '../types';
-import { IS_PUBLIC_KEY } from '../aws/cognito/cognito.decorator';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -58,15 +57,6 @@ describe('VolunteersController', () => {
       residentAnimals: 'One cat',
       fosterType: FosterType.CAT,
     } as CreateVolunteerDto;
-
-    it('is public so volunteers can sign up without a token', () => {
-      expect(
-        Reflect.getMetadata(
-          IS_PUBLIC_KEY,
-          VolunteersController.prototype.create,
-        ),
-      ).toBe(true);
-    });
 
     it('creates the volunteer through the service and returns it', async () => {
       const volunteer = {

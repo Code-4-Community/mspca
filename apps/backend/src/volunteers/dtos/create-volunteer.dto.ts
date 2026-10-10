@@ -1,5 +1,4 @@
 import {
-  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -68,8 +67,4 @@ export class CreateVolunteerDto {
 
   @IsEnum(FosterType)
   fosterType!: FosterType;
-
-  @IsOptional()
-  @IsBoolean()
-  completedCanineTraining?: boolean;
 }
