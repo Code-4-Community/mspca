@@ -14,11 +14,19 @@ import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
 const coordinator = {
   coordinatorId: 7,
   email: 'coordinator@gmail.com',
+  active: true,
 } as FosterCoordinator;
 
 const secondCoordinator = {
   coordinatorId: 8,
   email: 'second-coordinator@gmail.com',
+  active: true,
+} as FosterCoordinator;
+
+const inactiveCoordinator = {
+  coordinatorId: 9,
+  email: 'inactive-coordinator@gmail.com',
+  active: false,
 } as FosterCoordinator;
 
 const volunteerWithCoordinator = {
@@ -225,6 +233,68 @@ describe('MatchesService', () => {
       expect(bodyHtml).toContain('Ada Lovelace');
       expect(bodyHtml).toContain('volunteer 1');
       expect(bodyHtml).toContain('42');
+    });
+
+    it('escapes HTML in the volunteer name in the email body', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue({
+        ...volunteerWithCoordinator,
+        firstName: '<script>alert("x")</script>',
+      } as FosterVolunteer);
+      emailsService.sendEmail.mockResolvedValue(undefined);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+
+      await service.create({ volunteerId: 1, chameleonAnimalId: 42 });
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      const { bodyHtml } = emailsService.sendEmail.mock
+        .calls[0][0] as SendEmailDTO;
+      expect(bodyHtml).not.toContain('<script>');
+      expect(bodyHtml).toContain(
+        '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;',
+      );
+    });
+
+    it('does not email inactive assigned coordinators', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue({
+        ...volunteerWithCoordinator,
+        assignedCoordinators: [inactiveCoordinator, coordinator],
+      } as FosterVolunteer);
+      emailsService.sendEmail.mockResolvedValue(undefined);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+
+      await service.create({ volunteerId: 1, chameleonAnimalId: 42 });
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ toEmail: coordinator.email }),
+      );
+    });
+
+    it('warns and sends nothing when every assigned coordinator is inactive', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue({
+        ...volunteerWithCoordinator,
+        assignedCoordinators: [inactiveCoordinator],
+      } as FosterVolunteer);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+      const match = await service.create({
+        volunteerId: 1,
+        chameleonAnimalId: 42,
+      });
+
+      expect(match.matchId).toEqual(10);
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
     });
 
     it('still creates the match when the volunteer has no coordinator', async () => {

@@ -14,6 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
+import { escapeHtml } from '../volunteers/volunteers.emails';
 
 @Injectable()
 export class MatchesService {
@@ -90,10 +91,10 @@ export class MatchesService {
   }
 
   /**
-   * Emails each of the volunteer's assigned foster coordinators about a new match.
+   * Emails each of the volunteer's active assigned foster coordinators about a new match.
    *
    * Never throws: the match is already committed by the time this runs, so a
-   * volunteer with no coordinators is logged as a warning and each failed send
+   * volunteer with no active coordinators is logged as a warning and each failed send
    * as an error rather than failing the request. One failed send does not stop
    * the remaining coordinators from being emailed.
    *
@@ -104,14 +105,18 @@ export class MatchesService {
     match: Match,
     volunteer: FosterVolunteer,
   ): Promise<void> {
-    const coordinators = volunteer.assignedCoordinators;
+    const coordinators = volunteer.assignedCoordinators.filter((c) => c.active);
 
     if (coordinators.length === 0) {
       this.logger.warn(
-        `Volunteer ${volunteer.volunteerId} has no assigned coordinators; no match email sent for match ${match.matchId}.`,
+        `Volunteer ${volunteer.volunteerId} has no active assigned coordinators; no match email sent for match ${match.matchId}.`,
       );
       return;
     }
+
+    const volunteerName = escapeHtml(
+      `${volunteer.firstName} ${volunteer.lastName}`,
+    );
 
     for (const coordinator of coordinators) {
       // Placeholder copy - TODO: put real template here later.
@@ -119,7 +124,7 @@ export class MatchesService {
         await this.emailsService.sendEmail({
           toEmail: coordinator.email,
           subject: 'New foster match created',
-          bodyHtml: `<p>A match has been created for ${volunteer.firstName} ${volunteer.lastName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
+          bodyHtml: `<p>A match has been created for ${volunteerName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
         });
       } catch (error) {
         this.logger.error(

@@ -7,7 +7,7 @@ export interface CoordinatorEmail {
 }
 
 // Volunteer names come from signup input, so escape them before putting them in HTML.
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
