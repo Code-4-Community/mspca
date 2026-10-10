@@ -694,6 +694,33 @@ describe('VolunteersService', () => {
       expect(result.assignedCoordinators).toEqual([coordinator]);
     });
 
+    it('ignores a null homebase instead of reassigning or clearing it', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        volunteerId: 9,
+        homebase: Homebase.BOSTON,
+        assignedCoordinators: [],
+      } as FosterVolunteer);
+      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
+
+      const result = await service.updateVolunteerById(9, {
+        homebase: null,
+        notes: 'Null homebase',
+      } as unknown as UpdateVolunteerDto);
+
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          homebase: Homebase.BOSTON,
+          notes: 'Null homebase',
+        }),
+      );
+      expect(result.homebase).toBe(Homebase.BOSTON);
+    });
+
     it('does not reassign or email when the homebase is not in the update', async () => {
       mockRepo.findOne.mockResolvedValue({
         volunteerId: 9,

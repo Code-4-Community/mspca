@@ -334,7 +334,8 @@ export class VolunteersService {
     const { homebase, ...fields } = dto;
     Object.assign(volunteer, fields);
 
-    if (homebase !== undefined && homebase !== volunteer.homebase) {
+    // @IsOptional lets an explicit null through validation; treat it as absent.
+    if (homebase != null && homebase !== volunteer.homebase) {
       return this.reassignCoordinators(volunteer, homebase);
     }
 
