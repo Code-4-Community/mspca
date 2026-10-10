@@ -30,7 +30,7 @@ export class VolunteersService {
   ) {}
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinators.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -41,7 +41,7 @@ export class VolunteersService {
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinator'],
+      relations: ['assignedCoordinators'],
     });
 
     if (!volunteer) {

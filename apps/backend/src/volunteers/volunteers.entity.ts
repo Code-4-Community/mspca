@@ -2,8 +2,8 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
-  JoinColumn,
+  ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterType, VolunteerStatus } from './volunteers.types';
@@ -75,11 +75,17 @@ export class FosterVolunteer {
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
 
-  @ManyToOne(
+  @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
-    { nullable: true },
   )
-  @JoinColumn({ name: 'assigned_coordinator_id' })
-  assignedCoordinator!: FosterCoordinator | null;
+  @JoinTable({
+    name: 'volunteer_coordinator_assignments',
+    joinColumn: { name: 'volunteer_id', referencedColumnName: 'volunteerId' },
+    inverseJoinColumn: {
+      name: 'coordinator_id',
+      referencedColumnName: 'coordinatorId',
+    },
+  })
+  assignedCoordinators!: FosterCoordinator[];
 }

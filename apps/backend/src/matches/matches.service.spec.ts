@@ -16,17 +16,27 @@ const coordinator = {
   email: 'coordinator@gmail.com',
 } as FosterCoordinator;
 
+const secondCoordinator = {
+  coordinatorId: 8,
+  email: 'second-coordinator@gmail.com',
+} as FosterCoordinator;
+
 const volunteerWithCoordinator = {
   volunteerId: 1,
   firstName: 'Ada',
   lastName: 'Lovelace',
   status: VolunteerStatus.ACTIVE,
-  assignedCoordinator: coordinator,
+  assignedCoordinators: [coordinator],
+} as FosterVolunteer;
+
+const volunteerWithCoordinators = {
+  ...volunteerWithCoordinator,
+  assignedCoordinators: [coordinator, secondCoordinator],
 } as FosterVolunteer;
 
 const volunteerWithoutCoordinator = {
   ...volunteerWithCoordinator,
-  assignedCoordinator: null,
+  assignedCoordinators: [],
 } as FosterVolunteer;
 
 describe('MatchesService', () => {
@@ -144,6 +154,59 @@ describe('MatchesService', () => {
       );
     });
 
+    it('emails every assigned coordinator', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinators,
+      );
+      emailsService.sendEmail.mockResolvedValue(undefined);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+
+      await service.create({ volunteerId: 1, chameleonAnimalId: 42 });
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ toEmail: coordinator.email }),
+      );
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ toEmail: secondCoordinator.email }),
+      );
+    });
+
+    it('still emails the remaining coordinators when one send fails', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinators,
+      );
+      emailsService.sendEmail
+        .mockRejectedValueOnce(new Error('SES is down'))
+        .mockResolvedValueOnce(undefined);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const match = await service.create({
+        volunteerId: 1,
+        chameleonAnimalId: 42,
+      });
+
+      expect(match.matchId).toEqual(10);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenLastCalledWith(
+        expect.objectContaining({ toEmail: secondCoordinator.email }),
+      );
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('coordinator 7'),
+        expect.any(String),
+      );
+    });
+
     it('names the volunteer and the animal in the email body', async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinator,
@@ -181,7 +244,7 @@ describe('MatchesService', () => {
 
       expect(match.status).toEqual(MatchStatus.PENDING);
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      expect(warn).toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
     });
 
     it('creates the match even when the email fails to send', async () => {

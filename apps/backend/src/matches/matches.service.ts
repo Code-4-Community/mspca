@@ -29,11 +29,11 @@ export class MatchesService {
 
   /**
    * Creates a PENDING match between a volunteer and a Chameleon animal, then
-   * notifies the volunteer's assigned foster coordinator by email.
+   * notifies the volunteer's assigned foster coordinators by email.
    *
    * The email is best-effort: the match is already committed when it is sent,
    * so a send failure is logged rather than surfaced to the caller. Volunteers
-   * with no assigned coordinator still get a match; no email goes out.
+   * with no assigned coordinators still get a match; no email goes out.
    *
    * @param dto the volunteer and Chameleon animal to match
    * @returns the created match
@@ -54,7 +54,7 @@ export class MatchesService {
       }),
     );
 
-    await this.notifyCoordinator(match, volunteer);
+    await this.notifyCoordinators(match, volunteer);
 
     return match;
   }
@@ -90,40 +90,43 @@ export class MatchesService {
   }
 
   /**
-   * Emails the volunteer's assigned foster coordinator about a new match.
+   * Emails each of the volunteer's assigned foster coordinators about a new match.
    *
    * Never throws: the match is already committed by the time this runs, so a
-   * missing coordinator is logged as a warning and a failed send as an error
-   * rather than failing the request.
+   * volunteer with no coordinators is logged as a warning and each failed send
+   * as an error rather than failing the request. One failed send does not stop
+   * the remaining coordinators from being emailed.
    *
    * @param match the match that was just created
-   * @param volunteer the matched volunteer, with assignedCoordinator loaded
+   * @param volunteer the matched volunteer, with assignedCoordinators loaded
    */
-  private async notifyCoordinator(
+  private async notifyCoordinators(
     match: Match,
     volunteer: FosterVolunteer,
   ): Promise<void> {
-    const coordinator = volunteer.assignedCoordinator;
+    const coordinators = volunteer.assignedCoordinators;
 
-    if (!coordinator) {
+    if (coordinators.length === 0) {
       this.logger.warn(
-        `Volunteer ${volunteer.volunteerId} has no assigned coordinator; no match email sent for match ${match.matchId}.`,
+        `Volunteer ${volunteer.volunteerId} has no assigned coordinators; no match email sent for match ${match.matchId}.`,
       );
       return;
     }
 
-    // Placeholder copy - TODO: put real template here later.
-    try {
-      await this.emailsService.sendEmail({
-        toEmail: coordinator.email,
-        subject: 'New foster match created',
-        bodyHtml: `<p>A match has been created for ${volunteer.firstName} ${volunteer.lastName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send match creation email for match ${match.matchId}.`,
-        error instanceof Error ? error.stack : String(error),
-      );
+    for (const coordinator of coordinators) {
+      // Placeholder copy - TODO: put real template here later.
+      try {
+        await this.emailsService.sendEmail({
+          toEmail: coordinator.email,
+          subject: 'New foster match created',
+          bodyHtml: `<p>A match has been created for ${volunteer.firstName} ${volunteer.lastName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send match creation email to coordinator ${coordinator.coordinatorId} for match ${match.matchId}.`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
     }
   }
 
