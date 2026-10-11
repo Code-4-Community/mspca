@@ -11,4 +11,16 @@ describe('validateId', () => {
       new BadRequestException('Invalid User ID'),
     );
   });
+
+  it('should throw BadRequestException for a non-integer ID', () => {
+    expect(() => validateId(1.5, 'User')).toThrow(
+      new BadRequestException('Invalid User ID'),
+    );
+  });
+
+  it('should throw BadRequestException for a missing ID', () => {
+    expect(() => validateId(undefined as unknown as number, 'User')).toThrow(
+      new BadRequestException('Invalid User ID'),
+    );
+  });
 });
