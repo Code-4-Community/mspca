@@ -17,7 +17,6 @@ import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { FosterVolunteer } from './volunteers.entity';
 
 @ApiTags('Volunteers')
-// @ApiBearerAuth()
 @Controller('volunteers')
 export class VolunteersController {
   constructor(
@@ -45,6 +44,36 @@ export class VolunteersController {
     await this.volunteersService.findByIdOrFail(volunteerId);
 
     return this.matchesService.findByVolunteerId(volunteerId);
+  }
+
+  @ApiOperation({ summary: 'Deactivate an active foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was deactivated',
+    type: FosterVolunteer,
+  })
+  @Patch('/:id/deactivate')
+  async deactivate(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.deactivate(id);
+  }
+
+  @ApiOperation({ summary: 'Reactivate an inactive foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was reactivated',
+    type: FosterVolunteer,
+  })
+  @Patch('/:id/reactivate')
+  async reactivate(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.reactivate(id);
   }
 
   @Get('/:volunteerId')
