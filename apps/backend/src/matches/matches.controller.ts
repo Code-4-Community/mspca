@@ -12,7 +12,7 @@ import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
-import { DenyMatchDto } from './dto/deny-match.dto';
+import { DenyMatchDto } from './dtos/deny-match.dto';
 
 @ApiTags('Matches')
 @Controller('matches')

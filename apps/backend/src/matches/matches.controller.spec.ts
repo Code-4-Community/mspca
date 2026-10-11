@@ -10,7 +10,7 @@ import { MatchesService } from './matches.service';
 import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
-import { DenyMatchDto } from './dto/deny-match.dto';
+import { DenyMatchDto } from './dtos/deny-match.dto';
 
 describe('MatchesController', () => {
   let controller: MatchesController;
@@ -23,7 +23,7 @@ describe('MatchesController', () => {
 
   const mockMatch = {
     matchId: 1,
-    status: MatchStatus.ACTIVE,
+    status: MatchStatus.PENDING,
     deniedReason: null,
   } as Match;
 
@@ -129,11 +129,15 @@ describe('MatchesController', () => {
 
   describe('approveMatch', () => {
     it('should approve and return the match when found', async () => {
-      service.approveMatch.mockResolvedValue(mockMatch);
+      const approvedMatch = {
+        ...mockMatch,
+        status: MatchStatus.ACTIVE,
+      } as Match;
+      service.approveMatch.mockResolvedValue(approvedMatch);
 
       const result = await controller.approveMatch(1);
 
-      expect(result).toEqual(mockMatch);
+      expect(result).toEqual(approvedMatch);
       expect(service.approveMatch).toHaveBeenCalledWith(1);
     });
 
