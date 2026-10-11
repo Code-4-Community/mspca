@@ -6,7 +6,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Homebase } from '../types';
-import { FosterType } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 @Entity('foster_volunteers')
@@ -65,8 +65,12 @@ export class FosterVolunteer {
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
 
-  @Column({ type: 'boolean' })
-  active!: boolean;
+  @Column({
+    type: 'enum',
+    enum: VolunteerStatus,
+    default: VolunteerStatus.PENDING,
+  })
+  status!: VolunteerStatus;
 
   @ManyToOne(
     () => FosterCoordinator,
