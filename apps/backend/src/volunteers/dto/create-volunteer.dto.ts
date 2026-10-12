@@ -6,6 +6,7 @@ import {
   IsPhoneNumber,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
@@ -37,6 +38,12 @@ export class CreateVolunteerDto {
   @IsEmail()
   @MaxLength(255)
   email!: string;
+
+  // Cognito enforces the pool's full password policy; these are its outer bounds.
+  @IsString()
+  @MinLength(8)
+  @MaxLength(256)
+  password!: string;
 
   @IsString()
   @IsNotEmpty()

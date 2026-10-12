@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dto/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
@@ -47,42 +49,48 @@ export class VolunteersService {
   }
 
   /**
-   * Creates a Volunteer account.
+   * Signs up a Volunteer account.
    *
-   * The Cognito user is created first; the Postgres row is only saved once that
-   * succeeds, so a Cognito failure never leaves a Volunteer without a login.
+   * The Cognito user is registered first; the Postgres row is only saved once
+   * that succeeds, so a Cognito failure never leaves a Volunteer without a login.
    * If the save fails, the Cognito user is deleted so the email can be reused.
-   * New Volunteers are pending until a coordinator approves them.
+   * Cognito emails the Volunteer a verification code, which they pass to
+   * {@link confirm}. New Volunteers are pending until a coordinator approves them.
    *
-   * @param dto - The Volunteer's profile fields.
+   * @param dto - The Volunteer's profile fields and chosen password.
    * @returns The saved Volunteer.
    * @throws {ConflictException} If a Volunteer or Cognito user with the email already exists.
-   * @throws {InternalServerErrorException} If the Cognito user could not be created.
+   * @throws {BadRequestException} If Cognito rejects the password.
+   * @throws {InternalServerErrorException} If the Cognito user could not be registered.
+   * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
    */
   async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
-    const email = dto.email.toLowerCase();
+    // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
+    const { password, ...profile } = dto;
+    const email = profile.email.toLowerCase();
 
     const existing = await this.repo.findOneBy({ email });
     if (existing) {
       throw new ConflictException('A volunteer with this email already exists');
     }
 
-    const cognitoSub = await this.cognitoService.createUser({
-      firstName: dto.firstName,
-      lastName: dto.lastName,
+    const cognitoSub = await this.cognitoService.signUpUser({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
       email,
-      role: CognitoRole.FosterVolunteer,
+      password,
     });
 
     try {
       return await this.repo.save({
-        ...dto,
+        ...profile,
         email,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
       });
     } catch (error) {
+      this.logger.error(`Failed to save Volunteer ${email}`, error);
       await this.cognitoService
         .deleteUser(email)
         .catch(() =>
@@ -90,8 +98,36 @@ export class VolunteersService {
             `Created Cognito user ${cognitoSub} for ${email} but failed to save the Volunteer or delete the Cognito user`,
           ),
         );
-      throw error;
+      throw new InternalServerErrorException('Failed to save the Volunteer');
     }
+  }
+
+  /**
+   * Confirms a signed-up Volunteer's email and gives them the FosterVolunteer role.
+   *
+   * Only emails with a Volunteer row can be confirmed. The app client is public,
+   * so this stops someone who signed up directly with Cognito (skipping
+   * {@link create}) from getting the role without a Volunteer profile.
+   *
+   * @param dto - The Volunteer's email and the verification code Cognito emailed them.
+   * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
+   * @throws {BadRequestException} If the code is wrong or has expired.
+   * @throws {ConflictException} If the Cognito user can't be confirmed, e.g. they already are.
+   * @throws {InternalServerErrorException} If confirmation or adding the role fails.
+   */
+  async confirm(dto: ConfirmVolunteerDto): Promise<void> {
+    const email = dto.email.toLowerCase();
+
+    const volunteer = await this.repo.findOneBy({ email });
+    if (!volunteer) {
+      throw new NotFoundException('No volunteer with this email exists');
+    }
+
+    await this.cognitoService.confirmUser(
+      email,
+      dto.code,
+      CognitoRole.FosterVolunteer,
+    );
   }
 
   /**

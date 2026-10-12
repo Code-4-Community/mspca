@@ -12,6 +12,7 @@ import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dto/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { Homebase } from '../types';
 
@@ -27,6 +28,7 @@ describe('VolunteersController', () => {
 
   let mockVolunteersService: {
     create: jest.Mock;
+    confirm: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
@@ -38,6 +40,7 @@ describe('VolunteersController', () => {
   beforeEach(async () => {
     mockVolunteersService = {
       create: jest.fn(),
+      confirm: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
@@ -73,6 +76,7 @@ describe('VolunteersController', () => {
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
       fosterType: FosterType.CAT,
+      password: 'Str0ng!Password',
     } as CreateVolunteerDto;
 
     it('creates the volunteer through the service and returns it', async () => {
@@ -95,6 +99,32 @@ describe('VolunteersController', () => {
 
       await expect(controller.create(dto)).rejects.toThrow(
         new ConflictException('A volunteer with this email already exists'),
+      );
+    });
+  });
+
+  describe('confirm', () => {
+    const dto = {
+      email: 'jane@example.com',
+      code: '123456',
+    } as ConfirmVolunteerDto;
+
+    it('confirms the volunteer through the service', async () => {
+      mockVolunteersService.confirm.mockResolvedValue(undefined);
+
+      await expect(controller.confirm(dto)).resolves.toBeUndefined();
+
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      mockVolunteersService.confirm.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
+      );
+
+      await expect(controller.confirm(dto)).rejects.toThrow(
+        new BadRequestException('Invalid verification code'),
       );
     });
   });
