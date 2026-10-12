@@ -14,6 +14,7 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
 
 @ApiTags('Volunteers')
@@ -116,5 +117,30 @@ export class VolunteersController {
       throw new BadRequestException('At least one field must be provided');
     }
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
+  }
+
+  @Patch('/:volunteerId/animal-preferences')
+  @ApiOperation({ summary: "Update a volunteer's animal preferences" })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of Chameleon animal IDs",
+    type: [Number],
+  })
+  async updateAnimalPreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    validateId(volunteerId, 'Volunteer');
+    if (!dto.added?.length && !dto.removed?.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
+    return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 }
