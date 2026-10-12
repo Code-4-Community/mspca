@@ -7,8 +7,8 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { VolunteerStatus } from './volunteers.types';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
 
 describe('VolunteersService', () => {
@@ -108,6 +108,129 @@ describe('VolunteersService', () => {
     });
   });
 
+  describe('deactivate', () => {
+    it('sets status to Inactive, saves, and does not delete the volunteer', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      mockRepo.save.mockResolvedValue({
+        ...volunteer,
+        status: VolunteerStatus.INACTIVE,
+      });
+
+      const result = await service.deactivate(1);
+
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...volunteer,
+        status: VolunteerStatus.INACTIVE,
+      });
+      expect(result.status).toBe(VolunteerStatus.INACTIVE);
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.deactivate(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the volunteer is already inactive', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.INACTIVE,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      await expect(service.deactivate(1)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not active'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the volunteer is pending', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      await expect(service.deactivate(1)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not active'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reactivate', () => {
+    it('sets status to Active and saves the volunteer', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.INACTIVE,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      mockRepo.save.mockResolvedValue({
+        ...volunteer,
+        status: VolunteerStatus.ACTIVE,
+      });
+
+      const result = await service.reactivate(1);
+
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...volunteer,
+        status: VolunteerStatus.ACTIVE,
+      });
+      expect(result.status).toBe(VolunteerStatus.ACTIVE);
+    });
+
+    it('throws NotFoundException if volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.reactivate(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the volunteer is already active', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      await expect(service.reactivate(1)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not inactive'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if the volunteer is pending', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      await expect(service.reactivate(1)).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not inactive'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getVolunteerById', () => {
     it('should return a volunteer when found', async () => {
       mockRepo.findOne.mockResolvedValue(mockVolunteer);
@@ -187,77 +310,6 @@ describe('VolunteersService', () => {
       await expect(
         service.updateVolunteerById(999, { notes: 'x' }),
       ).rejects.toThrow(
-        new NotFoundException('Volunteer with ID 999 not found'),
-      );
-      expect(mockRepo.save).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('deactivate', () => {
-    it('sets status to Inactive, saves, and does not delete the volunteer', async () => {
-      const volunteer = {
-        volunteerId: 1,
-        status: VolunteerStatus.ACTIVE,
-      } as FosterVolunteer;
-      mockRepo.findOne.mockResolvedValue(volunteer);
-      mockRepo.save.mockResolvedValue({
-        ...volunteer,
-        status: VolunteerStatus.INACTIVE,
-      });
-
-      const result = await service.deactivate(1);
-
-      expect(mockRepo.findOne).toHaveBeenCalledWith({
-        where: { volunteerId: 1 },
-        relations: ['assignedCoordinator'],
-      });
-      expect(mockRepo.save).toHaveBeenCalledWith({
-        ...volunteer,
-        status: VolunteerStatus.INACTIVE,
-      });
-      expect(result.status).toBe(VolunteerStatus.INACTIVE);
-      expect(mockRepo.delete).not.toHaveBeenCalled();
-    });
-
-    it('throws NotFoundException if volunteer does not exist', async () => {
-      mockRepo.findOne.mockResolvedValue(null);
-
-      await expect(service.deactivate(999)).rejects.toThrow(
-        new NotFoundException('Volunteer with ID 999 not found'),
-      );
-      expect(mockRepo.save).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('activate', () => {
-    it('sets status to Active and saves the volunteer', async () => {
-      const volunteer = {
-        volunteerId: 1,
-        status: VolunteerStatus.INACTIVE,
-      } as FosterVolunteer;
-      mockRepo.findOne.mockResolvedValue(volunteer);
-      mockRepo.save.mockResolvedValue({
-        ...volunteer,
-        status: VolunteerStatus.ACTIVE,
-      });
-
-      const result = await service.activate(1);
-
-      expect(mockRepo.findOne).toHaveBeenCalledWith({
-        where: { volunteerId: 1 },
-        relations: ['assignedCoordinator'],
-      });
-      expect(mockRepo.save).toHaveBeenCalledWith({
-        ...volunteer,
-        status: VolunteerStatus.ACTIVE,
-      });
-      expect(result.status).toBe(VolunteerStatus.ACTIVE);
-    });
-
-    it('throws NotFoundException if volunteer does not exist', async () => {
-      mockRepo.findOne.mockResolvedValue(null);
-
-      await expect(service.activate(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
