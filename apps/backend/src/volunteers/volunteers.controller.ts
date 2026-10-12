@@ -127,7 +127,7 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid ID, or the volunteer is not pending',
+    description: 'Invalid ID',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -135,7 +135,7 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'The volunteer is already active',
+    description: 'The volunteer is not pending',
   })
   @Patch('/:id/approve')
   async approve(

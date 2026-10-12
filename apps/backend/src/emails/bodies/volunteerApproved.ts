@@ -1,4 +1,4 @@
-import { escapeHtml } from '../emails.utils';
+import { escapeHtml } from '../../utils/emails.utils';
 
 /**
  * Builds the email sent to a Volunteer once a coordinator approves their account.

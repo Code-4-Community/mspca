@@ -101,11 +101,23 @@ export class VolunteersService {
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
-    if (volunteer.status !== VolunteerStatus.ACTIVE) {
-      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
-    }
+    this.checkVolunteerActive(volunteer);
 
     return volunteer;
+  }
+
+  /**
+   * Ensures a Volunteer's account is active.
+   *
+   * @param volunteer - The Volunteer to check.
+   * @throws {BadRequestException} If the Volunteer's status is not Active.
+   */
+  checkVolunteerActive(volunteer: FosterVolunteer): void {
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Volunteer with ID ${volunteer.volunteerId} is not active`,
+      );
+    }
   }
 
   /**
@@ -146,18 +158,13 @@ export class VolunteersService {
    * @param id - The Volunteer's ID.
    * @returns The approved Volunteer.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {ConflictException} If the Volunteer is already active.
-   * @throws {BadRequestException} If the Volunteer is not pending.
+   * @throws {ConflictException} If the Volunteer is not pending.
    */
   async approve(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
-    if (volunteer.status === VolunteerStatus.ACTIVE) {
-      throw new ConflictException(`Volunteer with ID ${id} is already active`);
-    }
-
     if (volunteer.status !== VolunteerStatus.PENDING) {
-      throw new BadRequestException(`Only pending Volunteers can be approved`);
+      throw new ConflictException(`Only pending Volunteers can be approved`);
     }
 
     volunteer.status = VolunteerStatus.ACTIVE;
