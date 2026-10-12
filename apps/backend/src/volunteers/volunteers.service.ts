@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 
 @Injectable()
 export class VolunteersService {

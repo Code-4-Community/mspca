@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;

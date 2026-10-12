@@ -7,7 +7,7 @@ import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;

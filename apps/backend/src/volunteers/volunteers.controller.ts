@@ -13,7 +13,7 @@ import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { FosterVolunteer } from './volunteers.entity';
 
 @ApiTags('Volunteers')
