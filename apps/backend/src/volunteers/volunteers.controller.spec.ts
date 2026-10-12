@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
@@ -7,33 +11,46 @@ import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
-import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { CreateVolunteerDto } from './dto/create-volunteer.dto';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { Homebase } from '../types';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
-  let volunteersService: {
+
+  const mockVolunteer = {
+    volunteerId: 1,
+    firstName: 'Jane',
+    lastName: 'Doe',
+    notes: 'likes cats',
+  } as FosterVolunteer;
+
+  let mockVolunteersService: {
     create: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
+    getVolunteerById: jest.Mock;
+    updateVolunteerById: jest.Mock;
   };
-  let matchesService: { findByVolunteerId: jest.Mock };
+  let mockMatchesService: { findByVolunteerId: jest.Mock };
 
   beforeEach(async () => {
-    volunteersService = {
+    mockVolunteersService = {
       create: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
+      getVolunteerById: jest.fn(),
+      updateVolunteerById: jest.fn(),
     };
-    matchesService = { findByVolunteerId: jest.fn() };
+    mockMatchesService = { findByVolunteerId: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
-        { provide: VolunteersService, useValue: volunteersService },
-        { provide: MatchesService, useValue: matchesService },
+        { provide: VolunteersService, useValue: mockVolunteersService },
+        { provide: MatchesService, useValue: mockMatchesService },
       ],
     }).compile();
 
@@ -63,16 +80,16 @@ describe('VolunteersController', () => {
         volunteerId: 1,
         status: VolunteerStatus.PENDING,
       } as FosterVolunteer;
-      volunteersService.create.mockResolvedValue(volunteer);
+      mockVolunteersService.create.mockResolvedValue(volunteer);
 
       const result = await controller.create(dto);
 
-      expect(volunteersService.create).toHaveBeenCalledWith(dto);
+      expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
       expect(result).toBe(volunteer);
     });
 
     it('propagates errors thrown by the service', async () => {
-      volunteersService.create.mockRejectedValue(
+      mockVolunteersService.create.mockRejectedValue(
         new ConflictException('A volunteer with this email already exists'),
       );
 
@@ -93,32 +110,102 @@ describe('VolunteersController', () => {
           deniedReason: 'Schedule conflict',
         },
       ] as Match[];
-      volunteersService.findByIdOrFail.mockResolvedValue({});
-      matchesService.findByVolunteerId.mockResolvedValue(matches);
+      mockVolunteersService.findByIdOrFail.mockResolvedValue({});
+      mockMatchesService.findByVolunteerId.mockResolvedValue(matches);
 
       const result = await controller.getVolunteerMatches(7);
 
       expect(result).toBe(matches);
-      expect(volunteersService.findByIdOrFail).toHaveBeenCalledWith(7);
-      expect(matchesService.findByVolunteerId).toHaveBeenCalledWith(7);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(7);
+      expect(mockMatchesService.findByVolunteerId).toHaveBeenCalledWith(7);
     });
 
     it('returns an empty array when the volunteer exists but has no matches', async () => {
-      volunteersService.findByIdOrFail.mockResolvedValue({});
-      matchesService.findByVolunteerId.mockResolvedValue([]);
+      mockVolunteersService.findByIdOrFail.mockResolvedValue({});
+      mockMatchesService.findByVolunteerId.mockResolvedValue([]);
 
       await expect(controller.getVolunteerMatches(7)).resolves.toEqual([]);
     });
 
     it('throws NotFoundException when the volunteer does not exist', async () => {
-      volunteersService.findByIdOrFail.mockRejectedValue(
+      mockVolunteersService.findByIdOrFail.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
 
       await expect(controller.getVolunteerMatches(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
-      expect(matchesService.findByVolunteerId).not.toHaveBeenCalled();
+      expect(mockMatchesService.findByVolunteerId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getVolunteerById', () => {
+    it('should return a volunteer when found', async () => {
+      mockVolunteersService.getVolunteerById.mockResolvedValue(mockVolunteer);
+
+      const result = await controller.getVolunteerById(1);
+
+      expect(result).toEqual(mockVolunteer);
+      expect(mockVolunteersService.getVolunteerById).toHaveBeenCalledWith(1);
+    });
+
+    it('should throw NotFoundException when volunteer does not exist', async () => {
+      mockVolunteersService.getVolunteerById.mockRejectedValue(
+        new NotFoundException('Volunteer with id 999 not found'),
+      );
+
+      await expect(controller.getVolunteerById(999)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException when id is invalid', async () => {
+      await expect(controller.getVolunteerById(0)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockVolunteersService.getVolunteerById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateVolunteerById', () => {
+    it('should update and return the volunteer when found', async () => {
+      const dto = { notes: 'updated notes' } as UpdateVolunteerDto;
+      const updatedVolunteer = { ...mockVolunteer, ...dto } as FosterVolunteer;
+      mockVolunteersService.updateVolunteerById.mockResolvedValue(
+        updatedVolunteer,
+      );
+
+      const result = await controller.updateVolunteerById(1, dto);
+
+      expect(result).toEqual(updatedVolunteer);
+      expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
+        1,
+        dto,
+      );
+    });
+
+    it('should throw NotFoundException when volunteer does not exist', async () => {
+      mockVolunteersService.updateVolunteerById.mockRejectedValue(
+        new NotFoundException('Volunteer with id 999 not found'),
+      );
+
+      await expect(
+        controller.updateVolunteerById(999, { notes: 'x' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when id is invalid', async () => {
+      await expect(
+        controller.updateVolunteerById(0, { notes: 'x' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when no fields are provided', async () => {
+      await expect(
+        controller.updateVolunteerById(1, {} as UpdateVolunteerDto),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
   });
 
@@ -128,16 +215,16 @@ describe('VolunteersController', () => {
         volunteerId: 1,
         status: VolunteerStatus.INACTIVE,
       } as FosterVolunteer;
-      volunteersService.deactivate.mockResolvedValue(volunteer);
+      mockVolunteersService.deactivate.mockResolvedValue(volunteer);
 
       const result = await controller.deactivate(1);
 
-      expect(volunteersService.deactivate).toHaveBeenCalledWith(1);
+      expect(mockVolunteersService.deactivate).toHaveBeenCalledWith(1);
       expect(result).toEqual(volunteer);
     });
 
     it('propagates errors thrown by the service', async () => {
-      volunteersService.deactivate.mockRejectedValue(
+      mockVolunteersService.deactivate.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
 
@@ -153,16 +240,16 @@ describe('VolunteersController', () => {
         volunteerId: 1,
         status: VolunteerStatus.ACTIVE,
       } as FosterVolunteer;
-      volunteersService.reactivate.mockResolvedValue(volunteer);
+      mockVolunteersService.reactivate.mockResolvedValue(volunteer);
 
       const result = await controller.reactivate(1);
 
-      expect(volunteersService.reactivate).toHaveBeenCalledWith(1);
+      expect(mockVolunteersService.reactivate).toHaveBeenCalledWith(1);
       expect(result).toEqual(volunteer);
     });
 
     it('propagates errors thrown by the service', async () => {
-      volunteersService.reactivate.mockRejectedValue(
+      mockVolunteersService.reactivate.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
 

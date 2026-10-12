@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -13,8 +14,9 @@ import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { FosterVolunteer } from './volunteers.entity';
-import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
@@ -95,5 +97,47 @@ export class VolunteersController {
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
     return this.volunteersService.reactivate(id);
+  }
+
+  @Get('/:volunteerId')
+  @ApiOperation({ summary: 'Get a volunteer by ID' })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was found',
+    type: FosterVolunteer,
+  })
+  async getVolunteerById(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+  ): Promise<FosterVolunteer> {
+    validateId(volunteerId, 'Volunteer');
+    return this.volunteersService.getVolunteerById(volunteerId);
+  }
+
+  @Patch('/:volunteerId')
+  @ApiOperation({ summary: 'Update a volunteer by ID' })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was updated',
+    type: FosterVolunteer,
+  })
+  async updateVolunteerById(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    validateId(volunteerId, 'Volunteer');
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException('At least one field must be provided');
+    }
+    return this.volunteersService.updateVolunteerById(volunteerId, dto);
   }
 }
