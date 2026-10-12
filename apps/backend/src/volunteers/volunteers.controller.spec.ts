@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
@@ -6,8 +8,9 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -25,6 +28,7 @@ describe('VolunteersController', () => {
     reactivate: jest.Mock;
     getVolunteerById: jest.Mock;
     updateVolunteerById: jest.Mock;
+    updateFosterTypePreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -35,6 +39,7 @@ describe('VolunteersController', () => {
       reactivate: jest.fn(),
       getVolunteerById: jest.fn(),
       updateVolunteerById: jest.fn(),
+      updateFosterTypePreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -210,6 +215,176 @@ describe('VolunteersController', () => {
       await expect(controller.reactivate(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
+    });
+  });
+
+  describe('updateFosterTypePreferences', () => {
+    it('returns the updated list from the service', async () => {
+      const dto = { added: [FosterType.CAT], removed: [FosterType.DOG] };
+      mockVolunteersService.updateFosterTypePreferences.mockResolvedValue([
+        FosterType.CAT,
+      ]);
+
+      const result = await controller.updateFosterTypePreferences(1, dto);
+
+      expect(result).toEqual([FosterType.CAT]);
+      expect(
+        mockVolunteersService.updateFosterTypePreferences,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockVolunteersService.updateFosterTypePreferences,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('returns the list exactly as the service returns it', async () => {
+      const list = [FosterType.DOG, FosterType.SMALL_ANIMALS];
+      mockVolunteersService.updateFosterTypePreferences.mockResolvedValue(list);
+
+      const result = await controller.updateFosterTypePreferences(5, {
+        added: [FosterType.SMALL_ANIMALS],
+      });
+
+      expect(result).toBe(list);
+    });
+
+    it.each([
+      { added: [FosterType.DOG] },
+      { removed: [FosterType.DOG] },
+      { added: [FosterType.DOG], removed: [] },
+      { added: [], removed: [FosterType.DOG] },
+      { added: [FosterType.DOG], removed: null },
+    ])(
+      'calls the service when at least one list has values: %j',
+      async (body) => {
+        mockVolunteersService.updateFosterTypePreferences.mockResolvedValue([]);
+
+        await controller.updateFosterTypePreferences(
+          1,
+          body as unknown as UpdateFosterTypePreferencesDto,
+        );
+
+        expect(
+          mockVolunteersService.updateFosterTypePreferences,
+        ).toHaveBeenCalledWith(1, body);
+      },
+    );
+
+    it.each([0, -1, 1.5, NaN])(
+      'throws BadRequestException when id is %p',
+      async (id) => {
+        await expect(
+          controller.updateFosterTypePreferences(id, {
+            added: [FosterType.DOG],
+          }),
+        ).rejects.toThrow(new BadRequestException('Invalid Volunteer ID'));
+        expect(
+          mockVolunteersService.updateFosterTypePreferences,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      {},
+      { added: [] },
+      { removed: [] },
+      { added: [], removed: [] },
+      { added: null, removed: null },
+      { added: undefined, removed: undefined },
+    ])(
+      'throws BadRequestException when neither list has values: %j',
+      async (body) => {
+        await expect(
+          controller.updateFosterTypePreferences(
+            1,
+            body as unknown as UpdateFosterTypePreferencesDto,
+          ),
+        ).rejects.toThrow(
+          new BadRequestException(
+            'At least one of added or removed must be provided',
+          ),
+        );
+        expect(
+          mockVolunteersService.updateFosterTypePreferences,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('validates the id before checking the body', async () => {
+      await expect(
+        controller.updateFosterTypePreferences(
+          0,
+          {} as UpdateFosterTypePreferencesDto,
+        ),
+      ).rejects.toThrow(new BadRequestException('Invalid Volunteer ID'));
+    });
+
+    it('propagates NotFoundException thrown by the service', async () => {
+      mockVolunteersService.updateFosterTypePreferences.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(
+        controller.updateFosterTypePreferences(999, {
+          added: [FosterType.DOG],
+        }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+
+    it('propagates unexpected errors thrown by the service', async () => {
+      mockVolunteersService.updateFosterTypePreferences.mockRejectedValue(
+        new Error('db failure'),
+      );
+
+      await expect(
+        controller.updateFosterTypePreferences(1, { added: [FosterType.DOG] }),
+      ).rejects.toThrow('db failure');
+    });
+  });
+
+  describe('UpdateFosterTypePreferencesDto validation', () => {
+    const validateBody = (body: object) =>
+      validate(plainToInstance(UpdateFosterTypePreferencesDto, body));
+
+    it.each([
+      { added: ['Dog'] },
+      { removed: ['Cat'] },
+      { added: ['Dog'], removed: ['Cat'] },
+      { added: ['Dog', 'Cat', 'Small Animals', 'Baby Bottle Animals'] },
+      { added: [], removed: [] },
+      { added: null, removed: null },
+      {},
+    ])('accepts %j', async (body) => {
+      expect(await validateBody(body)).toHaveLength(0);
+    });
+
+    it.each([
+      { added: ['Hamster'] },
+      { added: ['Dog', 'Hamster'] },
+      { added: ['dog'] },
+      { added: ['SMALL_ANIMALS'] },
+      { added: [1] },
+      { added: [null] },
+      { added: 'Dog' },
+      { added: { 0: 'Dog' } },
+      { removed: ['Rabbit'] },
+      { removed: [2] },
+      { removed: 'Cat' },
+    ])('rejects %j', async (body) => {
+      expect((await validateBody(body)).length).toBeGreaterThan(0);
+    });
+
+    it('reports an error for each invalid field', async () => {
+      const errors = await validateBody({
+        added: ['Hamster'],
+        removed: ['Rabbit'],
+      });
+
+      expect(errors.map((e) => e.property).sort()).toEqual([
+        'added',
+        'removed',
+      ]);
     });
   });
 });

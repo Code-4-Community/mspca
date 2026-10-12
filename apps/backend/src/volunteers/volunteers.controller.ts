@@ -14,7 +14,9 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
+import { FosterType } from './volunteers.types';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -116,5 +118,33 @@ export class VolunteersController {
       throw new BadRequestException('At least one field must be provided');
     }
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
+  }
+
+  @Patch('/:volunteerId/species-preferences')
+  @ApiOperation({ summary: "Update a volunteer's foster type preferences" })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of foster types",
+    schema: {
+      type: 'array',
+      items: { type: 'string', enum: Object.values(FosterType) },
+    },
+  })
+  async updateFosterTypePreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateFosterTypePreferencesDto,
+  ): Promise<FosterType[]> {
+    validateId(volunteerId, 'Volunteer');
+    if (!dto.added?.length && !dto.removed?.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
+    return this.volunteersService.updateFosterTypePreferences(volunteerId, dto);
   }
 }
