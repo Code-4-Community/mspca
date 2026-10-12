@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
 @Injectable()
 export class VolunteersService {
@@ -127,5 +128,39 @@ export class VolunteersService {
     const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
+   *
+   * Removals are applied first, then additions. Adding an ID that is already in the
+   * list does not create a duplicate, and removing an ID that isn't in the list is ignored.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The animal IDs to add and/or remove.
+   * @returns The Volunteer's updated list of animal IDs.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If animals are removed from an empty list.
+   */
+  async updateAnimalPreferences(
+    id: number,
+    dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    const volunteer = await this.findByIdOrFail(id);
+    const { added = [], removed = [] } = dto;
+
+    if (removed.length > 0 && volunteer.animalPreferences.length === 0) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} has no animal preferences to remove`,
+      );
+    }
+
+    const preferences = new Set(volunteer.animalPreferences);
+    removed.forEach((animalId) => preferences.delete(animalId));
+    added.forEach((animalId) => preferences.add(animalId));
+
+    volunteer.animalPreferences = [...preferences];
+    const saved = await this.repo.save(volunteer);
+    return saved.animalPreferences;
   }
 }
