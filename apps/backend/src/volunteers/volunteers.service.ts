@@ -6,8 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
 
 @Injectable()
 export class VolunteersService {
@@ -127,5 +128,33 @@ export class VolunteersService {
     const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Updates a Volunteer's foster type preferences by adding and removing FosterTypes.
+   *
+   * Removals are applied first, then additions. Adding a type that is already in the
+   * list does not create a duplicate, and removing a type that isn't in the list is ignored.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The foster types to add and/or remove.
+   * @returns The Volunteer's updated list of foster types.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async updateFosterTypePreferences(
+    id: number,
+    dto: UpdateFosterTypePreferencesDto,
+  ): Promise<FosterType[]> {
+    const volunteer = await this.findByIdOrFail(id);
+    const added = dto.added ?? [];
+    const removed = dto.removed ?? [];
+
+    const preferences = new Set(volunteer.fosterTypePreferences);
+    removed.forEach((type) => preferences.delete(type));
+    added.forEach((type) => preferences.add(type));
+
+    volunteer.fosterTypePreferences = [...preferences];
+    const saved = await this.repo.save(volunteer);
+    return saved.fosterTypePreferences;
   }
 }

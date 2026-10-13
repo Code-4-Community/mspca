@@ -72,6 +72,16 @@ export class FosterVolunteer {
   })
   status!: VolunteerStatus;
 
+  @Column({
+    name: 'foster_type_preferences',
+    type: 'enum',
+    enum: FosterType,
+    enumName: 'foster_type_enum',
+    array: true,
+    default: () => "'{}'",
+  })
+  fosterTypePreferences!: FosterType[];
+
   @ManyToOne(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
