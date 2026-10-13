@@ -249,6 +249,9 @@ describe('CognitoService', () => {
         sendSpy
           .mockResolvedValueOnce({ User: { Attributes: [] } })
           .mockResolvedValueOnce({}); // deleteUser
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
 
         await expect(
           service.createUser({
@@ -271,6 +274,7 @@ describe('CognitoService', () => {
           UserPoolId: 'us-east-2_TestPool',
           Username: 'jane@example.com',
         });
+        expect(logError).not.toHaveBeenCalled();
       });
 
       it('deletes the user and throws when adding to the group fails', async () => {
@@ -280,7 +284,9 @@ describe('CognitoService', () => {
           })
           .mockRejectedValueOnce(new Error('Group not found'))
           .mockResolvedValueOnce({}); // deleteUser
-        jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
 
         await expect(
           service.createUser({
@@ -306,6 +312,10 @@ describe('CognitoService', () => {
           UserPoolId: 'us-east-2_TestPool',
           Username: 'jane@example.com',
         });
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).not.toHaveBeenCalledWith(
+          'Failed to delete partially created user jane@example.com',
+        );
       });
 
       it('throws the original error when cleanup also fails', async () => {
