@@ -162,8 +162,6 @@ export class CognitoService {
     try {
       await this.addUserToGroup(email, role);
     } catch (error) {
-      // A user that exists but isn't in a group is in a broken state with no
-      // role, so delete it rather than leave a login that can't be used.
       await this.deleteUser(email).catch(() =>
         this.logger.error(`Failed to delete partially created user ${email}`),
       );
