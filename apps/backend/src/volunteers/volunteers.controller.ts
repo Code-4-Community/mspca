@@ -92,7 +92,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'Volunteer');
-    return this.volunteersService.getVolunteerById(volunteerId);
+    return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
   @Patch('/:volunteerId')

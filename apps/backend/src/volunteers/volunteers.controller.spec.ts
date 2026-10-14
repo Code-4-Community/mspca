@@ -27,7 +27,6 @@ describe('VolunteersController', () => {
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
-    getVolunteerById: jest.Mock;
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
   };
@@ -38,7 +37,6 @@ describe('VolunteersController', () => {
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
-      getVolunteerById: jest.fn(),
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
     };
@@ -101,17 +99,17 @@ describe('VolunteersController', () => {
 
   describe('getVolunteerById', () => {
     it('should return a volunteer when found', async () => {
-      mockVolunteersService.getVolunteerById.mockResolvedValue(mockVolunteer);
+      mockVolunteersService.findByIdOrFail.mockResolvedValue(mockVolunteer);
 
       const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
-      expect(mockVolunteersService.getVolunteerById).toHaveBeenCalledWith(1);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
-      mockVolunteersService.getVolunteerById.mockRejectedValue(
-        new NotFoundException('Volunteer with id 999 not found'),
+      mockVolunteersService.findByIdOrFail.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
       );
 
       await expect(controller.getVolunteerById(999)).rejects.toThrow(
@@ -123,7 +121,7 @@ describe('VolunteersController', () => {
       await expect(controller.getVolunteerById(0)).rejects.toThrow(
         BadRequestException,
       );
-      expect(mockVolunteersService.getVolunteerById).not.toHaveBeenCalled();
+      expect(mockVolunteersService.findByIdOrFail).not.toHaveBeenCalled();
     });
   });
 
