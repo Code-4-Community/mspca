@@ -13,7 +13,6 @@ import { AWSSESModule } from '../aws/ses/email.module';
     CoordinatorsModule,
     AWSSESModule,
     forwardRef(() => MatchesModule),
-    AWSSESModule,
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],
