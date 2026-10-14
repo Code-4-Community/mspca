@@ -1,13 +1,15 @@
-import { IsEmail, IsEnum, IsString } from 'class-validator';
+import { IsEmail, IsEnum } from 'class-validator';
 import { CognitoRole } from '../cognito.types';
+import { IsNonEmptyString } from '../../../utils/dtos/utils.dto';
 
 export class CreateCognitoUserDto {
-  @IsString()
+  @IsNonEmptyString()
   firstName!: string;
 
-  @IsString()
+  @IsNonEmptyString()
   lastName!: string;
 
+  @IsNonEmptyString()
   @IsEmail()
   email!: string;
 

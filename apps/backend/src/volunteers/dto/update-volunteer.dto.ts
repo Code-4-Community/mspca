@@ -2,60 +2,52 @@ import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 import {
   IsOptional,
-  IsString,
   IsEnum,
-  IsNotEmpty,
   MaxLength,
   IsPhoneNumber,
   IsEmail,
 } from 'class-validator';
+import { IsNonEmptyString } from '../../utils/dtos/utils.dto';
 
 export class UpdateVolunteerDto {
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   firstName?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   lastName?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
   phone?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
   secondaryPhone?: string;
 
   @IsOptional()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   @IsEmail()
   email?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   address?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   city?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(10)
   zipcode?: string;
 
@@ -64,13 +56,11 @@ export class UpdateVolunteerDto {
   homebase?: Homebase;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   residentAnimals?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   notes?: string;
 
   @IsOptional()

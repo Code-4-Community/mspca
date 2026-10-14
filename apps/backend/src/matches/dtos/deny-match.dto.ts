@@ -1,7 +1,6 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNonEmptyString } from '../../utils/dtos/utils.dto';
 
 export class DenyMatchDto {
-  @IsNotEmpty()
-  @IsString()
+  @IsNonEmptyString()
   deniedReason!: string;
 }
