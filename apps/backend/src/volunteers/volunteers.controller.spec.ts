@@ -29,8 +29,14 @@ describe('VolunteersController', () => {
     reactivate: jest.Mock;
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
+    getAllVolunteers: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
+
+  const mockVolunteers = [
+    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
+    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
+  ] as FosterVolunteer[];
 
   beforeEach(async () => {
     mockVolunteersService = {
@@ -39,6 +45,7 @@ describe('VolunteersController', () => {
       reactivate: jest.fn(),
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
+      getAllVolunteers: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -246,6 +253,25 @@ describe('VolunteersController', () => {
       await expect(controller.approve(1)).rejects.toThrow(
         new ConflictException('Only pending Volunteers can be approved'),
       );
+    });
+  });
+
+  describe('getAllVolunteers', () => {
+    it('should return all volunteers', async () => {
+      mockVolunteersService.getAllVolunteers.mockResolvedValue(mockVolunteers);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual(mockVolunteers);
+      expect(mockVolunteersService.getAllVolunteers).toHaveBeenCalled();
+    });
+
+    it('should return an empty array when there are no volunteers', async () => {
+      mockVolunteersService.getAllVolunteers.mockResolvedValue([]);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual([]);
     });
   });
 });
