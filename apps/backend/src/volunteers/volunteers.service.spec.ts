@@ -619,6 +619,99 @@ describe('VolunteersService', () => {
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
+
+    it('reassigns coordinators and sends emails when the homebase changes', async () => {
+      const oldCoordinator = {
+        coordinatorId: 1,
+        email: 'old1@example.com',
+        active: true,
+      } as FosterCoordinator;
+      const newCoordinator = {
+        coordinatorId: 3,
+        email: 'new3@example.com',
+        active: true,
+      } as FosterCoordinator;
+      mockRepo.findOne.mockResolvedValue({
+        volunteerId: 9,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        homebase: Homebase.BOSTON,
+        assignedCoordinators: [oldCoordinator],
+      } as FosterVolunteer);
+      mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([
+        newCoordinator,
+      ]);
+      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
+      emailsService.sendEmail.mockResolvedValue(undefined);
+
+      const result = await service.updateVolunteerById(9, {
+        homebase: Homebase.SALEM,
+        notes: 'Moved north',
+      } as UpdateVolunteerDto);
+
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).toHaveBeenCalledTimes(1);
+      expect(mockCoordinatorsService.findActiveByHomebase).toHaveBeenCalledWith(
+        Homebase.SALEM,
+      );
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          homebase: Homebase.SALEM,
+          notes: 'Moved north',
+          assignedCoordinators: [newCoordinator],
+        }),
+      );
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(result.assignedCoordinators).toEqual([newCoordinator]);
+    });
+
+    it('does not reassign or email when the homebase is unchanged', async () => {
+      const coordinator = {
+        coordinatorId: 1,
+        email: 'c1@example.com',
+        active: true,
+      } as FosterCoordinator;
+      mockRepo.findOne.mockResolvedValue({
+        volunteerId: 9,
+        homebase: Homebase.BOSTON,
+        assignedCoordinators: [coordinator],
+      } as FosterVolunteer);
+      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
+
+      const result = await service.updateVolunteerById(9, {
+        homebase: Homebase.BOSTON,
+        notes: 'Same place',
+      } as UpdateVolunteerDto);
+
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(result.notes).toBe('Same place');
+      expect(result.assignedCoordinators).toEqual([coordinator]);
+    });
+
+    it('does not reassign or email when the homebase is not in the update', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        volunteerId: 9,
+        homebase: Homebase.BOSTON,
+        assignedCoordinators: [],
+      } as FosterVolunteer);
+      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
+
+      await service.updateVolunteerById(9, {
+        notes: 'Just notes',
+      } as UpdateVolunteerDto);
+
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('approve', () => {

@@ -319,6 +319,8 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * Changing the homebase reassigns the volunteer's coordinators and emails them,
+   * the same as changeHomebase; an unchanged homebase is left alone.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer
@@ -329,7 +331,13 @@ export class VolunteersService {
     dto: UpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
-    Object.assign(volunteer, dto);
+    const { homebase, ...fields } = dto;
+    Object.assign(volunteer, fields);
+
+    if (homebase !== undefined && homebase !== volunteer.homebase) {
+      return this.reassignCoordinators(volunteer, homebase);
+    }
+
     return this.repo.save(volunteer);
   }
 
