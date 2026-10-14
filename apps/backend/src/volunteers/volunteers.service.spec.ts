@@ -460,6 +460,9 @@ describe('VolunteersService', () => {
       });
 
       expect(result).toEqual([42, 55]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [42, 55] }),
+      );
     });
 
     it('does not create duplicates when adding an ID already in the list', async () => {
@@ -472,14 +475,30 @@ describe('VolunteersService', () => {
       expect(result).toEqual([42, 55]);
     });
 
-    it('ignores removing an ID that is not in the list', async () => {
+    it('throws BadRequestException when a removed ID is not in the list', async () => {
       mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
 
-      const result = await service.updateAnimalPreferences(1, {
-        removed: [999],
-      });
+      await expect(
+        service.updateAnimalPreferences(1, { removed: [42, 999] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "Animal IDs not in the volunteer's preferences: 999",
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
 
-      expect(result).toEqual([42]);
+    it('throws BadRequestException when an ID is in both added and removed', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      await expect(
+        service.updateAnimalPreferences(1, { added: [42, 55], removed: [42] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Animal IDs cannot be both added and removed: 42',
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when removing from an empty list', async () => {

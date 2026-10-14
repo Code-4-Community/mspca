@@ -169,6 +169,15 @@ export class VolunteersController {
     description: "The volunteer's updated list of Chameleon animal IDs",
     type: [Number],
   })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Invalid volunteer or animal IDs, neither list has IDs, an ID is in both lists, or a removed ID is not in the volunteer's preferences",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
   async updateAnimalPreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateAnimalPreferencesDto,

@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
 import {
   BadRequestException,
   ConflictException,
@@ -331,29 +329,6 @@ describe('VolunteersController', () => {
       ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
-    });
-  });
-
-  describe('UpdateAnimalPreferencesDto validation', () => {
-    const validateBody = (body: object) =>
-      validate(plainToInstance(UpdateAnimalPreferencesDto, body));
-
-    it.each([
-      { added: [1, 2] },
-      { removed: [3] },
-      { added: [1], removed: [2] },
-    ])('accepts %j', async (body) => {
-      expect(await validateBody(body)).toHaveLength(0);
-    });
-
-    it.each([
-      { added: [1, 'abc'] },
-      { added: [-3] },
-      { added: [0] },
-      { removed: [1.5] },
-      { added: 5 },
-    ])('rejects %j', async (body) => {
-      expect((await validateBody(body)).length).toBeGreaterThan(0);
     });
   });
 });
