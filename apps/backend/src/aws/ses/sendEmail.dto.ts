@@ -5,15 +5,14 @@ import {
   IsArray,
   IsEmail,
   IsInstance,
-  IsNotEmpty,
   IsOptional,
-  IsString,
   Length,
   Matches,
   MaxLength,
   ValidateNested,
   registerDecorator,
 } from 'class-validator';
+import { IsNonEmptyString } from '../../utils/dtos/utils.dto';
 
 /**
  * Bounds the byte length of `EmailAttachmentDto.content`. Pair with
@@ -40,8 +39,7 @@ function MaxBufferSize(maxBytes: number) {
  * nodemailer handles base64-encoding it into the MIME message.
  */
 export class EmailAttachmentDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   // Reject `/` and `\` to prevent path-traversal-style filenames
   // (e.g. `../../etc/passwd`) from being used as the attachment name.
@@ -61,6 +59,7 @@ export class EmailAttachmentDto {
  * Input shape for EmailsService.sendEmails. All validation lives here
  */
 export class SendEmailDTO {
+  @IsNonEmptyString()
   @IsEmail()
   @Length(1, 255)
   toEmail!: string;
@@ -79,8 +78,7 @@ export class SendEmailDTO {
   @Length(1, 255, { each: true })
   bccEmails?: string[];
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @Length(1, 255)
   // Reject carriage return (\r) and line feed (\n) to prevent MIME header injection
   @Matches(/^[^\r\n]+$/, {
@@ -88,8 +86,7 @@ export class SendEmailDTO {
   })
   subject!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   // Roughly 5-10 KB of string memory, far below SES's 40 MB raw-message cap
   @MaxLength(5000)
   bodyHtml!: string;
