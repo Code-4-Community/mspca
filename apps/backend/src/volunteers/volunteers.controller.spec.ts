@@ -25,8 +25,14 @@ describe('VolunteersController', () => {
     reactivate: jest.Mock;
     getVolunteerById: jest.Mock;
     updateVolunteerById: jest.Mock;
+    getAllVolunteers: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
+
+  const mockVolunteers = [
+    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
+    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
+  ] as FosterVolunteer[];
 
   beforeEach(async () => {
     mockVolunteersService = {
@@ -35,6 +41,7 @@ describe('VolunteersController', () => {
       reactivate: jest.fn(),
       getVolunteerById: jest.fn(),
       updateVolunteerById: jest.fn(),
+      getAllVolunteers: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -210,6 +217,25 @@ describe('VolunteersController', () => {
       await expect(controller.reactivate(999)).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
+    });
+  });
+
+  describe('getAllVolunteers', () => {
+    it('should return all volunteers', async () => {
+      mockVolunteersService.getAllVolunteers.mockResolvedValue(mockVolunteers);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual(mockVolunteers);
+      expect(mockVolunteersService.getAllVolunteers).toHaveBeenCalled();
+    });
+
+    it('should return an empty array when there are no volunteers', async () => {
+      mockVolunteersService.getAllVolunteers.mockResolvedValue([]);
+
+      const result = await controller.getAllVolunteers();
+
+      expect(result).toEqual([]);
     });
   });
 });

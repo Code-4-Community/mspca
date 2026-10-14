@@ -117,4 +117,15 @@ export class VolunteersController {
     }
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
   }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All volunteers, regardless of match status',
+    type: [FosterVolunteer],
+  })
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.volunteersService.getAllVolunteers();
+  }
 }

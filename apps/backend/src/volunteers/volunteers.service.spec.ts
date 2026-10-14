@@ -17,11 +17,22 @@ describe('VolunteersService', () => {
     assignedCoordinator: null,
   } as FosterVolunteer;
 
-  let mockRepo: { findOne: jest.Mock; save: jest.Mock; delete: jest.Mock };
+  let mockRepo: {
+    findOne: jest.Mock;
+    find: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
+
+  const mockVolunteers = [
+    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
+    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
+  ] as FosterVolunteer[];
 
   beforeEach(async () => {
     mockRepo = {
       findOne: jest.fn(),
+      find: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
     };
@@ -305,6 +316,26 @@ describe('VolunteersService', () => {
         new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllVolunteers', () => {
+    it('should return all volunteers', async () => {
+      mockRepo.find.mockResolvedValue(mockVolunteers);
+
+      const result = await service.getAllVolunteers();
+
+      expect(result).toEqual(mockVolunteers);
+      expect(mockRepo.find).toHaveBeenCalled();
+    });
+
+    it('should return an empty array when there are no volunteers', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      const result = await service.getAllVolunteers();
+
+      expect(result).toEqual([]);
+      expect(mockRepo.find).toHaveBeenCalled();
     });
   });
 });
