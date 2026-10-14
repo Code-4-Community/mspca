@@ -5,11 +5,11 @@ import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { VolunteerStatus } from '../volunteers/volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
-import { VolunteerStatus } from '../volunteers/volunteers.types';
 
 const coordinator = {
   coordinatorId: 7,

@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,12 +10,17 @@ import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { EmailsService } from '../aws/ses/email.service';
+import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 
 @Injectable()
 export class VolunteersService {
+  private readonly logger = new Logger(VolunteersService.name);
+
   constructor(
     @InjectRepository(FosterVolunteer)
     private repo: Repository<FosterVolunteer>,
+    private emailsService: EmailsService,
   ) {}
 
   /**
@@ -94,22 +101,23 @@ export class VolunteersService {
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
-    if (volunteer.status !== VolunteerStatus.ACTIVE) {
-      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
-    }
+    this.checkVolunteerActive(volunteer);
 
     return volunteer;
   }
 
   /**
-   * Gets a single foster volunteer by ID.
-   * Includes the volunteer's assigned coordinator.
-   * @param id - ID of the volunteer to get
-   * @returns The volunteer with the given ID
-   * @throws NotFoundException if no volunteer exists with the given ID
+   * Ensures a Volunteer's account is active.
+   *
+   * @param volunteer - The Volunteer to check.
+   * @throws {BadRequestException} If the Volunteer's status is not Active.
    */
-  async getVolunteerById(id: number): Promise<FosterVolunteer> {
-    return this.findByIdOrFail(id);
+  checkVolunteerActive(volunteer: FosterVolunteer): void {
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Volunteer with ID ${volunteer.volunteerId} is not active`,
+      );
+    }
   }
 
   /**
@@ -127,6 +135,43 @@ export class VolunteersService {
     const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Approves a pending Volunteer, setting their status to Active and emailing
+   * them that they can now log in.
+   *
+   * If the email fails to send, the approval is kept and the failure is logged,
+   * so the coordinator isn't left with an approved Volunteer they can't re-approve.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The approved Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   */
+  async approve(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be approved`);
+    }
+
+    volunteer.status = VolunteerStatus.ACTIVE;
+    const saved = await this.repo.save(volunteer);
+
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: saved.email,
+        ...volunteerApprovedEmail(saved.firstName),
+      });
+    } catch (err) {
+      this.logger.error(
+        `Volunteer with ID ${id} was approved but the approval email didn't send`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+
+    return saved;
   }
 
   /**

@@ -92,7 +92,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'Volunteer');
-    return this.volunteersService.getVolunteerById(volunteerId);
+    return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
   @Patch('/:volunteerId')
@@ -116,6 +116,33 @@ export class VolunteersController {
       throw new BadRequestException('At least one field must be provided');
     }
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
+  }
+
+  @ApiOperation({ summary: 'Approve a pending foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was approved and emailed',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'The volunteer is not pending',
+  })
+  @Patch('/:id/approve')
+  async approve(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.approve(id);
   }
 
   @Get()
