@@ -16,15 +16,15 @@ import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
-import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import {
+  EmailContent,
+  volunteerApprovedEmail,
+} from '../emails/bodies/volunteerApproved';
+import { coordinatorGainedVolunteerEmail } from '../emails/bodies/coordinatorGainedVolunteer';
+import { coordinatorLostVolunteerEmail } from '../emails/bodies/coordinatorLostVolunteer';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
-import {
-  CoordinatorEmail,
-  coordinatorGainedVolunteerEmail,
-  coordinatorLostVolunteerEmail,
-} from './volunteers.emails';
 
 @Injectable()
 export class VolunteersService {
@@ -266,7 +266,7 @@ export class VolunteersService {
    */
   private async notifyCoordinators(
     coordinators: FosterCoordinator[],
-    email: CoordinatorEmail,
+    email: EmailContent,
     volunteerId: number,
   ): Promise<void> {
     for (const coordinator of coordinators) {

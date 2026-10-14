@@ -14,7 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
-import { escapeHtml } from '../volunteers/volunteers.emails';
+import { escapeHtml } from '../utils/emails.utils';
 
 @Injectable()
 export class MatchesService {
