@@ -9,7 +9,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 
@@ -181,5 +182,58 @@ export class VolunteersService {
    */
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.repo.find();
+  }
+
+  /**
+   * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
+   *
+   * Removals are applied first, then additions. Adding an ID that is already in the
+   * list does not create a duplicate.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The animal IDs to add and/or remove.
+   * @returns The Volunteer's updated list of animal IDs.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If animals are removed from an empty list, an ID is in
+   * both the added and removed lists, or a removed ID is not in the Volunteer's preferences.
+   */
+  async updateAnimalPreferences(
+    id: number,
+    dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    const volunteer = await this.findByIdOrFail(id);
+    const { added = [], removed = [] } = dto;
+
+    if (removed.length > 0 && volunteer.animalPreferences.length === 0) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} has no animal preferences to remove`,
+      );
+    }
+
+    const overlapping = added.filter((animalId) => removed.includes(animalId));
+    if (overlapping.length > 0) {
+      throw new BadRequestException(
+        `Animal IDs cannot be both added and removed: ${overlapping.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    const missing = removed.filter(
+      (animalId) => !volunteer.animalPreferences.includes(animalId),
+    );
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Animal IDs not in the volunteer's preferences: ${missing.join(', ')}`,
+      );
+    }
+
+    const preferences = new Set(volunteer.animalPreferences);
+    removed.forEach((animalId) => preferences.delete(animalId));
+    added.forEach((animalId) => preferences.add(animalId));
+
+    volunteer.animalPreferences = [...preferences];
+    const saved = await this.repo.save(volunteer);
+    return saved.animalPreferences;
   }
 }

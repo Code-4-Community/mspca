@@ -8,7 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
 
 describe('VolunteersService', () => {
@@ -412,6 +412,119 @@ describe('VolunteersService', () => {
 
       expect(result).toEqual([]);
       expect(mockRepo.find).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateAnimalPreferences', () => {
+    const volunteerWithPreferences = (animalPreferences: number[]) =>
+      ({ ...mockVolunteer, animalPreferences } as FosterVolunteer);
+
+    beforeEach(() => {
+      mockRepo.save.mockImplementation(async (v) => v);
+    });
+
+    it('adds the given animal IDs to the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+      const findSpy = jest.spyOn(service, 'findByIdOrFail');
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [107, 230],
+      });
+
+      expect(findSpy).toHaveBeenCalledWith(1);
+      expect(result).toEqual([42, 107, 230]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [42, 107, 230] }),
+      );
+    });
+
+    it('removes the given animal IDs from the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        removed: [42],
+      });
+
+      expect(result).toEqual([107]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [107] }),
+      );
+    });
+
+    it('applies removals and additions in the same request', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [55],
+        removed: [107],
+      });
+
+      expect(result).toEqual([42, 55]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [42, 55] }),
+      );
+    });
+
+    it('does not create duplicates when adding an ID already in the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [42, 55, 55],
+      });
+
+      expect(result).toEqual([42, 55]);
+    });
+
+    it('throws BadRequestException when a removed ID is not in the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+
+      await expect(
+        service.updateAnimalPreferences(1, { removed: [42, 999] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "Animal IDs not in the volunteer's preferences: 999",
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when an ID is in both added and removed', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      await expect(
+        service.updateAnimalPreferences(1, { added: [42, 55], removed: [42] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Animal IDs cannot be both added and removed: 42',
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when removing from an empty list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([]));
+
+      await expect(
+        service.updateAnimalPreferences(1, { removed: [42] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Volunteer with ID 1 has no animal preferences to remove',
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+      const findSpy = jest.spyOn(service, 'findByIdOrFail');
+
+      await expect(
+        service.updateAnimalPreferences(999, { added: [42] }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(findSpy).toHaveBeenCalledWith(999);
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
   });
 });

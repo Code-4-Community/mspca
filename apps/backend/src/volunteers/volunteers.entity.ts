@@ -72,6 +72,14 @@ export class FosterVolunteer {
   })
   status!: VolunteerStatus;
 
+  @Column({
+    name: 'animal_preferences',
+    type: 'int',
+    array: true,
+    default: () => "'{}'",
+  })
+  animalPreferences!: number[];
+
   @ManyToOne(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
