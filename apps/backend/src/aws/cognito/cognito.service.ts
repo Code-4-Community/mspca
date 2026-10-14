@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -181,8 +183,8 @@ export class CognitoService {
    * @param dto - The user's name, email, and chosen password.
    * @returns The Cognito `sub` (unique user ID) for the new, unconfirmed user.
    * @throws {ConflictException} If a user with the email already exists.
-   * @throws {BadRequestException} If Cognito rejects the password or another parameter.
-   * @throws {InternalServerErrorException} If the user could not be registered.
+   * @throws {BadRequestException} If the password doesn't meet the policy, or Cognito rejects the email or password format.
+   * @throws {InternalServerErrorException} If the user could not be registered (the user is deleted if Cognito returned no sub).
    */
   async signUpUser({
     firstName,
@@ -208,31 +210,36 @@ export class CognitoService {
       const response = await client.send(command);
       sub = response.UserSub;
     } catch (error) {
+      // These messages go back to the client, so they're kept generic rather
+      // than passing through Cognito's own error text.
       const name = error instanceof Error ? error.name : '';
-      const reason = error instanceof Error ? error.message : String(error);
       if (name === 'UsernameExistsException') {
         throw new ConflictException('A user with this email already exists');
       }
-      if (
-        name === 'InvalidPasswordException' ||
-        name === 'InvalidParameterException'
-      ) {
-        throw new BadRequestException(reason);
+      if (name === 'InvalidPasswordException') {
+        throw new BadRequestException(
+          'Password does not meet the requirements',
+        );
       }
-      throw new InternalServerErrorException(
-        `Failed to sign up user: ${reason}`,
-      );
+      // Thrown when a value fails Cognito's own format checks rather than the
+      // password policy: e.g. the email doesn't match the pool's username
+      // format, the password has leading or trailing spaces, or an attribute
+      // doesn't fit the pool's schema.
+      if (name === 'InvalidParameterException') {
+        throw new BadRequestException('Invalid email or password');
+      }
+      this.logger.error(`Failed to sign up user ${email}`, error);
+      throw new InternalServerErrorException('Failed to sign up user');
     }
 
     // Cognito should always return a sub for a registered user; a missing one
     // would only come from an AWS outage or internal bug.
     if (!sub) {
+      this.logger.error(`Cognito returned no sub when signing up ${email}`);
       await this.deleteUser(email).catch(() =>
         this.logger.error(`Failed to delete partially created user ${email}`),
       );
-      throw new InternalServerErrorException(
-        'Failed to sign up user: Cognito returned no sub',
-      );
+      throw new InternalServerErrorException('Failed to sign up user');
     }
 
     return sub;
@@ -248,10 +255,10 @@ export class CognitoService {
    * @param email - The user's email (their Cognito username).
    * @param code - The verification code from the sign-up email.
    * @param role - The role (group) to assign once confirmed.
-   * @throws {BadRequestException} If the code is wrong or has expired.
+   * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed (e.g. they already are).
    * @throws {NotFoundException} If no user with the email exists.
-   * @throws {ConflictException} If the user can't be confirmed, e.g. they already are.
-   * @throws {InternalServerErrorException} If confirmation or adding to the group fails.
+   * @throws {HttpException} 429 if there have been too many attempts.
+   * @throws {InternalServerErrorException} If confirmation fails, or adding to the group fails (the user is then deleted).
    */
   async confirmUser(
     email: string,
@@ -270,8 +277,9 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
+      // These messages go back to the client, so they're kept generic rather
+      // than passing through Cognito's own error text.
       const name = error instanceof Error ? error.name : '';
-      const reason = error instanceof Error ? error.message : String(error);
       if (name === 'CodeMismatchException') {
         throw new BadRequestException('Invalid verification code');
       }
@@ -282,20 +290,30 @@ export class CognitoService {
         throw new NotFoundException('No user with this email exists');
       }
       if (name === 'NotAuthorizedException') {
-        throw new ConflictException(`User cannot be confirmed: ${reason}`);
+        throw new BadRequestException('User cannot be confirmed');
       }
-      throw new InternalServerErrorException(
-        `Failed to confirm user: ${reason}`,
-      );
+      // Cognito throws these after too many wrong codes.
+      if (
+        name === 'LimitExceededException' ||
+        name === 'TooManyFailedAttemptsException'
+      ) {
+        throw new HttpException(
+          'Too many attempts, please try again later',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      this.logger.error(`Failed to confirm user ${email}`, error);
+      throw new InternalServerErrorException('Failed to confirm user');
     }
 
     try {
       await this.addUserToGroup(email, role);
-    } catch (error) {
+    } catch {
+      // addUserToGroup already logs the Cognito error.
       await this.deleteUser(email).catch(() =>
         this.logger.error(`Failed to delete partially created user ${email}`),
       );
-      throw error;
+      throw new InternalServerErrorException('Failed to confirm user');
     }
   }
 

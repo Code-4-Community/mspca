@@ -94,13 +94,13 @@ export class VolunteersService {
       });
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
-      await this.cognitoService
-        .deleteUser(email)
-        .catch(() =>
-          this.logger.error(
-            `Created Cognito user ${cognitoSub} for ${email} but failed to save the Volunteer or delete the Cognito user`,
-          ),
+      try {
+        await this.cognitoService.deleteUser(email);
+      } catch {
+        this.logger.error(
+          `Created Cognito user ${cognitoSub} for ${email} but failed to save the Volunteer or delete the Cognito user`,
         );
+      }
       throw new InternalServerErrorException('Failed to save the Volunteer');
     }
   }

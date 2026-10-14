@@ -178,14 +178,24 @@ describe('VolunteersService', () => {
     it('signs up the Cognito user with their password', async () => {
       await service.create(dto);
 
+      expect(mockRepo.findOneBy).toHaveBeenCalledTimes(1);
+      expect(mockRepo.findOneBy).toHaveBeenCalledWith({
+        email: 'jane@example.com',
+      });
+      expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
       expect(mockCognitoService.signUpUser).toHaveBeenCalledWith({
         firstName: 'Jane',
         lastName: 'Doe',
         email: 'jane@example.com',
         password,
       });
-      expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...profile,
+        status: VolunteerStatus.PENDING,
+        mostRecentWaiverSigned: true,
+        cognitoSub: 'cognito-sub-123',
+      });
     });
 
     it('saves the volunteer as pending with a signed waiver and the Cognito sub, without the password', async () => {
@@ -224,21 +234,17 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
-    it.each([
-      new ConflictException('A user with this email already exists'),
-      new BadRequestException('Password did not conform with policy'),
-      new InternalServerErrorException('Failed to sign up user: boom'),
-    ])(
-      'propagates %p from Cognito without saving the volunteer',
-      async (error) => {
-        mockCognitoService.signUpUser.mockRejectedValue(error);
+    it('propagates errors from Cognito without saving the volunteer', async () => {
+      const error = new ConflictException(
+        'A user with this email already exists',
+      );
+      mockCognitoService.signUpUser.mockRejectedValue(error);
 
-        await expect(service.create(dto)).rejects.toBe(error);
-        expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
-        expect(mockRepo.save).not.toHaveBeenCalled();
-        expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
-      },
-    );
+      await expect(service.create(dto)).rejects.toBe(error);
+      expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+    });
 
     it('lowercases the email before checking for duplicates and signing up the user', async () => {
       await service.create({ ...dto, email: 'Jane@Example.com' });

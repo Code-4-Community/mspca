@@ -107,6 +107,8 @@ describe('VolunteersController', () => {
       await expect(controller.create(dto)).rejects.toThrow(
         new ConflictException('A volunteer with this email already exists'),
       );
+      expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
     });
   });
 
@@ -133,6 +135,8 @@ describe('VolunteersController', () => {
       await expect(controller.confirm(dto)).rejects.toThrow(
         new BadRequestException('Invalid verification code'),
       );
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
     });
   });
 
