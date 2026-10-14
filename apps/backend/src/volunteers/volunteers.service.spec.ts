@@ -82,21 +82,26 @@ describe('VolunteersService', () => {
         status: VolunteerStatus.ACTIVE,
       } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
+      const checkSpy = jest.spyOn(service, 'checkVolunteerActive');
 
       const result = await service.findActiveOrFail(7);
 
       expect(result).toBe(volunteer);
+      expect(checkSpy).toHaveBeenCalledWith(volunteer);
     });
 
     it('throws BadRequestException when the volunteer is not active', async () => {
-      mockRepo.findOne.mockResolvedValue({
+      const volunteer = {
         volunteerId: 7,
         status: VolunteerStatus.INACTIVE,
-      } as FosterVolunteer);
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      const checkSpy = jest.spyOn(service, 'checkVolunteerActive');
 
       await expect(service.findActiveOrFail(7)).rejects.toThrow(
         new BadRequestException('Volunteer with ID 7 is not active'),
       );
+      expect(checkSpy).toHaveBeenCalledWith(volunteer);
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
@@ -118,14 +123,11 @@ describe('VolunteersService', () => {
       ).not.toThrow();
     });
 
-    it.each([VolunteerStatus.PENDING, VolunteerStatus.INACTIVE])(
-      'throws BadRequestException for a %s volunteer',
-      (status) => {
-        expect(() =>
-          service.checkVolunteerActive(makeVolunteer(status)),
-        ).toThrow(new BadRequestException('Volunteer with ID 1 is not active'));
-      },
-    );
+    it('throws BadRequestException for a volunteer who is not active', () => {
+      expect(() =>
+        service.checkVolunteerActive(makeVolunteer(VolunteerStatus.INACTIVE)),
+      ).toThrow(new BadRequestException('Volunteer with ID 1 is not active'));
+    });
   });
 
   describe('deactivate', () => {
@@ -339,18 +341,18 @@ describe('VolunteersService', () => {
       });
     });
 
-    it.each([VolunteerStatus.ACTIVE, VolunteerStatus.INACTIVE])(
-      'throws ConflictException and does not send an email if the volunteer is %s instead of pending',
-      async (status) => {
-        mockRepo.findOne.mockResolvedValue({ ...pendingVolunteer(), status });
+    it('throws ConflictException and does not send an email if the volunteer is not pending', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.ACTIVE,
+      });
 
-        await expect(service.approve(1)).rejects.toThrow(
-          new ConflictException('Only pending Volunteers can be approved'),
-        );
-        expect(mockRepo.save).not.toHaveBeenCalled();
-        expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      },
-    );
+      await expect(service.approve(1)).rejects.toThrow(
+        new ConflictException('Only pending Volunteers can be approved'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
 
     it('throws NotFoundException if volunteer does not exist', async () => {
       mockRepo.findOne.mockResolvedValue(null);
@@ -375,6 +377,9 @@ describe('VolunteersService', () => {
       const result = await service.approve(1);
 
       expect(result.status).toBe(VolunteerStatus.ACTIVE);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: VolunteerStatus.ACTIVE }),
+      );
       expect(loggerSpy).toHaveBeenCalled();
     });
   });

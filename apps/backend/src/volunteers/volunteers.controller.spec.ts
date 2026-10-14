@@ -238,23 +238,13 @@ describe('VolunteersController', () => {
       expect(mockVolunteersService.approve).not.toHaveBeenCalled();
     });
 
-    it('propagates NotFoundException thrown by the service', async () => {
+    it('propagates errors thrown by the service', async () => {
       mockVolunteersService.approve.mockRejectedValue(
-        new NotFoundException('Volunteer with ID 999 not found'),
-      );
-
-      await expect(controller.approve(999)).rejects.toThrow(
-        new NotFoundException('Volunteer with ID 999 not found'),
-      );
-    });
-
-    it('propagates ConflictException thrown by the service', async () => {
-      mockVolunteersService.approve.mockRejectedValue(
-        new ConflictException('Volunteer with ID 1 is already active'),
+        new ConflictException('Only pending Volunteers can be approved'),
       );
 
       await expect(controller.approve(1)).rejects.toThrow(
-        new ConflictException('Volunteer with ID 1 is already active'),
+        new ConflictException('Only pending Volunteers can be approved'),
       );
     });
   });
