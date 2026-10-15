@@ -3,6 +3,7 @@ import { FosterType } from '../volunteers.types';
 import {
   IsOptional,
   IsEnum,
+  IsNotEmpty,
   MaxLength,
   IsPhoneNumber,
   IsEmail,
@@ -31,7 +32,7 @@ export class UpdateVolunteerDto {
   secondaryPhone?: string;
 
   @IsOptional()
-  @IsNonEmptyString()
+  @IsNotEmpty()
   @MaxLength(255)
   @IsEmail()
   email?: string;

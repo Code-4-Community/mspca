@@ -59,7 +59,6 @@ export class EmailAttachmentDto {
  * Input shape for EmailsService.sendEmails. All validation lives here
  */
 export class SendEmailDTO {
-  @IsNonEmptyString()
   @IsEmail()
   @Length(1, 255)
   toEmail!: string;

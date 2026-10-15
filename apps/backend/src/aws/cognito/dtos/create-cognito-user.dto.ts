@@ -9,7 +9,6 @@ export class CreateCognitoUserDto {
   @IsNonEmptyString()
   lastName!: string;
 
-  @IsNonEmptyString()
   @IsEmail()
   email!: string;
 
