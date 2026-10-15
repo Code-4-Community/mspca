@@ -114,8 +114,8 @@ export class VolunteersService {
    *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
-   * @throws {BadRequestException} If the code is wrong or has expired.
-   * @throws {ConflictException} If the Cognito user can't be confirmed, e.g. they already are.
+   * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
+   * @throws {HttpException} 429 if there have been too many attempts.
    * @throws {InternalServerErrorException} If confirmation or adding the role fails.
    */
   async confirm(dto: ConfirmVolunteerDto): Promise<void> {

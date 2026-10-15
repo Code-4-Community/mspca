@@ -69,15 +69,16 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'The code is invalid or has expired',
+    description:
+      'The code is not 6 digits, is wrong or has expired, or the volunteer cannot be confirmed or is already confirmed',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'No volunteer with this email exists',
   })
   @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'The volunteer cannot be confirmed, e.g. they already are',
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many attempts; try again later',
   })
   @ApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,

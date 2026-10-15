@@ -144,29 +144,30 @@ export class CognitoService {
       if (error instanceof Error && error.name === 'UsernameExistsException') {
         throw new ConflictException('A user with this email already exists');
       }
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to create user: ${reason}`,
-      );
+      this.logger.error(`Failed to create user ${email}`, error);
+      throw new InternalServerErrorException('Failed to create user');
     }
 
     // Cognito should always return a sub for a created user; a missing one would
     // only come from an AWS outage or internal bug.
     if (!sub) {
-      await this.deleteUser(email).catch(() =>
-        this.logger.error(`Failed to delete partially created user ${email}`),
-      );
-      throw new InternalServerErrorException(
-        'Failed to create user: Cognito returned no sub',
-      );
+      this.logger.error(`Cognito returned no sub when creating ${email}`);
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
+      throw new InternalServerErrorException('Failed to create user');
     }
 
     try {
       await this.addUserToGroup(email, role);
     } catch (error) {
-      await this.deleteUser(email).catch(() =>
-        this.logger.error(`Failed to delete partially created user ${email}`),
-      );
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
       throw error;
     }
 
@@ -236,9 +237,11 @@ export class CognitoService {
     // would only come from an AWS outage or internal bug.
     if (!sub) {
       this.logger.error(`Cognito returned no sub when signing up ${email}`);
-      await this.deleteUser(email).catch(() =>
-        this.logger.error(`Failed to delete partially created user ${email}`),
-      );
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
       throw new InternalServerErrorException('Failed to sign up user');
     }
 
@@ -289,10 +292,17 @@ export class CognitoService {
       if (name === 'UserNotFoundException') {
         throw new NotFoundException('No user with this email exists');
       }
+      // Thrown when the user is already confirmed, or is in a state that can't
+      // be confirmed (e.g. disabled).
       if (name === 'NotAuthorizedException') {
-        throw new BadRequestException('User cannot be confirmed');
+        throw new BadRequestException(
+          'User cannot be confirmed, or is already confirmed',
+        );
       }
-      // Cognito throws these after too many wrong codes.
+      // LimitExceededException: Cognito's attempt limit was hit after repeated
+      // wrong codes ("Attempt limit exceeded, please try after some time").
+      // TooManyFailedAttemptsException: too many failed attempts at this action
+      // for the user. Both clear after a cool-down, so the client should retry later.
       if (
         name === 'LimitExceededException' ||
         name === 'TooManyFailedAttemptsException'
@@ -310,9 +320,11 @@ export class CognitoService {
       await this.addUserToGroup(email, role);
     } catch {
       // addUserToGroup already logs the Cognito error.
-      await this.deleteUser(email).catch(() =>
-        this.logger.error(`Failed to delete partially created user ${email}`),
-      );
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
       throw new InternalServerErrorException('Failed to confirm user');
     }
   }
@@ -334,9 +346,8 @@ export class CognitoService {
         `Failed to add user ${username} to group ${groupName}`,
         error,
       );
-      const reason = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(
-        `Failed to add user to group ${groupName}: ${reason}`,
+        `Failed to add user to group ${groupName}`,
       );
     }
   }
@@ -357,9 +368,12 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to remove user ${username} from group ${groupName}`,
+        error,
+      );
       throw new InternalServerErrorException(
-        `Failed to remove user from group ${groupName}: ${reason}`,
+        `Failed to remove user from group ${groupName}`,
       );
     }
   }
@@ -376,10 +390,8 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to disable user: ${reason}`,
-      );
+      this.logger.error(`Failed to disable user ${email}`, error);
+      throw new InternalServerErrorException('Failed to disable user');
     }
   }
 
@@ -395,10 +407,8 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to enable user: ${reason}`,
-      );
+      this.logger.error(`Failed to enable user ${email}`, error);
+      throw new InternalServerErrorException('Failed to enable user');
     }
   }
 
@@ -423,10 +433,8 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to delete user: ${reason}`,
-      );
+      this.logger.error(`Failed to delete user ${email}`, error);
+      throw new InternalServerErrorException('Failed to delete user');
     }
   }
 }

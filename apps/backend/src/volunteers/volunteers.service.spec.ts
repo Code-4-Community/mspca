@@ -175,8 +175,8 @@ describe('VolunteersService', () => {
       jest.restoreAllMocks();
     });
 
-    it('signs up the Cognito user with their password', async () => {
-      await service.create(dto);
+    it('signs up the Cognito user and saves the volunteer as pending with a signed waiver and the Cognito sub, without the password', async () => {
+      const result = await service.create(dto);
 
       expect(mockRepo.findOneBy).toHaveBeenCalledTimes(1);
       expect(mockRepo.findOneBy).toHaveBeenCalledWith({
@@ -189,19 +189,6 @@ describe('VolunteersService', () => {
         email: 'jane@example.com',
         password,
       });
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockRepo.save).toHaveBeenCalledWith({
-        ...profile,
-        status: VolunteerStatus.PENDING,
-        mostRecentWaiverSigned: true,
-        cognitoSub: 'cognito-sub-123',
-      });
-    });
-
-    it('saves the volunteer as pending with a signed waiver and the Cognito sub, without the password', async () => {
-      const result = await service.create(dto);
-
-      expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...profile,
@@ -308,7 +295,7 @@ describe('VolunteersService', () => {
         dbError,
       );
       expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining('cognito-sub-123'),
+        'Created Cognito user cognito-sub-123 for jane@example.com but failed to save the Volunteer or delete the Cognito user',
       );
     });
   });
