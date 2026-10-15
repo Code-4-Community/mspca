@@ -8,7 +8,7 @@ import {
   IsPhoneNumber,
   IsEmail,
 } from 'class-validator';
-import { IsNonEmptyString } from '../../utils/dtos/utils.dto';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 export class UpdateVolunteerDto {
   @IsOptional()

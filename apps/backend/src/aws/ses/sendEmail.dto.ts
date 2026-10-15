@@ -12,7 +12,7 @@ import {
   ValidateNested,
   registerDecorator,
 } from 'class-validator';
-import { IsNonEmptyString } from '../../utils/dtos/utils.dto';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 /**
  * Bounds the byte length of `EmailAttachmentDto.content`. Pair with

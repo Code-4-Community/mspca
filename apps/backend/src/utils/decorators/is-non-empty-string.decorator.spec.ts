@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { IsOptional, validate } from 'class-validator';
-import { IsNonEmptyString } from './utils.dto';
+import { IsNonEmptyString } from './is-non-empty-string.decorator';
 
 class TestDto {
   @IsNonEmptyString()
