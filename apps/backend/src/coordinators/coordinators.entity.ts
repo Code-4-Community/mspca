@@ -36,6 +36,8 @@ export class FosterCoordinator {
   @ManyToMany(
     () => FosterVolunteer,
     (volunteer) => volunteer.assignedCoordinators,
+    // Matches the migration: a coordinator with assigned volunteers can't be deleted.
+    { onDelete: 'RESTRICT' },
   )
   assignedVolunteers!: FosterVolunteer[];
 }

@@ -17,12 +17,13 @@ export class ReplaceAssignedCoordinatorWithJoinTable1791100000000
                 CONSTRAINT "fk_assignment_coordinator"
                     FOREIGN KEY ("coordinator_id")
                     REFERENCES "foster_coordinators" ("coordinator_id")
-                    ON DELETE CASCADE
+                    ON DELETE RESTRICT
             )
         `);
 
-    // The composite PK leads with volunteer_id, so lookups and cascades by
-    // coordinator need their own index.
+    // Deleting a coordinator who still has volunteers is blocked, as it was with
+    // the old single-column FK. The composite PK leads with volunteer_id, so
+    // lookups and that delete check by coordinator need their own index.
     await queryRunner.query(`
             CREATE INDEX "idx_volunteer_coordinator_assignments_coordinator_id"
                 ON "volunteer_coordinator_assignments" ("coordinator_id")
