@@ -1,8 +1,10 @@
 import { StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { Authenticator } from '@aws-amplify/ui-react';
+import { ChakraProvider } from '@chakra-ui/react';
 import { configureAmplify, isAuthEnabled } from './auth/auth.config';
 import App from './app';
+import { system } from './theme';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
@@ -12,15 +14,17 @@ const root = ReactDOM.createRoot(
 configureAmplify();
 
 root.render(
-  isAuthEnabled() ? (
-    <Authenticator>
+  <ChakraProvider value={system}>
+    {isAuthEnabled() ? (
+      <Authenticator>
+        <StrictMode>
+          <App />
+        </StrictMode>
+      </Authenticator>
+    ) : (
       <StrictMode>
         <App />
       </StrictMode>
-    </Authenticator>
-  ) : (
-    <StrictMode>
-      <App />
-    </StrictMode>
-  ),
+    )}
+  </ChakraProvider>,
 );
