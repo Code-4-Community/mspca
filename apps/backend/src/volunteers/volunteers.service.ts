@@ -12,7 +12,9 @@ import { VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
-import { UpdateAnimalUpdatesDto } from './dtos/update-animal-updates.dto';
+import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { EmailsService } from '../aws/ses/email.service';
+import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 
 @Injectable()
 export class VolunteersService {
@@ -22,6 +24,7 @@ export class VolunteersService {
     @InjectRepository(FosterVolunteer)
     private repo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
+    private emailsService: EmailsService,
   ) {}
 
   /**
@@ -138,26 +141,6 @@ export class VolunteersService {
   }
 
   /**
-   * Opts a Volunteer in or out of hearing what happens to an animal after it
-   * returns to MSPCA.
-   *
-   * @param id - The Volunteer's ID.
-   * @param dto - Contains the new animalUpdates value.
-   * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
-   */
-  async updateAnimalUpdates(
-    id: number,
-    dto: UpdateAnimalUpdatesDto,
-  ): Promise<FosterVolunteer> {
-    const volunteer = await this.findByIdOrFail(id);
-
-    volunteer.animalUpdates = dto.animalUpdates;
-
-    return this.repo.save(volunteer);
-  }
-
-  /**
    * Fetches a Volunteer by ID, requiring that they are active.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
@@ -170,10 +153,85 @@ export class VolunteersService {
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
-    if (volunteer.status !== VolunteerStatus.ACTIVE) {
-      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
-    }
+    this.checkVolunteerActive(volunteer);
 
     return volunteer;
+  }
+
+  /**
+   * Ensures a Volunteer's account is active.
+   *
+   * @param volunteer - The Volunteer to check.
+   * @throws {BadRequestException} If the Volunteer's status is not Active.
+   */
+  checkVolunteerActive(volunteer: FosterVolunteer): void {
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Volunteer with ID ${volunteer.volunteerId} is not active`,
+      );
+    }
+  }
+
+  /**
+   * Updates a foster volunteer by ID.
+   * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * @param id - ID of the volunteer to update
+   * @param dto - The fields to update
+   * @returns The updated volunteer
+   * @throws NotFoundException if no volunteer exists with the given ID
+   */
+  async updateVolunteerById(
+    id: number,
+    dto: UpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+    Object.assign(volunteer, dto);
+    return this.repo.save(volunteer);
+  }
+
+  /**
+   * Approves a pending Volunteer, setting their status to Active and emailing
+   * them that they can now log in.
+   *
+   * If the email fails to send, the approval is kept and the failure is logged,
+   * so the coordinator isn't left with an approved Volunteer they can't re-approve.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The approved Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   */
+  async approve(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be approved`);
+    }
+
+    volunteer.status = VolunteerStatus.ACTIVE;
+    const saved = await this.repo.save(volunteer);
+
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: saved.email,
+        ...volunteerApprovedEmail(saved.firstName),
+      });
+    } catch (err) {
+      this.logger.error(
+        `Volunteer with ID ${id} was approved but the approval email didn't send`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+
+    return saved;
+  }
+
+  /**
+   * Gets all foster volunteers.
+   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * @returns A list of all volunteers
+   */
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.repo.find();
   }
 }
