@@ -1,10 +1,5 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
-// Values mirror the MSPCA UI Kit in Figma (Color/Global Tokens, Color/Semantic
-// Tokens, Typography Tokens). Update them here to change them across the app.
-
-// Raw brand palette. Use these directly only where Chakra props aren't available
-// (e.g. third-party components); otherwise prefer tokens like `color="blue.primary"`.
 export const colors = {
   gray: {
     0: '#ffffff',
