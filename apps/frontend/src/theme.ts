@@ -1,4 +1,9 @@
-import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
+import {
+  createSystem,
+  defaultConfig,
+  defineConfig,
+  defineTextStyles,
+} from '@chakra-ui/react';
 
 export const colors = {
   gray: {
@@ -43,7 +48,6 @@ export const colors = {
     black85: '#4d4d4f',
     grey: '#858f98',
   },
-  // Foster home restriction labels (carried over from the Trello board).
   trello: {
     noRestrictions: '#174b35',
     dogFreeHome: '#87b400',
@@ -65,21 +69,31 @@ const toColorTokens = (palette: typeof colors) =>
     ]),
   );
 
-// Figma defines a Desktop and a Mobile value for each size; Mobile applies
-// below the `md` breakpoint. Line heights are the Figma desktop line height
-// divided by the font size, so they scale down with the mobile sizes.
 const textStyle = (
   mobile: string,
   desktop: string,
   lineHeight: string,
-  fontFamily = 'heading',
+  font: 'heading' | 'body' = 'heading',
 ) => ({
   value: {
-    fontFamily,
+    fontFamily: font,
     fontSize: { base: mobile, md: desktop },
+    fontWeight: font === 'heading' ? 'semibold' : 'normal',
     lineHeight,
     letterSpacing: '0',
   },
+});
+
+const textStyles = defineTextStyles({
+  h1: textStyle('36px', '60px', '1.5'),
+  h2: textStyle('32px', '48px', '1.5'),
+  h3: textStyle('28px', '36px', '1.5'),
+  h4: textStyle('24px', '30px', '1.533'),
+  h5: textStyle('20px', '24px', '1.5'),
+  h6: textStyle('18px', '20px', '1.5'),
+  h7: textStyle('16px', '18px', '1.556'),
+  body: textStyle('14px', '16px', '1.5', 'body'),
+  'body-small': textStyle('12px', '14px', '1.43', 'body'),
 });
 
 const config = defineConfig({
@@ -145,28 +159,14 @@ const config = defineConfig({
         },
       },
     },
-    // Pair with a fontWeight prop for the weight variants Figma offers
-    // (normal/medium/semibold/bold), e.g. <Text textStyle="h5" fontWeight="bold">.
-    textStyles: {
-      h1: textStyle('36px', '60px', '1.5'),
-      h2: textStyle('32px', '48px', '1.5'),
-      h3: textStyle('28px', '36px', '1.5'),
-      h4: textStyle('24px', '30px', '1.533'),
-      h5: textStyle('20px', '24px', '1.5'),
-      h6: textStyle('18px', '20px', '1.5'),
-      h7: textStyle('16px', '18px', '1.556'),
-      body: textStyle('14px', '16px', '1.5', 'body'),
-      'body-small': textStyle('12px', '14px', '1.43', 'body'),
-    },
+    textStyles,
   },
   globalCss: {
     body: {
       textStyle: 'body',
-      fontWeight: 'normal',
       color: 'fg',
       bg: 'bg',
     },
-    'h1, h2, h3, h4, h5, h6': { fontWeight: 'semibold' },
     h1: { textStyle: 'h1' },
     h2: { textStyle: 'h2' },
     h3: { textStyle: 'h3' },
