@@ -555,17 +555,11 @@ describe('CognitoService', () => {
     });
 
     describe('confirmUser', () => {
-      it('confirms the user and then adds them to the group', async () => {
+      it('confirms the user without adding a group', async () => {
         sendSpy.mockResolvedValueOnce({});
-        const addUserToGroup = jest
-          .spyOn(service, 'addUserToGroup')
-          .mockResolvedValue(undefined);
+        const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
 
-        await service.confirmUser(
-          'jane@example.com',
-          '123456',
-          CognitoRole.FosterVolunteer,
-        );
+        await service.confirmUser('jane@example.com', '123456');
 
         expect(sendSpy).toHaveBeenCalledTimes(1);
         const confirmCmd = sendSpy.mock.calls[0][0];
@@ -575,11 +569,7 @@ describe('CognitoService', () => {
           Username: 'jane@example.com',
           ConfirmationCode: '123456',
         });
-        expect(addUserToGroup).toHaveBeenCalledTimes(1);
-        expect(addUserToGroup).toHaveBeenCalledWith(
-          'jane@example.com',
-          CognitoRole.FosterVolunteer,
-        );
+        expect(addUserToGroup).not.toHaveBeenCalled();
       });
 
       it.each([
@@ -615,131 +605,40 @@ describe('CognitoService', () => {
             HttpStatus.TOO_MANY_REQUESTS,
           ),
         ],
-      ])(
-        'maps %s to the matching HTTP error without adding a group',
-        async (name, expected) => {
-          const error = new Error('Current status is CONFIRMED');
-          error.name = name;
-          sendSpy.mockRejectedValueOnce(error);
-          const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
+      ])('maps %s to the matching HTTP error', async (name, expected) => {
+        const error = new Error('Current status is CONFIRMED');
+        error.name = name;
+        sendSpy.mockRejectedValueOnce(error);
+        const thrown = await service
+          .confirmUser('jane@example.com', '123456')
+          .catch((e: unknown) => e);
 
-          const thrown = await service
-            .confirmUser(
-              'jane@example.com',
-              '123456',
-              CognitoRole.FosterVolunteer,
-            )
-            .catch((e: unknown) => e);
-
-          expect(thrown).toBeInstanceOf(expected.constructor);
-          expect((thrown as HttpException).getStatus()).toBe(
-            expected.getStatus(),
-          );
-          expect((thrown as HttpException).message).toBe(expected.message);
-          expect(sendSpy).toHaveBeenCalledTimes(1);
-          expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(ConfirmSignUpCommand);
-          expect(addUserToGroup).not.toHaveBeenCalled();
-        },
-      );
+        expect(thrown).toBeInstanceOf(expected.constructor);
+        expect((thrown as HttpException).getStatus()).toBe(
+          expected.getStatus(),
+        );
+        expect((thrown as HttpException).message).toBe(expected.message);
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(ConfirmSignUpCommand);
+      });
 
       it('logs the Cognito error and throws a generic InternalServerErrorException on unknown confirm error', async () => {
         const error = new Error('Cognito down');
         sendSpy.mockRejectedValueOnce(error);
-        const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
         const logError = jest
           .spyOn(Logger.prototype, 'error')
           .mockImplementation();
 
         await expect(
-          service.confirmUser(
-            'jane@example.com',
-            '123456',
-            CognitoRole.FosterVolunteer,
-          ),
+          service.confirmUser('jane@example.com', '123456'),
         ).rejects.toThrow(
           new InternalServerErrorException('Failed to confirm user'),
         );
         expect(sendSpy).toHaveBeenCalledTimes(1);
-        expect(addUserToGroup).not.toHaveBeenCalled();
         expect(logError).toHaveBeenCalledTimes(1);
         expect(logError).toHaveBeenCalledWith(
           'Failed to confirm user jane@example.com',
           error,
-        );
-      });
-
-      it('deletes the user and throws a generic error when adding to the group fails', async () => {
-        sendSpy.mockResolvedValueOnce({});
-        const addUserToGroup = jest
-          .spyOn(service, 'addUserToGroup')
-          .mockRejectedValue(
-            new InternalServerErrorException(
-              'Failed to add user to group FosterVolunteer',
-            ),
-          );
-        const deleteUser = jest
-          .spyOn(service, 'deleteUser')
-          .mockResolvedValue(undefined);
-        const logError = jest
-          .spyOn(Logger.prototype, 'error')
-          .mockImplementation();
-
-        await expect(
-          service.confirmUser(
-            'jane@example.com',
-            '123456',
-            CognitoRole.FosterVolunteer,
-          ),
-        ).rejects.toThrow(
-          new InternalServerErrorException('Failed to confirm user'),
-        );
-
-        expect(sendSpy).toHaveBeenCalledTimes(1);
-        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(ConfirmSignUpCommand);
-        expect(addUserToGroup).toHaveBeenCalledTimes(1);
-        expect(addUserToGroup).toHaveBeenCalledWith(
-          'jane@example.com',
-          CognitoRole.FosterVolunteer,
-        );
-        expect(deleteUser).toHaveBeenCalledTimes(1);
-        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
-        expect(logError).not.toHaveBeenCalled();
-      });
-
-      it('logs and throws a generic error when adding to the group and deleting the user both fail', async () => {
-        sendSpy.mockResolvedValueOnce({});
-        const addUserToGroup = jest
-          .spyOn(service, 'addUserToGroup')
-          .mockRejectedValue(
-            new InternalServerErrorException(
-              'Failed to add user to group FosterVolunteer',
-            ),
-          );
-        const deleteUser = jest
-          .spyOn(service, 'deleteUser')
-          .mockRejectedValue(
-            new InternalServerErrorException('Failed to delete user'),
-          );
-        const logError = jest
-          .spyOn(Logger.prototype, 'error')
-          .mockImplementation();
-
-        await expect(
-          service.confirmUser(
-            'jane@example.com',
-            '123456',
-            CognitoRole.FosterVolunteer,
-          ),
-        ).rejects.toThrow(
-          new InternalServerErrorException('Failed to confirm user'),
-        );
-
-        expect(addUserToGroup).toHaveBeenCalledTimes(1);
-        expect(deleteUser).toHaveBeenCalledTimes(1);
-        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
-        expect(logError).toHaveBeenCalledTimes(1);
-        expect(logError).toHaveBeenCalledWith(
-          'Failed to delete partially created user jane@example.com',
         );
       });
     });
