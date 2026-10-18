@@ -1,29 +1,45 @@
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   Matches,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { Homebase } from '../../types';
 
-// Accepts every FosterCoordinator field except `active` (defaults to true) and
-// `assignedVolunteers` (defaults to []), which are not client-settable on create.
 export class CreateCoordinatorDto {
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   firstName!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   lastName!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
   phone!: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
   secondaryPhone?: string | null;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
+  @MaxLength(255)
   @Matches(/^[^\s@]+@mspca\.org$/, {
     message: 'Email must end in @mspca.org',
   })

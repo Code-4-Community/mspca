@@ -24,7 +24,7 @@ export class FosterCoordinator {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'enum', enum: Homebase })

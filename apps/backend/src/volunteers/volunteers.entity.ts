@@ -6,7 +6,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Homebase } from '../types';
-import { FosterType } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 @Entity('foster_volunteers')
@@ -31,7 +31,7 @@ export class FosterVolunteer {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -65,8 +65,15 @@ export class FosterVolunteer {
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
 
-  @Column({ type: 'boolean' })
-  active!: boolean;
+  @Column({
+    type: 'enum',
+    enum: VolunteerStatus,
+    default: VolunteerStatus.PENDING,
+  })
+  status!: VolunteerStatus;
+
+  @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
+  cognitoSub!: string;
 
   @ManyToOne(
     () => FosterCoordinator,

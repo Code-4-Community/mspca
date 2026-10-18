@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FosterCoordinator } from './coordinators.entity';
+import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { CoordinatorsController } from './coordinators.controller';
 import { CoordinatorsService } from './coordinators.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([FosterCoordinator])],
+  imports: [TypeOrmModule.forFeature([FosterCoordinator, FosterVolunteer])],
   controllers: [CoordinatorsController],
   providers: [CoordinatorsService],
   exports: [CoordinatorsService],

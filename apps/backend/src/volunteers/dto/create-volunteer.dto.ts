@@ -1,0 +1,77 @@
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { Homebase } from '../../types';
+import { FosterType } from '../volunteers.types';
+
+export class CreateVolunteerDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  firstName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  lastName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
+  phone!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
+  secondaryPhone?: string;
+
+  @IsEmail()
+  @MaxLength(255)
+  email!: string;
+
+  // Cognito enforces the pool's full password policy; these are its outer bounds.
+  @IsString()
+  @MinLength(8)
+  @MaxLength(256)
+  password!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  address!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  city!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(10)
+  zipcode!: string;
+
+  @IsEnum(Homebase)
+  homebase!: Homebase;
+
+  @IsString()
+  @IsNotEmpty()
+  residentAnimals!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  notes?: string;
+
+  @IsEnum(FosterType)
+  fosterType!: FosterType;
+}
