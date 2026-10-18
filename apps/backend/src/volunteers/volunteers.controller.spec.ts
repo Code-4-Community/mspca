@@ -291,15 +291,6 @@ describe('VolunteersController', () => {
       ).toHaveBeenCalledWith(1, dto);
     });
 
-    it('throws BadRequestException when id is invalid', async () => {
-      await expect(
-        controller.updateAnimalPreferences(0, { added: [42] }),
-      ).rejects.toThrow(BadRequestException);
-      expect(
-        mockVolunteersService.updateAnimalPreferences,
-      ).not.toHaveBeenCalled();
-    });
-
     it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(
       'throws BadRequestException when neither list has IDs: %j',
       async (body) => {

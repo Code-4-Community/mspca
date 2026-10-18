@@ -417,7 +417,11 @@ describe('VolunteersService', () => {
 
   describe('updateAnimalPreferences', () => {
     const volunteerWithPreferences = (animalPreferences: number[]) =>
-      ({ ...mockVolunteer, animalPreferences } as FosterVolunteer);
+      ({
+        ...mockVolunteer,
+        status: VolunteerStatus.ACTIVE,
+        animalPreferences,
+      } as FosterVolunteer);
 
     beforeEach(() => {
       mockRepo.save.mockImplementation(async (v) => v);
@@ -425,7 +429,7 @@ describe('VolunteersService', () => {
 
     it('adds the given animal IDs to the list', async () => {
       mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
-      const findSpy = jest.spyOn(service, 'findByIdOrFail');
+      const findSpy = jest.spyOn(service, 'findActiveOrFail');
 
       const result = await service.updateAnimalPreferences(1, {
         added: [107, 230],
@@ -475,28 +479,45 @@ describe('VolunteersService', () => {
       expect(result).toEqual([42, 55]);
     });
 
-    it('throws BadRequestException when a removed ID is not in the list', async () => {
+    it('throws BadRequestException listing every removed ID that is not in the list', async () => {
       mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
 
       await expect(
-        service.updateAnimalPreferences(1, { removed: [42, 999] }),
+        service.updateAnimalPreferences(1, { removed: [42, 998, 999] }),
       ).rejects.toThrow(
         new BadRequestException(
-          "Animal IDs not in the volunteer's preferences: 999",
+          "Animal IDs not in the volunteer's preferences: 998, 999",
         ),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
-    it('throws BadRequestException when an ID is in both added and removed', async () => {
+    it('throws BadRequestException listing every ID that is in both added and removed', async () => {
       mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
 
       await expect(
-        service.updateAnimalPreferences(1, { added: [42, 55], removed: [42] }),
+        service.updateAnimalPreferences(1, {
+          added: [42, 107, 55],
+          removed: [42, 107],
+        }),
       ).rejects.toThrow(
         new BadRequestException(
-          'Animal IDs cannot be both added and removed: 42',
+          'Animal IDs cannot be both added and removed: 42, 107',
         ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when the volunteer is not active', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...volunteerWithPreferences([42]),
+        status: VolunteerStatus.PENDING,
+      });
+
+      await expect(
+        service.updateAnimalPreferences(1, { added: [55] }),
+      ).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not active'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
@@ -516,7 +537,7 @@ describe('VolunteersService', () => {
 
     it('throws NotFoundException if the volunteer does not exist', async () => {
       mockRepo.findOne.mockResolvedValue(null);
-      const findSpy = jest.spyOn(service, 'findByIdOrFail');
+      const findSpy = jest.spyOn(service, 'findActiveOrFail');
 
       await expect(
         service.updateAnimalPreferences(999, { added: [42] }),

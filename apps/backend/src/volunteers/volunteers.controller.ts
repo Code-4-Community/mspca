@@ -172,7 +172,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      "Invalid volunteer or animal IDs, neither list has IDs, an ID is in both lists, or a removed ID is not in the volunteer's preferences",
+      "Invalid volunteer or animal IDs, the volunteer is not active, neither list has IDs, an ID is in both lists, or a removed ID is not in the volunteer's preferences",
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,

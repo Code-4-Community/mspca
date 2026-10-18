@@ -194,23 +194,26 @@ export class VolunteersService {
    * @param dto - The animal IDs to add and/or remove.
    * @returns The Volunteer's updated list of animal IDs.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If animals are removed from an empty list, an ID is in
-   * both the added and removed lists, or a removed ID is not in the Volunteer's preferences.
+   * @throws {BadRequestException} If the Volunteer is not active, animals are removed from
+   * an empty list, an ID is in both the added and removed lists, or a removed ID is not in
+   * the Volunteer's preferences.
    */
   async updateAnimalPreferences(
     id: number,
     dto: UpdateAnimalPreferencesDto,
   ): Promise<number[]> {
-    const volunteer = await this.findByIdOrFail(id);
+    const volunteer = await this.findActiveOrFail(id);
     const { added = [], removed = [] } = dto;
+    const removedSet = new Set(removed);
+    const preferences = new Set(volunteer.animalPreferences);
 
-    if (removed.length > 0 && volunteer.animalPreferences.length === 0) {
+    if (removed.length > 0 && preferences.size === 0) {
       throw new BadRequestException(
         `Volunteer with ID ${id} has no animal preferences to remove`,
       );
     }
 
-    const overlapping = added.filter((animalId) => removed.includes(animalId));
+    const overlapping = added.filter((animalId) => removedSet.has(animalId));
     if (overlapping.length > 0) {
       throw new BadRequestException(
         `Animal IDs cannot be both added and removed: ${overlapping.join(
@@ -219,16 +222,13 @@ export class VolunteersService {
       );
     }
 
-    const missing = removed.filter(
-      (animalId) => !volunteer.animalPreferences.includes(animalId),
-    );
+    const missing = removed.filter((animalId) => !preferences.has(animalId));
     if (missing.length > 0) {
       throw new BadRequestException(
         `Animal IDs not in the volunteer's preferences: ${missing.join(', ')}`,
       );
     }
 
-    const preferences = new Set(volunteer.animalPreferences);
     removed.forEach((animalId) => preferences.delete(animalId));
     added.forEach((animalId) => preferences.add(animalId));
 
