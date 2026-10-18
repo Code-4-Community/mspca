@@ -1,7 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import {
@@ -12,11 +16,14 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   AdminDeleteUserCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AuthConfigurationError } from './cognito.config';
 import { CognitoService } from './cognito.service';
 import { AccessTokenPayload, CognitoRole } from './cognito.types';
+import { SignUpCognitoUserDto } from './dtos/sign-up-cognito-user.dto';
 
 type TestRequest = Request & { user?: AccessTokenPayload };
 
@@ -213,78 +220,18 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
-        ).rejects.toThrow(ConflictException);
-      });
-
-      it('throws InternalServerErrorException on unknown error', async () => {
-        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
-
-        await expect(
-          service.createUser({
-            firstName: 'Jane',
-            lastName: 'Doe',
-            email: 'jane@example.com',
-            role: CognitoRole.FosterVolunteer,
-          }),
-        ).rejects.toThrow(InternalServerErrorException);
-      });
-
-      it('deletes the user and throws when Cognito returns no sub', async () => {
-        sendSpy
-          .mockResolvedValueOnce({ User: { Attributes: [] } })
-          .mockResolvedValueOnce({}); // deleteUser
-
-        await expect(
-          service.createUser({
-            firstName: 'Jane',
-            lastName: 'Doe',
-            email: 'jane@example.com',
-            role: CognitoRole.FosterVolunteer,
-          }),
         ).rejects.toThrow(
-          new InternalServerErrorException(
-            'Failed to create user: Cognito returned no sub',
-          ),
+          new ConflictException('A user with this email already exists'),
         );
 
-        expect(sendSpy).toHaveBeenCalledTimes(2);
-        const deleteCmd = sendSpy.mock.calls[1][0];
-        expect(deleteCmd).toBeInstanceOf(AdminDeleteUserCommand);
-        expect(deleteCmd.input).toEqual({
-          UserPoolId: 'us-east-2_TestPool',
-          Username: 'jane@example.com',
-        });
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
       });
 
-      it('deletes the user and throws when adding to the group fails', async () => {
-        sendSpy
-          .mockResolvedValueOnce({
-            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
-          })
-          .mockRejectedValueOnce(new Error('Group not found'))
-          .mockResolvedValueOnce({}); // deleteUser
-        jest.spyOn(Logger.prototype, 'error').mockImplementation();
-
-        await expect(
-          service.createUser({
-            firstName: 'Jane',
-            lastName: 'Doe',
-            email: 'jane@example.com',
-            role: CognitoRole.FosterVolunteer,
-          }),
-        ).rejects.toThrow(InternalServerErrorException);
-
-        expect(sendSpy).toHaveBeenCalledTimes(3);
-        expect(sendSpy.mock.calls[2][0]).toBeInstanceOf(AdminDeleteUserCommand);
-      });
-
-      it('throws the original error when cleanup also fails', async () => {
-        sendSpy
-          .mockResolvedValueOnce({
-            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
-          })
-          .mockRejectedValueOnce(new Error('Group not found'))
-          .mockRejectedValueOnce(new Error('Cognito down'));
+      it('logs the Cognito error and throws a generic InternalServerErrorException on unknown error, without deleting', async () => {
+        const error = new Error('Cognito down');
+        sendSpy.mockRejectedValueOnce(error);
+        const deleteUser = jest.spyOn(service, 'deleteUser');
         const logError = jest
           .spyOn(Logger.prototype, 'error')
           .mockImplementation();
@@ -296,7 +243,162 @@ describe('CognitoService', () => {
             email: 'jane@example.com',
             role: CognitoRole.FosterVolunteer,
           }),
-        ).rejects.toThrow(/Failed to add user to group/);
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to create user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        expect(deleteUser).not.toHaveBeenCalled();
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to create user jane@example.com',
+          error,
+        );
+      });
+
+      it('deletes the user and throws when Cognito returns no sub', async () => {
+        sendSpy.mockResolvedValueOnce({ User: { Attributes: [] } });
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockResolvedValue(undefined);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to create user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Cognito returned no sub when creating jane@example.com',
+        );
+      });
+
+      it('deletes the user and throws when adding to the group fails', async () => {
+        const groupError = new Error('Group not found');
+        sendSpy
+          .mockResolvedValueOnce({
+            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
+          })
+          .mockRejectedValueOnce(groupError);
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockResolvedValue(undefined);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to add user to group FosterVolunteer',
+          ),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(2);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        expect(sendSpy.mock.calls[1][0]).toBeInstanceOf(
+          AdminAddUserToGroupCommand,
+        );
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to add user jane@example.com to group FosterVolunteer',
+          groupError,
+        );
+      });
+
+      it('throws the group error and logs both failures when cleanup also fails', async () => {
+        const groupError = new Error('Group not found');
+        sendSpy
+          .mockResolvedValueOnce({
+            User: { Attributes: [{ Name: 'sub', Value: 'test-sub-123' }] },
+          })
+          .mockRejectedValueOnce(groupError);
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockRejectedValue(
+            new InternalServerErrorException('Failed to delete user'),
+          );
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to add user to group FosterVolunteer',
+          ),
+        );
+
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(2);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to add user jane@example.com to group FosterVolunteer',
+          groupError,
+        );
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to delete partially created user jane@example.com',
+        );
+      });
+
+      it('logs and still throws when Cognito returns no sub and deleting the user fails', async () => {
+        sendSpy.mockResolvedValueOnce({ User: { Attributes: [] } });
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockRejectedValue(
+            new InternalServerErrorException('Failed to delete user'),
+          );
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.createUser({
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            role: CognitoRole.FosterVolunteer,
+          }),
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to create user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(AdminCreateUserCommand);
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(2);
+        expect(logError).toHaveBeenCalledWith(
+          'Cognito returned no sub when creating jane@example.com',
+        );
         expect(logError).toHaveBeenCalledWith(
           'Failed to delete partially created user jane@example.com',
         );
@@ -313,6 +415,332 @@ describe('CognitoService', () => {
             role: CognitoRole.FosterVolunteer,
           }),
         ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('signUpUser', () => {
+      const signUpDto = {
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: 'jane@example.com',
+        password: 'Str0ng!Password',
+      } as SignUpCognitoUserDto;
+
+      it('signs up the user with their password and returns the sub without adding a group', async () => {
+        sendSpy.mockResolvedValueOnce({ UserSub: 'test-sub-123' });
+        const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
+
+        const sub = await service.signUpUser(signUpDto);
+
+        expect(sub).toBe('test-sub-123');
+        expect(addUserToGroup).not.toHaveBeenCalled();
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(SignUpCommand);
+        expect(cmd.input).toEqual({
+          ClientId: '4h57k9lmno1pqrstuv2wxyz3ab',
+          Username: 'jane@example.com',
+          Password: 'Str0ng!Password',
+          UserAttributes: [
+            { Name: 'email', Value: 'jane@example.com' },
+            { Name: 'name', Value: 'Jane Doe' },
+          ],
+        });
+      });
+
+      it('throws ConflictException when the user already exists', async () => {
+        const error = new Error('User already exists');
+        error.name = 'UsernameExistsException';
+        sendSpy.mockRejectedValueOnce(error);
+
+        await expect(service.signUpUser(signUpDto)).rejects.toThrow(
+          new ConflictException('A user with this email already exists'),
+        );
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(SignUpCommand);
+      });
+
+      it.each([
+        [
+          'InvalidPasswordException',
+          new BadRequestException('Password does not meet the requirements'),
+        ],
+        [
+          'InvalidParameterException',
+          new BadRequestException('Invalid email or password'),
+        ],
+      ])(
+        'throws a generic BadRequestException on %s without the Cognito message',
+        async (name, expected) => {
+          const error = new Error(
+            'Password did not conform with policy: Password must have uppercase characters',
+          );
+          error.name = name;
+          sendSpy.mockRejectedValueOnce(error);
+
+          await expect(service.signUpUser(signUpDto)).rejects.toThrow(expected);
+          expect(sendSpy).toHaveBeenCalledTimes(1);
+          expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(SignUpCommand);
+        },
+      );
+
+      it('logs the Cognito error and throws a generic InternalServerErrorException on unknown error', async () => {
+        const error = new Error('Cognito down');
+        sendSpy.mockRejectedValueOnce(error);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(service.signUpUser(signUpDto)).rejects.toThrow(
+          new InternalServerErrorException('Failed to sign up user'),
+        );
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(SignUpCommand);
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to sign up user jane@example.com',
+          error,
+        );
+      });
+
+      it('deletes the user and throws when Cognito returns no sub', async () => {
+        sendSpy.mockResolvedValueOnce({});
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockResolvedValue(undefined);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(service.signUpUser(signUpDto)).rejects.toThrow(
+          new InternalServerErrorException('Failed to sign up user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(SignUpCommand);
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Cognito returned no sub when signing up jane@example.com',
+        );
+      });
+
+      it('logs and still throws when Cognito returns no sub and deleting the user fails', async () => {
+        sendSpy.mockResolvedValueOnce({});
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockRejectedValue(
+            new InternalServerErrorException('Failed to delete user'),
+          );
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(service.signUpUser(signUpDto)).rejects.toThrow(
+          new InternalServerErrorException('Failed to sign up user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(2);
+        expect(logError).toHaveBeenCalledWith(
+          'Cognito returned no sub when signing up jane@example.com',
+        );
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to delete partially created user jane@example.com',
+        );
+      });
+    });
+
+    describe('confirmUser', () => {
+      it('confirms the user and then adds them to the group', async () => {
+        sendSpy.mockResolvedValueOnce({});
+        const addUserToGroup = jest
+          .spyOn(service, 'addUserToGroup')
+          .mockResolvedValue(undefined);
+
+        await service.confirmUser(
+          'jane@example.com',
+          '123456',
+          CognitoRole.FosterVolunteer,
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const confirmCmd = sendSpy.mock.calls[0][0];
+        expect(confirmCmd).toBeInstanceOf(ConfirmSignUpCommand);
+        expect(confirmCmd.input).toEqual({
+          ClientId: '4h57k9lmno1pqrstuv2wxyz3ab',
+          Username: 'jane@example.com',
+          ConfirmationCode: '123456',
+        });
+        expect(addUserToGroup).toHaveBeenCalledTimes(1);
+        expect(addUserToGroup).toHaveBeenCalledWith(
+          'jane@example.com',
+          CognitoRole.FosterVolunteer,
+        );
+      });
+
+      it.each([
+        [
+          'CodeMismatchException',
+          new BadRequestException('Invalid verification code'),
+        ],
+        [
+          'ExpiredCodeException',
+          new BadRequestException('Verification code has expired'),
+        ],
+        [
+          'UserNotFoundException',
+          new NotFoundException('No user with this email exists'),
+        ],
+        [
+          'NotAuthorizedException',
+          new BadRequestException(
+            'User cannot be confirmed, or is already confirmed',
+          ),
+        ],
+        [
+          'LimitExceededException',
+          new HttpException(
+            'Too many attempts, please try again later',
+            HttpStatus.TOO_MANY_REQUESTS,
+          ),
+        ],
+        [
+          'TooManyFailedAttemptsException',
+          new HttpException(
+            'Too many attempts, please try again later',
+            HttpStatus.TOO_MANY_REQUESTS,
+          ),
+        ],
+      ])(
+        'maps %s to the matching HTTP error without adding a group',
+        async (name, expected) => {
+          const error = new Error('Current status is CONFIRMED');
+          error.name = name;
+          sendSpy.mockRejectedValueOnce(error);
+          const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
+
+          const thrown = await service
+            .confirmUser(
+              'jane@example.com',
+              '123456',
+              CognitoRole.FosterVolunteer,
+            )
+            .catch((e: unknown) => e);
+
+          expect(thrown).toBeInstanceOf(expected.constructor);
+          expect((thrown as HttpException).getStatus()).toBe(
+            expected.getStatus(),
+          );
+          expect((thrown as HttpException).message).toBe(expected.message);
+          expect(sendSpy).toHaveBeenCalledTimes(1);
+          expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(ConfirmSignUpCommand);
+          expect(addUserToGroup).not.toHaveBeenCalled();
+        },
+      );
+
+      it('logs the Cognito error and throws a generic InternalServerErrorException on unknown confirm error', async () => {
+        const error = new Error('Cognito down');
+        sendSpy.mockRejectedValueOnce(error);
+        const addUserToGroup = jest.spyOn(service, 'addUserToGroup');
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.confirmUser(
+            'jane@example.com',
+            '123456',
+            CognitoRole.FosterVolunteer,
+          ),
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to confirm user'),
+        );
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(addUserToGroup).not.toHaveBeenCalled();
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to confirm user jane@example.com',
+          error,
+        );
+      });
+
+      it('deletes the user and throws a generic error when adding to the group fails', async () => {
+        sendSpy.mockResolvedValueOnce({});
+        const addUserToGroup = jest
+          .spyOn(service, 'addUserToGroup')
+          .mockRejectedValue(
+            new InternalServerErrorException(
+              'Failed to add user to group FosterVolunteer',
+            ),
+          );
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockResolvedValue(undefined);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.confirmUser(
+            'jane@example.com',
+            '123456',
+            CognitoRole.FosterVolunteer,
+          ),
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to confirm user'),
+        );
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy.mock.calls[0][0]).toBeInstanceOf(ConfirmSignUpCommand);
+        expect(addUserToGroup).toHaveBeenCalledTimes(1);
+        expect(addUserToGroup).toHaveBeenCalledWith(
+          'jane@example.com',
+          CognitoRole.FosterVolunteer,
+        );
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).not.toHaveBeenCalled();
+      });
+
+      it('logs and throws a generic error when adding to the group and deleting the user both fail', async () => {
+        sendSpy.mockResolvedValueOnce({});
+        const addUserToGroup = jest
+          .spyOn(service, 'addUserToGroup')
+          .mockRejectedValue(
+            new InternalServerErrorException(
+              'Failed to add user to group FosterVolunteer',
+            ),
+          );
+        const deleteUser = jest
+          .spyOn(service, 'deleteUser')
+          .mockRejectedValue(
+            new InternalServerErrorException('Failed to delete user'),
+          );
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
+
+        await expect(
+          service.confirmUser(
+            'jane@example.com',
+            '123456',
+            CognitoRole.FosterVolunteer,
+          ),
+        ).rejects.toThrow(
+          new InternalServerErrorException('Failed to confirm user'),
+        );
+
+        expect(addUserToGroup).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledTimes(1);
+        expect(deleteUser).toHaveBeenCalledWith('jane@example.com');
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to delete partially created user jane@example.com',
+        );
       });
     });
 
@@ -391,6 +819,7 @@ describe('CognitoService', () => {
       it('sends AdminDeleteUserCommand', async () => {
         await service.deleteUser('jane@example.com');
 
+        expect(sendSpy).toHaveBeenCalledTimes(1);
         const cmd = sendSpy.mock.calls[0][0];
         expect(cmd).toBeInstanceOf(AdminDeleteUserCommand);
         expect(cmd.input).toEqual({
@@ -399,11 +828,21 @@ describe('CognitoService', () => {
         });
       });
 
-      it('throws InternalServerErrorException on failure', async () => {
-        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+      it('logs the Cognito error and throws a generic InternalServerErrorException on failure', async () => {
+        const error = new Error('Cognito down');
+        sendSpy.mockRejectedValueOnce(error);
+        const logError = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation();
 
         await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
-          InternalServerErrorException,
+          new InternalServerErrorException('Failed to delete user'),
+        );
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          'Failed to delete user jane@example.com',
+          error,
         );
       });
     });

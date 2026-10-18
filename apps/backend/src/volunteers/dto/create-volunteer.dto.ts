@@ -1,16 +1,17 @@
 import {
-  IsBoolean,
+  ArrayNotEmpty,
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
-import { ArrayNotEmpty } from 'class-validator';
-import { IsArray } from 'class-validator';
 
 export class CreateVolunteerDto {
   @IsString()
@@ -25,17 +26,26 @@ export class CreateVolunteerDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsPhoneNumber('US')
   @MaxLength(20)
   phone!: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumber('US')
   @MaxLength(20)
   secondaryPhone?: string;
 
   @IsEmail()
   @MaxLength(255)
   email!: string;
+
+  // Cognito enforces the pool's full password policy; these are its outer bounds.
+  @IsString()
+  @MinLength(8)
+  @MaxLength(256)
+  password!: string;
 
   @IsString()
   @IsNotEmpty()
@@ -61,14 +71,11 @@ export class CreateVolunteerDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   notes?: string;
 
   @IsArray()
   @ArrayNotEmpty()
   @IsEnum(FosterType, { each: true })
   fosterType!: FosterType[];
-
-  @IsOptional()
-  @IsBoolean()
-  completedCanineTraining?: boolean;
 }

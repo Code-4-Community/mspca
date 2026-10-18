@@ -11,10 +11,10 @@ import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
-import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { CreateVolunteerDto } from './dto/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { Homebase } from '../types';
-import { IS_PUBLIC_KEY } from '../aws/cognito/cognito.decorator';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -28,6 +28,7 @@ describe('VolunteersController', () => {
 
   let mockVolunteersService: {
     create: jest.Mock;
+    confirm: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
@@ -45,6 +46,7 @@ describe('VolunteersController', () => {
   beforeEach(async () => {
     mockVolunteersService = {
       create: jest.fn(),
+      confirm: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
@@ -70,7 +72,7 @@ describe('VolunteersController', () => {
   });
 
   describe('create', () => {
-    const dto: CreateVolunteerDto = {
+    const dto = {
       firstName: 'Jane',
       lastName: 'Doe',
       phone: '617-555-0100',
@@ -81,16 +83,8 @@ describe('VolunteersController', () => {
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
       fosterType: [FosterType.CAT],
-    };
-
-    it('is public so volunteers can sign up without a token', () => {
-      expect(
-        Reflect.getMetadata(
-          IS_PUBLIC_KEY,
-          VolunteersController.prototype.create,
-        ),
-      ).toBe(true);
-    });
+      password: 'Str0ng!Password',
+    } as CreateVolunteerDto;
 
     it('creates the volunteer through the service and returns it', async () => {
       const volunteer = {
@@ -105,7 +99,7 @@ describe('VolunteersController', () => {
       expect(result).toBe(volunteer);
     });
 
-    it('propagates ConflictException thrown by the service', async () => {
+    it('propagates errors thrown by the service', async () => {
       mockVolunteersService.create.mockRejectedValue(
         new ConflictException('A volunteer with this email already exists'),
       );
@@ -113,6 +107,36 @@ describe('VolunteersController', () => {
       await expect(controller.create(dto)).rejects.toThrow(
         new ConflictException('A volunteer with this email already exists'),
       );
+      expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+    });
+  });
+
+  describe('confirm', () => {
+    const dto = {
+      email: 'jane@example.com',
+      code: '123456',
+    } as ConfirmVolunteerDto;
+
+    it('confirms the volunteer through the service', async () => {
+      mockVolunteersService.confirm.mockResolvedValue(undefined);
+
+      await expect(controller.confirm(dto)).resolves.toBeUndefined();
+
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      mockVolunteersService.confirm.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
+      );
+
+      await expect(controller.confirm(dto)).rejects.toThrow(
+        new BadRequestException('Invalid verification code'),
+      );
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
     });
   });
 
