@@ -99,14 +99,13 @@ describe('VolunteersController', () => {
       expect(result).toBe(volunteer);
     });
 
-    it('propagates errors thrown by the service', async () => {
-      mockVolunteersService.create.mockRejectedValue(
-        new ConflictException('A volunteer with this email already exists'),
-      );
+    it.each([
+      new ConflictException('A volunteer with this email already exists'),
+      new BadRequestException('Password does not meet the requirements'),
+    ])('propagates %s thrown by the service', async (error) => {
+      mockVolunteersService.create.mockRejectedValue(error);
 
-      await expect(controller.create(dto)).rejects.toThrow(
-        new ConflictException('A volunteer with this email already exists'),
-      );
+      await expect(controller.create(dto)).rejects.toThrow(error);
       expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
     });
