@@ -820,7 +820,9 @@ describe('VolunteersService', () => {
       const result = await service.getAllVolunteers();
 
       expect(result).toEqual(mockVolunteers);
-      expect(mockRepo.find).toHaveBeenCalled();
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        relations: ['assignedCoordinators'],
+      });
     });
 
     it('should return an empty array when there are no volunteers', async () => {

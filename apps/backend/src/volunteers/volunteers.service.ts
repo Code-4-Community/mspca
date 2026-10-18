@@ -385,6 +385,6 @@ export class VolunteersService {
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo.find();
+    return this.repo.find({ relations: ['assignedCoordinators'] });
   }
 }
