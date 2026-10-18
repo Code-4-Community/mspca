@@ -21,15 +21,12 @@ export class ReplaceAssignedCoordinatorWithJoinTable1791100000000
             )
         `);
 
-    // Deleting a coordinator who still has volunteers is blocked, as it was with
-    // the old single-column FK. The composite PK leads with volunteer_id, so
-    // lookups and that delete check by coordinator need their own index.
+    // The composite PK leads with volunteer_id, so lookups by coordinator need their own index.
     await queryRunner.query(`
             CREATE INDEX "idx_volunteer_coordinator_assignments_coordinator_id"
                 ON "volunteer_coordinator_assignments" ("coordinator_id")
         `);
 
-    // Each existing single assignment becomes a one-element list.
     await queryRunner.query(`
             INSERT INTO "volunteer_coordinator_assignments" ("volunteer_id", "coordinator_id")
             SELECT "volunteer_id", "assigned_coordinator_id"
