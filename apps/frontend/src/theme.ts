@@ -6,6 +6,7 @@ import {
 } from '@chakra-ui/react';
 
 export const colors = {
+  black: '#000000',
   gray: {
     0: '#ffffff',
     50: '#fafafa',
@@ -63,9 +64,11 @@ const toColorTokens = (palette: typeof colors) =>
   Object.fromEntries(
     Object.entries(palette).map(([group, shades]) => [
       group,
-      Object.fromEntries(
-        Object.entries(shades).map(([shade, value]) => [shade, { value }]),
-      ),
+      typeof shades === 'string'
+        ? { value: shades }
+        : Object.fromEntries(
+            Object.entries(shades).map(([shade, value]) => [shade, { value }]),
+          ),
     ]),
   );
 
@@ -94,6 +97,8 @@ const textStyles = defineTextStyles({
   h7: textStyle('16px', '18px', '1.556'),
   body: textStyle('14px', '16px', '1.5', 'body'),
   'body-small': textStyle('12px', '14px', '1.43', 'body'),
+  xs: textStyle('10px', '12px', '1rem', 'body'),
+  '2xs': textStyle('8px', '10px', '0.75rem', 'body'),
 });
 
 const config = defineConfig({
@@ -123,12 +128,12 @@ const config = defineConfig({
           subtle: { value: '{colors.gray.50}' },
           muted: { value: '{colors.gray.100}' },
           emphasized: { value: '{colors.gray.200}' },
-          inverted: { value: '#000000' },
+          inverted: { value: '{colors.black}' },
           panel: { value: '{colors.gray.0}' },
           error: { value: '{colors.error.50}' },
         },
         fg: {
-          DEFAULT: { value: '#000000' },
+          DEFAULT: { value: '{colors.black}' },
           subtle: { value: '{colors.gray.400}' },
           muted: { value: '{colors.gray.600}' },
           inverted: { value: '{colors.gray.50}' },
@@ -143,7 +148,7 @@ const config = defineConfig({
           error: { value: '{colors.error.100}' },
         },
         text: {
-          fg: { value: '#000000' },
+          fg: { value: '{colors.black}' },
           fg_muted: { value: '{colors.gray.600}' },
           fg_subtle: { value: '{colors.gray.400}' },
           fg_error: { value: '{colors.error.100}' },
