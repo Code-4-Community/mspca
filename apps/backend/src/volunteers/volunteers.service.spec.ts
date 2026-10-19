@@ -469,6 +469,8 @@ describe('VolunteersService', () => {
       );
     });
 
+    // Can't happen through the endpoint, since the DTO's @ArrayUnique rejects
+    // duplicate IDs; this checks the service on its own.
     it('does not create duplicates when adding an ID already in the list', async () => {
       mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
 
@@ -480,7 +482,8 @@ describe('VolunteersService', () => {
     });
 
     it('throws BadRequestException listing every removed ID that is not in the list', async () => {
-      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+      const volunteer = volunteerWithPreferences([42]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
 
       await expect(
         service.updateAnimalPreferences(1, { removed: [42, 998, 999] }),
@@ -489,6 +492,7 @@ describe('VolunteersService', () => {
           "Animal IDs not in the volunteer's preferences: 998, 999",
         ),
       );
+      expect(volunteer.animalPreferences).toEqual([42]);
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
 

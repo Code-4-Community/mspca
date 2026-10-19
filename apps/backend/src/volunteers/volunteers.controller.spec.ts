@@ -310,7 +310,7 @@ describe('VolunteersController', () => {
       },
     );
 
-    it('propagates NotFoundException thrown by the service', async () => {
+    it('propagates errors thrown by the service', async () => {
       mockVolunteersService.updateAnimalPreferences.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
