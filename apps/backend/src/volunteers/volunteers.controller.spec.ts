@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
@@ -29,6 +30,7 @@ describe('VolunteersController', () => {
     reactivate: jest.Mock;
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
+    deny: jest.Mock;
     getAllVolunteers: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
@@ -45,6 +47,7 @@ describe('VolunteersController', () => {
       reactivate: jest.fn(),
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
+      deny: jest.fn(),
       getAllVolunteers: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
@@ -253,6 +256,36 @@ describe('VolunteersController', () => {
       await expect(controller.approve(1)).rejects.toThrow(
         new ConflictException('Only pending Volunteers can be approved'),
       );
+    });
+  });
+
+  describe('deny', () => {
+    it('calls service.deny with the parsed id and returns nothing', async () => {
+      mockVolunteersService.deny.mockResolvedValue(undefined);
+
+      const result = await controller.deny(1);
+
+      expect(mockVolunteersService.deny).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.deny).toHaveBeenCalledWith(1);
+      expect(result).toBeUndefined();
+    });
+
+    it.each([0, -1])(
+      'throws BadRequestException for invalid id %s without calling the service',
+      async (id) => {
+        await expect(controller.deny(id)).rejects.toThrow(BadRequestException);
+        expect(mockVolunteersService.deny).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      new NotFoundException('Volunteer with ID 999 not found'),
+      new ConflictException('Only pending Volunteers can be denied'),
+      new InternalServerErrorException('Failed to delete user: boom'),
+    ])('propagates %p thrown by the service', async (error) => {
+      mockVolunteersService.deny.mockRejectedValue(error);
+
+      await expect(controller.deny(1)).rejects.toBe(error);
     });
   });
 

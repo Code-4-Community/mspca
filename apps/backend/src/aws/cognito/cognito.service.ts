@@ -12,6 +12,7 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AccessTokenPayload, CognitoConfig } from './cognito.types';
@@ -215,6 +216,31 @@ export class CognitoService {
       const reason = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(
         `Failed to enable user: ${reason}`,
+      );
+    }
+  }
+
+  /**
+   * Permanently deletes a user from the Cognito user pool.
+   *
+   * @param email - The user's email, which is their Cognito username.
+   * @throws {InternalServerErrorException} If the Cognito call fails.
+   */
+  async deleteUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminDeleteUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        `Failed to delete user: ${reason}`,
       );
     }
   }

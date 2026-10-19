@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -10,6 +11,7 @@ import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
+import { CognitoService } from '../aws/cognito/cognito.service';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -29,6 +31,7 @@ describe('VolunteersService', () => {
     delete: jest.Mock;
   };
   let emailsService: { sendEmail: jest.Mock };
+  let cognitoService: { deleteUser: jest.Mock };
 
   const mockVolunteers = [
     { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
@@ -43,12 +46,14 @@ describe('VolunteersService', () => {
       delete: jest.fn(),
     };
     emailsService = { sendEmail: jest.fn() };
+    cognitoService = { deleteUser: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VolunteersService,
         { provide: getRepositoryToken(FosterVolunteer), useValue: mockRepo },
         { provide: EmailsService, useValue: emailsService },
+        { provide: CognitoService, useValue: cognitoService },
       ],
     }).compile();
 
@@ -390,6 +395,99 @@ describe('VolunteersService', () => {
       expect(result.status).toBe(VolunteerStatus.ACTIVE);
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ status: VolunteerStatus.ACTIVE }),
+      );
+      expect(loggerSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('deny', () => {
+    const pendingVolunteer = () =>
+      ({
+        volunteerId: 1,
+        firstName: 'Jane',
+        email: 'jane@example.com',
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer);
+
+    it('deletes the volunteer from Cognito, then from the database', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
+      const findSpy = jest.spyOn(service, 'findByIdOrFail');
+
+      await service.deny(1);
+
+      expect(findSpy).toHaveBeenCalledWith(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(mockRepo.delete).toHaveBeenCalledTimes(1);
+      expect(mockRepo.delete).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(
+        cognitoService.deleteUser.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockRepo.delete.mock.invocationCallOrder[0]);
+    });
+
+    it('does not send an email', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
+
+      await service.deny(1);
+
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException and deletes nothing if the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.deny(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(cognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it.each([VolunteerStatus.ACTIVE, VolunteerStatus.INACTIVE])(
+      'throws ConflictException and deletes nothing if the volunteer is %s',
+      async (status) => {
+        mockRepo.findOne.mockResolvedValue({ ...pendingVolunteer(), status });
+
+        await expect(service.deny(1)).rejects.toThrow(
+          new ConflictException('Only pending Volunteers can be denied'),
+        );
+        expect(cognitoService.deleteUser).not.toHaveBeenCalled();
+        expect(mockRepo.delete).not.toHaveBeenCalled();
+      },
+    );
+
+    it('propagates the error and does not touch the database if Cognito fails', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      const cognitoError = new InternalServerErrorException(
+        'Failed to delete user: boom',
+      );
+      cognitoService.deleteUser.mockRejectedValue(cognitoError);
+
+      await expect(service.deny(1)).rejects.toBe(cognitoError);
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws a PARTIAL DELETION error if the database delete fails after Cognito succeeds', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockRejectedValue(new Error('connection lost'));
+      const loggerSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => undefined);
+
+      const promise = service.deny(1);
+
+      await expect(promise).rejects.toThrow(InternalServerErrorException);
+      await expect(promise).rejects.toThrow(/PARTIAL DELETION/);
+      await expect(promise).rejects.toThrow(/ID 1/);
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
       );
       expect(loggerSpy).toHaveBeenCalled();
     });

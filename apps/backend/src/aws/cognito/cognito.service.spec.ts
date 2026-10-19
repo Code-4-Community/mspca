@@ -10,6 +10,7 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AuthConfigurationError } from './cognito.config';
@@ -331,6 +332,39 @@ describe('CognitoService', () => {
         await expect(service.enableUser('jane@example.com')).rejects.toThrow(
           InternalServerErrorException,
         );
+      });
+    });
+
+    describe('deleteUser', () => {
+      it('sends AdminDeleteUserCommand', async () => {
+        await service.deleteUser('jane@example.com');
+
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        const cmd = sendSpy.mock.calls[0][0];
+        expect(cmd).toBeInstanceOf(AdminDeleteUserCommand);
+        expect(cmd.input).toEqual({
+          UserPoolId: 'us-east-2_TestPool',
+          Username: 'jane@example.com',
+        });
+      });
+
+      it('throws InternalServerErrorException on failure', async () => {
+        sendSpy.mockRejectedValueOnce(new Error('Cognito down'));
+
+        await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
+          new InternalServerErrorException(
+            'Failed to delete user: Cognito down',
+          ),
+        );
+      });
+
+      it('throws when auth is disabled and does not call Cognito', async () => {
+        process.env.AUTH_DISABLED = 'true';
+
+        await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+        expect(sendSpy).not.toHaveBeenCalled();
       });
     });
   });
