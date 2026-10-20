@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { CognitoService } from '../aws/cognito/cognito.service';
 
 @Injectable()
 export class VolunteersService {
@@ -21,6 +23,7 @@ export class VolunteersService {
     @InjectRepository(FosterVolunteer)
     private repo: Repository<FosterVolunteer>,
     private emailsService: EmailsService,
+    private cognitoService: CognitoService,
   ) {}
 
   /**
@@ -172,6 +175,46 @@ export class VolunteersService {
     }
 
     return saved;
+  }
+
+  /**
+   * Denies a pending Volunteer by permanently deleting them from both Cognito
+   * and the database. No email is sent.
+   *
+   * Cognito is deleted first so that a Cognito failure leaves everything
+   * untouched. If Cognito succeeds but the database delete fails, the
+   * Volunteer is left in a partial state (no login, but a database row), so
+   * a loud error with the Volunteer's ID is logged and thrown for manual cleanup.
+   *
+   * @param id - The Volunteer's ID.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   * @throws {InternalServerErrorException} If the Cognito deletion fails, or
+   *   if the database deletion fails after Cognito succeeded (partial deletion).
+   */
+  async deny(id: number): Promise<void> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be denied`);
+    }
+
+    // Step 1: Cognito. If this throws, nothing has been deleted yet.
+    await this.cognitoService.deleteUser(volunteer.email);
+
+    // Step 2: Postgres. A failure here means a partial deletion.
+    try {
+      await this.repo.delete({ volunteerId: id });
+    } catch (err) {
+      const message =
+        `PARTIAL DELETION: Volunteer with ID ${id} (${volunteer.email}) was deleted from Cognito ` +
+        `but NOT from the database. Manual cleanup required: delete the foster_volunteers row with volunteer_id ${id}.`;
+      this.logger.error(
+        message,
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(message);
+    }
   }
 
   /**
