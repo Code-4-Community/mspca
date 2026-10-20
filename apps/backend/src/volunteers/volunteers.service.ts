@@ -127,11 +127,15 @@ export class VolunteersService {
    * so this stops someone who signed up directly with Cognito (skipping
    * {@link create}) from getting the role without a Volunteer profile.
    *
+   * If the role can't be added, both the Cognito user and the Volunteer are
+   * deleted so the Volunteer can sign up again with the same email.
+   *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
-   * @throws {BadRequestException} If the code is wrong or has expired.
-   * @throws {ConflictException} If the Cognito user can't be confirmed, e.g. they already are.
-   * @throws {InternalServerErrorException} If confirmation or adding the role fails.
+   * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
+   * @throws {HttpException} 429 if there have been too many attempts.
+   * @throws {InternalServerErrorException} If confirmation fails.
+   * @throws {InternalServerErrorException} If adding the role fails (the Cognito user and Volunteer are deleted).
    */
   async confirm(dto: ConfirmVolunteerDto): Promise<void> {
     const email = dto.email.toLowerCase();
@@ -141,11 +145,32 @@ export class VolunteersService {
       throw new NotFoundException('No volunteer with this email exists');
     }
 
-    await this.cognitoService.confirmUser(
-      email,
-      dto.code,
-      CognitoRole.FosterVolunteer,
-    );
+    await this.cognitoService.confirmUser(email, dto.code);
+
+    try {
+      await this.cognitoService.addUserToGroup(
+        email,
+        CognitoRole.FosterVolunteer,
+      );
+    } catch {
+      // addUserToGroup already logs the Cognito error.
+      try {
+        await this.cognitoService.deleteUser(email);
+      } catch {
+        this.logger.error(
+          `Failed to delete Cognito user ${email} after adding the role failed`,
+        );
+      }
+      try {
+        await this.repo.delete({ volunteerId: volunteer.volunteerId });
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete Volunteer ${volunteer.volunteerId} after adding the role failed`,
+          error,
+        );
+      }
+      throw new InternalServerErrorException('Failed to confirm the Volunteer');
+    }
   }
 
   /**
