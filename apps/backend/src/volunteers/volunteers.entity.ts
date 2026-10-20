@@ -4,12 +4,14 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 @Entity('foster_volunteers')
+@Unique('UQ_foster_volunteers_email', ['email'])
 export class FosterVolunteer {
   @PrimaryGeneratedColumn({ name: 'volunteer_id' })
   volunteerId!: number;
@@ -71,6 +73,9 @@ export class FosterVolunteer {
     default: VolunteerStatus.PENDING,
   })
   status!: VolunteerStatus;
+
+  @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
+  cognitoSub!: string;
 
   @ManyToOne(
     () => FosterCoordinator,
