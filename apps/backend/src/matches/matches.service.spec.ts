@@ -29,6 +29,8 @@ const volunteerWithoutCoordinator = {
   assignedCoordinator: null,
 } as FosterVolunteer;
 
+const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
+
 describe('MatchesService', () => {
   let service: MatchesService;
   let matchRepo: {
@@ -76,6 +78,8 @@ describe('MatchesService', () => {
   } as Match;
 
   beforeEach(async () => {
+    process.env.AWS_SES_SENDER_EMAIL = 'test-sender@example.com';
+
     transactionRepo = {
       findOneBy: jest.fn(),
       find: jest.fn(),
@@ -119,6 +123,14 @@ describe('MatchesService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterAll(() => {
+    if (originalSenderEmail === undefined) {
+      delete process.env.AWS_SES_SENDER_EMAIL;
+    } else {
+      process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
+    }
   });
 
   it('should be defined', () => {
@@ -408,7 +420,7 @@ describe('MatchesService', () => {
 
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).toHaveBeenCalledWith({
-        toEmail: process.env.AWS_SES_SENDER_EMAIL,
+        toEmail: 'test-sender@example.com',
         bccEmails: ['volunteer2@gmail.com', 'volunteer3@gmail.com'],
         subject: 'Foster Application Update',
         bodyHtml: expect.stringContaining('another'),
