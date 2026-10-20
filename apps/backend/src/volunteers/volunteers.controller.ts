@@ -42,9 +42,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<Match[]> {
     validateId(volunteerId, 'Volunteer');
-
     await this.volunteersService.findByIdOrFail(volunteerId);
-
     return this.matchesService.findByVolunteerId(volunteerId);
   }
 
@@ -94,7 +92,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'Volunteer');
-    return this.volunteersService.getVolunteerById(volunteerId);
+    return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
   @Patch('/:volunteerId')
@@ -135,6 +133,15 @@ export class VolunteersController {
       items: { type: 'string', enum: Object.values(FosterType) },
     },
   })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid ID, inactive volunteer, empty request, overlapping changes, nonexistent removal, or duplicate addition',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
   async updateFosterTypePreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateFosterTypePreferencesDto,
@@ -146,5 +153,40 @@ export class VolunteersController {
       );
     }
     return this.volunteersService.updateFosterTypePreferences(volunteerId, dto);
+  }
+
+  @ApiOperation({ summary: 'Approve a pending foster volunteer' })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was approved and emailed',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid ID' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'The volunteer is not pending',
+  })
+  @Patch('/:id/approve')
+  async approve(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.approve(id);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All volunteers, regardless of match status',
+    type: [FosterVolunteer],
+  })
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.volunteersService.getAllVolunteers();
   }
 }

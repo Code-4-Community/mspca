@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,23 +11,20 @@ import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
+import { EmailsService } from '../aws/ses/email.service';
+import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 
 @Injectable()
 export class VolunteersService {
+  private readonly logger = new Logger(VolunteersService.name);
+
   constructor(
     @InjectRepository(FosterVolunteer)
     private repo: Repository<FosterVolunteer>,
+    private emailsService: EmailsService,
   ) {}
 
-  /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
-   *
-   * Returns the Volunteer so callers can reuse it instead of fetching again.
-   *
-   * @param id - The Volunteer's ID.
-   * @returns The Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
-   */
+  /** Fetches a Volunteer by ID, including their assigned Foster Coordinator. */
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
@@ -39,14 +38,7 @@ export class VolunteersService {
     return volunteer;
   }
 
-  /**
-   * Deactivates a currently Active Volunteer.
-   *
-   * @param id - The Volunteer's ID.
-   * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If the Volunteer is not currently Active.
-   */
+  /** Deactivates a currently active Volunteer. */
   async deactivate(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
@@ -55,21 +47,10 @@ export class VolunteersService {
     }
 
     volunteer.status = VolunteerStatus.INACTIVE;
-
     return this.repo.save(volunteer);
   }
 
-  /**
-   * Reactivates a currently Inactive Volunteer.
-   *
-   * Does not apply to Pending Volunteers; those are moved to Active through
-   * the approval flow instead.
-   *
-   * @param id - The Volunteer's ID.
-   * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If the Volunteer is not currently Inactive.
-   */
+  /** Reactivates a currently inactive Volunteer. */
   async reactivate(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
 
@@ -78,49 +59,26 @@ export class VolunteersService {
     }
 
     volunteer.status = VolunteerStatus.ACTIVE;
-
     return this.repo.save(volunteer);
   }
 
-  /**
-   * Fetches a Volunteer by ID, requiring that they are active.
-   *
-   * Returns the Volunteer so callers can reuse it instead of fetching again.
-   *
-   * @param id - The Volunteer's ID.
-   * @returns The active Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If the Volunteer is not active.
-   */
+  /** Fetches a Volunteer by ID and requires an active account. */
   async findActiveOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
-
-    if (volunteer.status !== VolunteerStatus.ACTIVE) {
-      throw new BadRequestException(`Volunteer with ID ${id} is not active`);
-    }
-
+    this.checkVolunteerActive(volunteer);
     return volunteer;
   }
 
-  /**
-   * Gets a single foster volunteer by ID.
-   * Includes the volunteer's assigned coordinator.
-   * @param id - ID of the volunteer to get
-   * @returns The volunteer with the given ID
-   * @throws NotFoundException if no volunteer exists with the given ID
-   */
-  async getVolunteerById(id: number): Promise<FosterVolunteer> {
-    return this.findByIdOrFail(id);
+  /** Ensures a Volunteer's account is active. */
+  checkVolunteerActive(volunteer: FosterVolunteer): void {
+    if (volunteer.status !== VolunteerStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Volunteer with ID ${volunteer.volunteerId} is not active`,
+      );
+    }
   }
 
-  /**
-   * Updates a foster volunteer by ID.
-   * Only the fields included in the DTO are changed; all other fields keep their current values.
-   * @param id - ID of the volunteer to update
-   * @param dto - The fields to update
-   * @returns The updated volunteer
-   * @throws NotFoundException if no volunteer exists with the given ID
-   */
+  /** Updates the supplied fields on a Volunteer. */
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
@@ -131,30 +89,111 @@ export class VolunteersService {
   }
 
   /**
-   * Updates a Volunteer's foster type preferences by adding and removing FosterTypes.
+   * Updates an active Volunteer's foster type preferences.
+   * Validates all changes before mutating the Volunteer or saving.
+   * Removals are applied before additions.
    *
-   * Removals are applied first, then additions. Adding a type that is already in the
-   * list does not create a duplicate, and removing a type that isn't in the list is ignored.
-   *
-   * @param id - The Volunteer's ID.
-   * @param dto - The foster types to add and/or remove.
-   * @returns The Volunteer's updated list of foster types.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If the Volunteer does not exist.
+   * @throws {BadRequestException} If the Volunteer is inactive or the update is invalid.
    */
   async updateFosterTypePreferences(
     id: number,
     dto: UpdateFosterTypePreferencesDto,
   ): Promise<FosterType[]> {
-    const volunteer = await this.findByIdOrFail(id);
+    const volunteer = await this.findActiveOrFail(id);
     const added = dto.added ?? [];
     const removed = dto.removed ?? [];
+    const currentPreferences = volunteer.fosterTypePreferences ?? [];
 
-    const preferences = new Set(volunteer.fosterTypePreferences);
-    removed.forEach((type) => preferences.delete(type));
-    added.forEach((type) => preferences.add(type));
+    if (!added.length && !removed.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
 
-    volunteer.fosterTypePreferences = [...preferences];
+    const overlapping = [...new Set(added)].filter((type) =>
+      removed.includes(type),
+    );
+    if (overlapping.length > 0) {
+      throw new BadRequestException(
+        `Foster types cannot be both added and removed: ${overlapping.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    if (removed.length > 0 && currentPreferences.length === 0) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} has no foster type preferences to remove`,
+      );
+    }
+
+    const invalidRemovals = [...new Set(removed)].filter(
+      (type) => !currentPreferences.includes(type),
+    );
+    if (invalidRemovals.length > 0) {
+      throw new BadRequestException(
+        `Foster types not in the volunteer's preferences: ${invalidRemovals.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    const existingAdditions = [...new Set(added)].filter((type) =>
+      currentPreferences.includes(type),
+    );
+    if (existingAdditions.length > 0) {
+      throw new BadRequestException(
+        `Foster type preferences already exist: ${existingAdditions.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    if (new Set(added).size !== added.length) {
+      throw new BadRequestException(
+        'Duplicate foster types cannot be added in the same request',
+      );
+    }
+
+    const preferences = currentPreferences.filter(
+      (type) => !removed.includes(type),
+    );
+    preferences.push(...added);
+
+    volunteer.fosterTypePreferences = preferences;
     const saved = await this.repo.save(volunteer);
     return saved.fosterTypePreferences;
+  }
+
+  /** Approves a pending Volunteer and attempts to send an approval email. */
+  async approve(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException('Only pending Volunteers can be approved');
+    }
+
+    volunteer.status = VolunteerStatus.ACTIVE;
+    const saved = await this.repo.save(volunteer);
+
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: saved.email,
+        ...volunteerApprovedEmail(saved.firstName),
+      });
+    } catch (err) {
+      this.logger.error(
+        `Volunteer with ID ${id} was approved but the approval email didn't send`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+
+    return saved;
+  }
+
+  /** Gets all foster volunteers. */
+  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+    return this.repo.find();
   }
 }
