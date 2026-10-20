@@ -14,8 +14,8 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
-import { Homebase } from '../types';
 import { EmailsService } from '../aws/ses/email.service';
+import { Homebase } from '../types';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -158,7 +158,7 @@ describe('VolunteersService', () => {
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
       notes: 'Prefers kittens',
-      fosterType: FosterType.CAT,
+      fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
 
@@ -588,14 +588,18 @@ describe('VolunteersService', () => {
       });
     });
 
-    it('should update multiple allowed fields at once', async () => {
-      mockRepo.findOne.mockResolvedValue({ ...mockVolunteer });
+    it('should update multiple allowed fields at once and leave the rest untouched', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        animalUpdates: true,
+      });
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
       const dto = {
         address: '123 Main St',
         city: 'Boston',
         zipcode: '02115',
+        animalUpdates: false,
       } as UpdateVolunteerDto;
 
       const result = await service.updateVolunteerById(1, dto);
@@ -603,6 +607,9 @@ describe('VolunteersService', () => {
       expect(result.address).toBe('123 Main St');
       expect(result.city).toBe('Boston');
       expect(result.zipcode).toBe('02115');
+      expect(result.animalUpdates).toBe(false);
+      expect(result.firstName).toBe('Jane');
+      expect(result.notes).toBe('likes cats');
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
@@ -612,6 +619,7 @@ describe('VolunteersService', () => {
         address: '123 Main St',
         city: 'Boston',
         zipcode: '02115',
+        animalUpdates: false,
       });
     });
 

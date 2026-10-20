@@ -1,12 +1,16 @@
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
   IsOptional,
   IsEnum,
   IsNotEmpty,
   MaxLength,
   IsPhoneNumber,
   IsEmail,
+  ArrayUnique,
 } from 'class-validator';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
@@ -65,6 +69,13 @@ export class UpdateVolunteerDto {
   notes?: string;
 
   @IsOptional()
-  @IsEnum(FosterType)
-  fosterType?: FosterType;
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterType, { each: true })
+  fosterType?: FosterType[];
+
+  @IsOptional()
+  @IsBoolean()
+  animalUpdates?: boolean;
 }

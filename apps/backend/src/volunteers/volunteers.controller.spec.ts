@@ -82,7 +82,7 @@ describe('VolunteersController', () => {
       zipcode: '02130',
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
-      fosterType: FosterType.CAT,
+      fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
 
@@ -218,6 +218,25 @@ describe('VolunteersController', () => {
       const result = await controller.updateVolunteerById(1, dto);
 
       expect(result).toEqual(updatedVolunteer);
+      expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
+        1,
+        dto,
+      );
+    });
+
+    it('should pass animalUpdates through to the service', async () => {
+      const dto: UpdateVolunteerDto = { animalUpdates: false };
+      const updatedVolunteer = {
+        ...mockVolunteer,
+        animalUpdates: false,
+      } as FosterVolunteer;
+      mockVolunteersService.updateVolunteerById.mockResolvedValue(
+        updatedVolunteer,
+      );
+
+      const result = await controller.updateVolunteerById(1, dto);
+
+      expect(result.animalUpdates).toBe(false);
       expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
         1,
         dto,
