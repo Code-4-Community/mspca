@@ -7,13 +7,14 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
+import { matchCanceledEmail } from '../emails/bodies/matchCanceled';
 
 @Injectable()
 export class MatchesService {
@@ -142,25 +143,70 @@ export class MatchesService {
   }
 
   /**
-   * Approves a pending match.
-   * Sets the match status to Active, meaning the foster placement is now happening.
-   * Only matches that are currently Pending can be approved.
+   * Approves a pending match and cancels other pending matches for the same animal.
+   * Sends one email to the other applicants using BCC to protect their privacy.
+   * Approval and cancellation are performed in a transaction so that an email
+   * failure rolls back all status changes.
+   *
    * @param id - ID of the match to approve
    * @returns The updated match with status Active
    * @throws NotFoundException if no match exists with the given ID
    * @throws BadRequestException if the match is not Pending
    */
   async approveMatch(id: number): Promise<Match> {
-    const match = await this.repo.findOneBy({ matchId: id });
-    if (!match) {
-      throw new NotFoundException(`Match with id ${id} not found`);
-    }
-    if (match.status !== MatchStatus.PENDING) {
-      throw new BadRequestException(`Match with id ${id} is not pending`);
-    }
+    return this.repo.manager.transaction(async (manager) => {
+      const matchRepo = manager.getRepository(Match);
 
-    match.status = MatchStatus.ACTIVE;
-    return this.repo.save(match);
+      const match = await matchRepo.findOneBy({ matchId: id });
+
+      if (!match) {
+        throw new NotFoundException(`Match with id ${id} not found`);
+      }
+
+      if (match.status !== MatchStatus.PENDING) {
+        throw new BadRequestException(`Match with id ${id} is not pending`);
+      }
+
+      const otherMatches = await matchRepo.find({
+        where: {
+          chameleonAnimalId: match.chameleonAnimalId,
+          status: MatchStatus.PENDING,
+          matchId: Not(id),
+        },
+        relations: ['volunteer'],
+      });
+
+      match.status = MatchStatus.ACTIVE;
+      const approvedMatch = await matchRepo.save(match);
+
+      if (otherMatches.length > 0) {
+        for (const otherMatch of otherMatches) {
+          otherMatch.status = MatchStatus.CANCELED;
+        }
+
+        await matchRepo.save(otherMatches);
+
+        const applicantEmails = [
+          ...new Set(
+            otherMatches.map((otherMatch) => otherMatch.volunteer.email),
+          ),
+        ];
+
+        const senderEmail = process.env.AWS_SES_SENDER_EMAIL;
+
+        if (!senderEmail) {
+          throw new Error('AWS_SES_SENDER_EMAIL is not configured');
+        }
+
+        await this.emailsService.sendEmail({
+          toEmail: senderEmail,
+          bccEmails: applicantEmails,
+          ...matchCanceledEmail(),
+        });
+      }
+
+      return approvedMatch;
+    });
   }
 
   /**

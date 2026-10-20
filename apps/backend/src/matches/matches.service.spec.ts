@@ -36,6 +36,17 @@ describe('MatchesService', () => {
     save: jest.Mock;
     findOneBy: jest.Mock;
     find: jest.Mock;
+    manager: {
+      transaction: jest.Mock;
+    };
+  };
+  let transactionRepo: {
+    findOneBy: jest.Mock;
+    find: jest.Mock;
+    save: jest.Mock;
+  };
+  let transactionManager: {
+    getRepository: jest.Mock;
   };
   let volunteersService: { findActiveOrFail: jest.Mock };
   let emailsService: { sendEmail: jest.Mock };
@@ -59,17 +70,34 @@ describe('MatchesService', () => {
 
   const mockMatch = {
     matchId: 1,
+    chameleonAnimalId: 42,
     status: MatchStatus.PENDING,
     deniedReason: null,
   } as Match;
 
   beforeEach(async () => {
+    transactionRepo = {
+      findOneBy: jest.fn(),
+      find: jest.fn(),
+      save: jest.fn(),
+    };
+
+    transactionManager = {
+      getRepository: jest.fn().mockReturnValue(transactionRepo),
+    };
+
     matchRepo = {
       create: jest.fn(),
       save: jest.fn(),
       findOneBy: jest.fn(),
       find: jest.fn(),
+      manager: {
+        transaction: jest
+          .fn()
+          .mockImplementation(async (callback) => callback(transactionManager)),
+      },
     };
+
     volunteersService = { findActiveOrFail: jest.fn() };
     emailsService = { sendEmail: jest.fn() };
 
@@ -293,32 +321,200 @@ describe('MatchesService', () => {
   });
 
   describe('approveMatch', () => {
+    beforeEach(() => {
+      transactionRepo.save.mockImplementation((match) =>
+        Promise.resolve(match),
+      );
+      transactionRepo.find.mockResolvedValue([]);
+      emailsService.sendEmail.mockResolvedValue(undefined);
+    });
+
     it('should approve a pending match and set its status to Active', async () => {
-      matchRepo.findOneBy.mockResolvedValue({ ...mockMatch });
-      matchRepo.save.mockImplementation((m) => Promise.resolve(m));
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
 
       const result = await service.approveMatch(1);
 
       expect(result.status).toBe(MatchStatus.ACTIVE);
-      expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
-      expect(matchRepo.save).toHaveBeenCalledWith({
+      expect(matchRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(transactionManager.getRepository).toHaveBeenCalledWith(Match);
+      expect(transactionRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
+      expect(transactionRepo.save).toHaveBeenCalledWith({
         ...mockMatch,
         status: MatchStatus.ACTIVE,
       });
     });
 
+    it('should cancel other pending matches for the same animal', async () => {
+      const otherMatches = [
+        {
+          matchId: 2,
+          volunteerId: 2,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+        {
+          matchId: 3,
+          volunteerId: 3,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer3@gmail.com' },
+        },
+      ] as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      const result = await service.approveMatch(1);
+
+      expect(result.status).toBe(MatchStatus.ACTIVE);
+      expect(otherMatches[0].status).toBe(MatchStatus.CANCELED);
+      expect(otherMatches[1].status).toBe(MatchStatus.CANCELED);
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+      expect(transactionRepo.save).toHaveBeenCalledWith(otherMatches);
+      expect(transactionRepo.find).toHaveBeenCalledWith({
+        where: {
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          matchId: expect.objectContaining({
+            _type: 'not',
+            _value: 1,
+          }),
+        },
+        relations: ['volunteer'],
+      });
+    });
+
+    it('should send one email with other applicants in BCC', async () => {
+      const otherMatches = [
+        {
+          matchId: 2,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+        {
+          matchId: 3,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer3@gmail.com' },
+        },
+      ] as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      await service.approveMatch(1);
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith({
+        toEmail: process.env.AWS_SES_SENDER_EMAIL,
+        bccEmails: ['volunteer2@gmail.com', 'volunteer3@gmail.com'],
+        subject: 'Foster Application Update',
+        bodyHtml: expect.stringContaining('another'),
+      });
+    });
+
+    it('should not send an email when there are no other applicants', async () => {
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue([]);
+
+      const result = await service.approveMatch(1);
+
+      expect(result.status).toBe(MatchStatus.ACTIVE);
+      expect(transactionRepo.save).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not include duplicate applicant emails in BCC', async () => {
+      const otherMatches = [
+        {
+          matchId: 2,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+        {
+          matchId: 3,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+      ] as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      await service.approveMatch(1);
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bccEmails: ['volunteer2@gmail.com'],
+        }),
+      );
+    });
+
+    it('should propagate an email failure through the transaction', async () => {
+      const otherMatches = [
+        {
+          matchId: 2,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+      ] as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+      emailsService.sendEmail.mockRejectedValue(new Error('SES is down'));
+
+      await expect(service.approveMatch(1)).rejects.toThrow('SES is down');
+
+      expect(matchRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not affect matches for other animals', async () => {
+      const otherAnimalMatch = {
+        matchId: 4,
+        chameleonAnimalId: 43,
+        status: MatchStatus.PENDING,
+      } as Match;
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue([]);
+
+      await service.approveMatch(1);
+
+      expect(otherAnimalMatch.status).toBe(MatchStatus.PENDING);
+      expect(transactionRepo.find).toHaveBeenCalledWith({
+        where: {
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          matchId: expect.objectContaining({
+            _type: 'not',
+            _value: 1,
+          }),
+        },
+        relations: ['volunteer'],
+      });
+    });
+
     it('should throw NotFoundException when match does not exist', async () => {
-      matchRepo.findOneBy.mockResolvedValue(null);
+      transactionRepo.findOneBy.mockResolvedValue(null);
 
       await expect(service.approveMatch(999)).rejects.toThrow(
         new NotFoundException('Match with id 999 not found'),
       );
-      expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 999 });
-      expect(matchRepo.save).not.toHaveBeenCalled();
+      expect(transactionRepo.findOneBy).toHaveBeenCalledWith({ matchId: 999 });
+      expect(transactionRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when match is not pending', async () => {
-      matchRepo.findOneBy.mockResolvedValue({
+      transactionRepo.findOneBy.mockResolvedValue({
         ...mockMatch,
         status: MatchStatus.ACTIVE,
       });
@@ -326,8 +522,9 @@ describe('MatchesService', () => {
       await expect(service.approveMatch(1)).rejects.toThrow(
         new BadRequestException('Match with id 1 is not pending'),
       );
-      expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
-      expect(matchRepo.save).not.toHaveBeenCalled();
+      expect(transactionRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
+      expect(transactionRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
   });
 
