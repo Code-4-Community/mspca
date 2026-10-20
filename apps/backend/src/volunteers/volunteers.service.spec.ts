@@ -507,14 +507,18 @@ describe('VolunteersService', () => {
       });
     });
 
-    it('should update multiple allowed fields at once', async () => {
-      mockRepo.findOne.mockResolvedValue({ ...mockVolunteer });
+    it('should update multiple allowed fields at once and leave the rest untouched', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        animalUpdates: true,
+      });
       mockRepo.save.mockImplementation((v) => Promise.resolve(v));
 
       const dto = {
         address: '123 Main St',
         city: 'Boston',
         zipcode: '02115',
+        animalUpdates: false,
       } as UpdateVolunteerDto;
 
       const result = await service.updateVolunteerById(1, dto);
@@ -522,6 +526,9 @@ describe('VolunteersService', () => {
       expect(result.address).toBe('123 Main St');
       expect(result.city).toBe('Boston');
       expect(result.zipcode).toBe('02115');
+      expect(result.animalUpdates).toBe(false);
+      expect(result.firstName).toBe('Jane');
+      expect(result.notes).toBe('likes cats');
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
@@ -531,25 +538,6 @@ describe('VolunteersService', () => {
         address: '123 Main St',
         city: 'Boston',
         zipcode: '02115',
-      });
-    });
-
-    it('should save animalUpdates and leave other fields unchanged', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        ...mockVolunteer,
-        animalUpdates: true,
-      });
-      mockRepo.save.mockImplementation((v) => Promise.resolve(v));
-
-      const result = await service.updateVolunteerById(1, {
-        animalUpdates: false,
-      });
-
-      expect(result.animalUpdates).toBe(false);
-      expect(result.firstName).toBe('Jane');
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockRepo.save).toHaveBeenCalledWith({
-        ...mockVolunteer,
         animalUpdates: false,
       });
     });

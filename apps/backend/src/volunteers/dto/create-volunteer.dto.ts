@@ -1,5 +1,6 @@
 import {
   ArrayNotEmpty,
+  ArrayUnique,
   IsArray,
   IsEmail,
   IsEnum,
@@ -76,6 +77,7 @@ export class CreateVolunteerDto {
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayUnique()
   @IsEnum(FosterType, { each: true })
   fosterType!: FosterType[];
 }

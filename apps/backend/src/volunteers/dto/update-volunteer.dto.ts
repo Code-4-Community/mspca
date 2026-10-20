@@ -10,6 +10,7 @@ import {
   MaxLength,
   IsPhoneNumber,
   IsEmail,
+  ArrayUnique,
 } from 'class-validator';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
@@ -70,6 +71,7 @@ export class UpdateVolunteerDto {
   @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayUnique()
   @IsEnum(FosterType, { each: true })
   fosterType?: FosterType[];
 
