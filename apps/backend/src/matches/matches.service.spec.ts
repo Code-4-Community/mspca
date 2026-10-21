@@ -116,6 +116,20 @@ describe('MatchesService', () => {
   });
 
   describe('create', () => {
+    const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
+
+    beforeEach(() => {
+      process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
+    });
+
+    afterEach(() => {
+      if (originalSenderEmail === undefined) {
+        delete process.env.AWS_SES_SENDER_EMAIL;
+      } else {
+        process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
+      }
+    });
+
     it('creates the match with a PENDING status', async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinator,
@@ -141,7 +155,7 @@ describe('MatchesService', () => {
       expect(match.status).toEqual(MatchStatus.PENDING);
     });
 
-    it("emails the volunteer's assigned coordinator", async () => {
+    it("emails the sender address with the volunteer's assigned coordinator cc'd", async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinator,
       );
@@ -156,13 +170,14 @@ describe('MatchesService', () => {
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          toEmail: coordinator.email,
+          toEmail: 'sender@example.com',
+          ccEmails: [coordinator.email],
           subject: 'New foster match created',
         }),
       );
     });
 
-    it('emails every assigned coordinator', async () => {
+    it('ccs every assigned coordinator on one email', async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinators,
       );
@@ -174,44 +189,12 @@ describe('MatchesService', () => {
 
       await service.create({ volunteerId: 1, chameleonAnimalId: 42 });
 
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
-      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({ toEmail: coordinator.email }),
-      );
-      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ toEmail: secondCoordinator.email }),
-      );
-    });
-
-    it('still emails the remaining coordinators when one send fails', async () => {
-      volunteersService.findActiveOrFail.mockResolvedValue(
-        volunteerWithCoordinators,
-      );
-      emailsService.sendEmail
-        .mockRejectedValueOnce(new Error('SES is down'))
-        .mockResolvedValueOnce(undefined);
-      matchRepo.create.mockImplementation((attrs) => attrs);
-      matchRepo.save.mockImplementation((match) =>
-        Promise.resolve({ matchId: 10, ...match }),
-      );
-      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
-
-      const match = await service.create({
-        volunteerId: 1,
-        chameleonAnimalId: 42,
-      });
-
-      expect(match.matchId).toEqual(10);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
-      expect(emailsService.sendEmail).toHaveBeenLastCalledWith(
-        expect.objectContaining({ toEmail: secondCoordinator.email }),
-      );
-      expect(error).toHaveBeenCalledTimes(1);
-      expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('coordinator 7'),
-        expect.any(String),
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'sender@example.com',
+          ccEmails: [coordinator.email, secondCoordinator.email],
+        }),
       );
     });
 
@@ -272,7 +255,7 @@ describe('MatchesService', () => {
 
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ toEmail: coordinator.email }),
+        expect.objectContaining({ ccEmails: [coordinator.email] }),
       );
     });
 
@@ -334,7 +317,11 @@ describe('MatchesService', () => {
       });
 
       expect(match.matchId).toEqual(10);
-      expect(error).toHaveBeenCalled();
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        'Failed to send match creation email for match 10.',
+        expect.any(String),
+      );
     });
 
     it('throws when the volunteer does not exist', async () => {

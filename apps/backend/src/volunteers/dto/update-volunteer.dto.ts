@@ -1,4 +1,3 @@
-import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 import {
   IsOptional,
@@ -51,10 +50,6 @@ export class UpdateVolunteerDto {
   @IsNonEmptyString()
   @MaxLength(10)
   zipcode?: string;
-
-  @IsOptional()
-  @IsEnum(Homebase)
-  homebase?: Homebase;
 
   @IsOptional()
   @IsNonEmptyString()

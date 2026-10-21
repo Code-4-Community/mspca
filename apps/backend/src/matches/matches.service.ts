@@ -91,12 +91,12 @@ export class MatchesService {
   }
 
   /**
-   * Emails each of the volunteer's active assigned foster coordinators about a new match.
+   * Emails the sender address about a new match, with the volunteer's active
+   * assigned foster coordinators cc'd.
    *
    * Never throws: the match is already committed by the time this runs, so a
-   * volunteer with no active coordinators is logged as a warning and each failed send
-   * as an error rather than failing the request. One failed send does not stop
-   * the remaining coordinators from being emailed.
+   * volunteer with no active coordinators is logged as a warning and a failed send
+   * as an error rather than failing the request.
    *
    * @param match the match that was just created
    * @param volunteer the matched volunteer, with assignedCoordinators loaded
@@ -118,20 +118,19 @@ export class MatchesService {
       `${volunteer.firstName} ${volunteer.lastName}`,
     );
 
-    for (const coordinator of coordinators) {
-      // Placeholder copy - TODO: put real template here later.
-      try {
-        await this.emailsService.sendEmail({
-          toEmail: coordinator.email,
-          subject: 'New foster match created',
-          bodyHtml: `<p>A match has been created for ${volunteerName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to send match creation email to coordinator ${coordinator.coordinatorId} for match ${match.matchId}.`,
-          error instanceof Error ? error.stack : String(error),
-        );
-      }
+    // Placeholder copy - TODO: put real template here later.
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        subject: 'New foster match created',
+        bodyHtml: `<p>A match has been created for ${volunteerName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send match creation email for match ${match.matchId}.`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

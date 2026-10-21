@@ -219,17 +219,23 @@ export class VolunteersService {
   /**
    * Moves a Volunteer to a different homebase and reassigns their coordinators.
    *
+   * Saves the new homebase and coordinators first, then emails the old
+   * coordinators and the new ones. Emails are best-effort: a failed send is
+   * logged rather than failing the request, since the reassignment is already
+   * committed.
+   *
    * @param id - The Volunteer's ID.
    * @param homebase - The new homebase.
    * @returns The updated Volunteer, with their new assigned coordinators.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If the Volunteer is already at the homebase.
+   * @throws {BadRequestException} If the Volunteer is not active, or is already
+   * at the homebase.
    */
   async changeHomebase(
     id: number,
     homebase: Homebase,
   ): Promise<FosterVolunteer> {
-    const volunteer = await this.findByIdOrFail(id);
+    const volunteer = await this.findActiveOrFail(id);
 
     if (volunteer.homebase === homebase) {
       throw new BadRequestException(
@@ -237,47 +243,21 @@ export class VolunteersService {
       );
     }
 
-    return this.reassignCoordinators(volunteer, homebase);
-  }
-
-  /**
-   * Sets a Volunteer's homebase, replaces their assigned coordinators with the
-   * active coordinators there, saves, then emails the coordinators who lost and
-   * gained the Volunteer.
-   *
-   * Emails are sent only after the save, and are best-effort: a failed send is
-   * logged rather than failing the request, since the reassignment is already
-   * committed. Coordinators in both the old and new lists are not emailed.
-   *
-   * @param volunteer - The Volunteer, with assignedCoordinators loaded.
-   * @param homebase - The new homebase.
-   * @returns The saved Volunteer.
-   */
-  private async reassignCoordinators(
-    volunteer: FosterVolunteer,
-    homebase: Homebase,
-  ): Promise<FosterVolunteer> {
-    const previous = volunteer.assignedCoordinators;
+    const previous = volunteer.assignedCoordinators.filter((c) => c.active);
     const next = await this.coordinatorsService.findActiveByHomebase(homebase);
 
     volunteer.homebase = homebase;
     volunteer.assignedCoordinators = next;
     const saved = await this.repo.save(volunteer);
 
-    const previousIds = new Set(previous.map((c) => c.coordinatorId));
-    const nextIds = new Set(next.map((c) => c.coordinatorId));
-    const removed = previous.filter(
-      (c) => c.active && !nextIds.has(c.coordinatorId),
-    );
-    const added = next.filter((c) => !previousIds.has(c.coordinatorId));
-
+    // A coordinator has one homebase, so the old and new lists never overlap.
     await this.notifyCoordinators(
-      removed,
+      previous,
       coordinatorLostVolunteerEmail(saved, homebase),
       saved.volunteerId,
     );
     await this.notifyCoordinators(
-      added,
+      next,
       coordinatorGainedVolunteerEmail(saved),
       saved.volunteerId,
     );
@@ -286,26 +266,33 @@ export class VolunteersService {
   }
 
   /**
-   * Sends the same email to each coordinator, logging failures without throwing
-   * so one failed send does not stop the rest.
+   * Sends one email to the sender address with the coordinators cc'd.
+   * Logs a warning and sends nothing when there are no coordinators, and logs
+   * a failed send instead of throwing.
    */
   private async notifyCoordinators(
     coordinators: FosterCoordinator[],
     email: EmailContent,
     volunteerId: number,
   ): Promise<void> {
-    for (const coordinator of coordinators) {
-      try {
-        await this.emailsService.sendEmail({
-          toEmail: coordinator.email,
-          ...email,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to send reassignment email to coordinator ${coordinator.coordinatorId} for volunteer ${volunteerId}.`,
-          error instanceof Error ? error.stack : String(error),
-        );
-      }
+    if (coordinators.length === 0) {
+      this.logger.warn(
+        `No coordinators to send "${email.subject}" email to for volunteer ${volunteerId}.`,
+      );
+      return;
+    }
+
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        ...email,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send "${email.subject}" email for volunteer ${volunteerId}.`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
@@ -344,8 +331,7 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
-   * Changing the homebase reassigns the volunteer's coordinators and emails them,
-   * the same as changeHomebase; an unchanged homebase is left alone.
+   * The homebase is changed through changeHomebase instead.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer
@@ -356,14 +342,7 @@ export class VolunteersService {
     dto: UpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     const volunteer = await this.findByIdOrFail(id);
-    const { homebase, ...fields } = dto;
-    Object.assign(volunteer, fields);
-
-    // @IsOptional lets an explicit null through validation; treat it as absent.
-    if (homebase != null && homebase !== volunteer.homebase) {
-      return this.reassignCoordinators(volunteer, homebase);
-    }
-
+    Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
   }
 

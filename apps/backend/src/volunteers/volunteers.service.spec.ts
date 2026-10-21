@@ -686,126 +686,6 @@ describe('VolunteersService', () => {
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
-
-    it('reassigns coordinators and sends emails when the homebase changes', async () => {
-      const oldCoordinator = {
-        coordinatorId: 1,
-        email: 'old1@example.com',
-        active: true,
-      } as FosterCoordinator;
-      const newCoordinator = {
-        coordinatorId: 3,
-        email: 'new3@example.com',
-        active: true,
-      } as FosterCoordinator;
-      mockRepo.findOne.mockResolvedValue({
-        volunteerId: 9,
-        firstName: 'Ada',
-        lastName: 'Lovelace',
-        homebase: Homebase.BOSTON,
-        assignedCoordinators: [oldCoordinator],
-      } as FosterVolunteer);
-      mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([
-        newCoordinator,
-      ]);
-      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
-      emailsService.sendEmail.mockResolvedValue(undefined);
-
-      const result = await service.updateVolunteerById(9, {
-        homebase: Homebase.SALEM,
-        notes: 'Moved north',
-      } as UpdateVolunteerDto);
-
-      expect(
-        mockCoordinatorsService.findActiveByHomebase,
-      ).toHaveBeenCalledTimes(1);
-      expect(mockCoordinatorsService.findActiveByHomebase).toHaveBeenCalledWith(
-        Homebase.SALEM,
-      );
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          homebase: Homebase.SALEM,
-          notes: 'Moved north',
-          assignedCoordinators: [newCoordinator],
-        }),
-      );
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
-      expect(result.assignedCoordinators).toEqual([newCoordinator]);
-    });
-
-    it('does not reassign or email when the homebase is unchanged', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        email: 'c1@example.com',
-        active: true,
-      } as FosterCoordinator;
-      mockRepo.findOne.mockResolvedValue({
-        volunteerId: 9,
-        homebase: Homebase.BOSTON,
-        assignedCoordinators: [coordinator],
-      } as FosterVolunteer);
-      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
-
-      const result = await service.updateVolunteerById(9, {
-        homebase: Homebase.BOSTON,
-        notes: 'Same place',
-      } as UpdateVolunteerDto);
-
-      expect(
-        mockCoordinatorsService.findActiveByHomebase,
-      ).not.toHaveBeenCalled();
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(result.notes).toBe('Same place');
-      expect(result.assignedCoordinators).toEqual([coordinator]);
-    });
-
-    it('ignores a null homebase instead of reassigning or clearing it', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        volunteerId: 9,
-        homebase: Homebase.BOSTON,
-        assignedCoordinators: [],
-      } as FosterVolunteer);
-      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
-
-      const result = await service.updateVolunteerById(9, {
-        homebase: null,
-        notes: 'Null homebase',
-      } as unknown as UpdateVolunteerDto);
-
-      expect(
-        mockCoordinatorsService.findActiveByHomebase,
-      ).not.toHaveBeenCalled();
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          homebase: Homebase.BOSTON,
-          notes: 'Null homebase',
-        }),
-      );
-      expect(result.homebase).toBe(Homebase.BOSTON);
-    });
-
-    it('does not reassign or email when the homebase is not in the update', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        volunteerId: 9,
-        homebase: Homebase.BOSTON,
-        assignedCoordinators: [],
-      } as FosterVolunteer);
-      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
-
-      await service.updateVolunteerById(9, {
-        notes: 'Just notes',
-      } as UpdateVolunteerDto);
-
-      expect(
-        mockCoordinatorsService.findActiveByHomebase,
-      ).not.toHaveBeenCalled();
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('approve', () => {
@@ -903,6 +783,7 @@ describe('VolunteersService', () => {
   });
 
   describe('changeHomebase', () => {
+    const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
     const oldCoordinators = [
       { coordinatorId: 1, email: 'old1@example.com', active: true },
       { coordinatorId: 2, email: 'old2@example.com', active: true },
@@ -913,21 +794,32 @@ describe('VolunteersService', () => {
 
     const makeVolunteer = (
       assignedCoordinators: FosterCoordinator[] = oldCoordinators,
+      status: VolunteerStatus = VolunteerStatus.ACTIVE,
     ) =>
       ({
         volunteerId: 9,
         firstName: 'Ada',
         lastName: 'Lovelace',
         homebase: Homebase.BOSTON,
+        status,
         assignedCoordinators,
       } as FosterVolunteer);
 
     beforeEach(() => {
+      process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
       mockCoordinatorsService.findActiveByHomebase.mockResolvedValue(
         newCoordinators,
       );
       mockRepo.save.mockImplementation(async (volunteer) => volunteer);
       emailsService.sendEmail.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      if (originalSenderEmail === undefined) {
+        delete process.env.AWS_SES_SENDER_EMAIL;
+      } else {
+        process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
+      }
     });
 
     it('saves the new homebase and replaces the coordinator list', async () => {
@@ -958,30 +850,25 @@ describe('VolunteersService', () => {
       expect(result.assignedCoordinators).toBe(newCoordinators);
     });
 
-    it('emails the old coordinators and the new coordinators', async () => {
+    it('sends one email ccing the old coordinators and one ccing the new coordinators', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer());
 
       await service.changeHomebase(9, Homebase.SALEM);
 
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(3);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
       expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
-          toEmail: 'old1@example.com',
+          toEmail: 'sender@example.com',
+          ccEmails: ['old1@example.com', 'old2@example.com'],
           subject: 'Volunteer moved to another homebase',
         }),
       );
       expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
-          toEmail: 'old2@example.com',
-          subject: 'Volunteer moved to another homebase',
-        }),
-      );
-      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(
-        3,
-        expect.objectContaining({
-          toEmail: 'new3@example.com',
+          toEmail: 'sender@example.com',
+          ccEmails: ['new3@example.com'],
           subject: 'New volunteer assigned to you',
         }),
       );
@@ -1001,6 +888,24 @@ describe('VolunteersService', () => {
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
+    it.each([VolunteerStatus.PENDING, VolunteerStatus.INACTIVE])(
+      'throws BadRequestException and does nothing else when the volunteer is %s',
+      async (status) => {
+        mockRepo.findOne.mockResolvedValue(
+          makeVolunteer(oldCoordinators, status),
+        );
+
+        await expect(service.changeHomebase(9, Homebase.SALEM)).rejects.toThrow(
+          new BadRequestException('Volunteer with ID 9 is not active'),
+        );
+        expect(
+          mockCoordinatorsService.findActiveByHomebase,
+        ).not.toHaveBeenCalled();
+        expect(mockRepo.save).not.toHaveBeenCalled();
+        expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      },
+    );
+
     it('throws BadRequestException and does nothing else when the homebase is unchanged', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer());
 
@@ -1017,83 +922,76 @@ describe('VolunteersService', () => {
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('succeeds with an empty list and only emails the old coordinators when the new homebase has none', async () => {
+    it('succeeds with an empty list, only emails the old coordinators, and warns when the new homebase has none', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer());
       mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([]);
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       const result = await service.changeHomebase(9, Homebase.SALEM);
 
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(result.assignedCoordinators).toEqual([]);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
-      expect(emailsService.sendEmail).not.toHaveBeenCalledWith(
-        expect.objectContaining({ subject: 'New volunteer assigned to you' }),
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'Volunteer moved to another homebase',
+        }),
+      );
+      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(logWarn).toHaveBeenCalledWith(
+        'No coordinators to send "New volunteer assigned to you" email to for volunteer 9.',
       );
     });
 
-    it('only emails the new coordinators when the volunteer had none', async () => {
+    it('only emails the new coordinators and warns when the volunteer had none', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer([]));
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       await service.changeHomebase(9, Homebase.SALEM);
 
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          toEmail: 'new3@example.com',
+          ccEmails: ['new3@example.com'],
           subject: 'New volunteer assigned to you',
         }),
       );
+      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(logWarn).toHaveBeenCalledWith(
+        'No coordinators to send "Volunteer moved to another homebase" email to for volunteer 9.',
+      );
     });
 
-    it('sends no email when neither homebase has coordinators', async () => {
+    it('sends no email and warns twice when neither homebase has coordinators', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer([]));
       mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([]);
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       await service.changeHomebase(9, Homebase.SALEM);
 
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(logWarn).toHaveBeenCalledTimes(2);
     });
 
     it('does not email previously assigned coordinators who are now inactive', async () => {
       mockRepo.findOne.mockResolvedValue(
         makeVolunteer([
-          { coordinatorId: 1, email: 'old1@example.com', active: false },
+          oldCoordinators[0],
+          { coordinatorId: 4, email: 'inactive4@example.com', active: false },
         ] as FosterCoordinator[]),
       );
 
       await service.changeHomebase(9, Homebase.SALEM);
 
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
-      expect(emailsService.sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ toEmail: 'new3@example.com' }),
+      const ccd = emailsService.sendEmail.mock.calls.flatMap(
+        ([dto]) => dto.ccEmails,
       );
+      expect(ccd).toContain('old1@example.com');
+      expect(ccd).not.toContain('inactive4@example.com');
     });
 
-    it('keeps and does not email a coordinator who is in both the old and new lists', async () => {
-      const stays = {
-        coordinatorId: 5,
-        email: 'stays@example.com',
-        active: true,
-      } as FosterCoordinator;
-      mockRepo.findOne.mockResolvedValue(
-        makeVolunteer([oldCoordinators[0], stays]),
-      );
-      mockCoordinatorsService.findActiveByHomebase.mockResolvedValue([
-        stays,
-        newCoordinators[0],
-      ]);
-
-      const result = await service.changeHomebase(9, Homebase.SALEM);
-
-      expect(result.assignedCoordinators).toEqual([stays, newCoordinators[0]]);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
-      expect(emailsService.sendEmail).not.toHaveBeenCalledWith(
-        expect.objectContaining({ toEmail: 'stays@example.com' }),
-      );
-    });
-
-    it('still returns the saved volunteer and emails the rest when one send fails', async () => {
+    it('still returns the saved volunteer and sends the other email when one send fails', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer());
       emailsService.sendEmail
         .mockRejectedValueOnce(new Error('SES is down'))
@@ -1105,15 +1003,15 @@ describe('VolunteersService', () => {
       const result = await service.changeHomebase(9, Homebase.SALEM);
 
       expect(result.homebase).toBe(Homebase.SALEM);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(3);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
       expect(logError).toHaveBeenCalledTimes(1);
       expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining('coordinator 1'),
+        'Failed to send "Volunteer moved to another homebase" email for volunteer 9.',
         expect.any(String),
       );
     });
 
-    it('still returns the saved volunteer and logs each failure when every send fails', async () => {
+    it('still returns the saved volunteer and logs each failure when both sends fail', async () => {
       mockRepo.findOne.mockResolvedValue(makeVolunteer());
       emailsService.sendEmail.mockRejectedValue(new Error('SES is down'));
       const logError = jest
@@ -1124,8 +1022,8 @@ describe('VolunteersService', () => {
 
       expect(result.homebase).toBe(Homebase.SALEM);
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(3);
-      expect(logError).toHaveBeenCalledTimes(3);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(logError).toHaveBeenCalledTimes(2);
     });
 
     it('propagates a save failure without sending any email', async () => {
