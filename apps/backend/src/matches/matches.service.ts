@@ -105,21 +105,23 @@ export class MatchesService {
     match: Match,
     volunteer: FosterVolunteer,
   ): Promise<void> {
-    const coordinators = volunteer.assignedCoordinators.filter((c) => c.active);
-
-    if (coordinators.length === 0) {
-      this.logger.warn(
-        `Volunteer ${volunteer.volunteerId} has no active assigned coordinators; no match email sent for match ${match.matchId}.`,
-      );
-      return;
-    }
-
-    const volunteerName = escapeHtml(
-      `${volunteer.firstName} ${volunteer.lastName}`,
-    );
-
-    // Placeholder copy - TODO: put real template here later.
     try {
+      const coordinators = volunteer.assignedCoordinators.filter(
+        (c) => c.active,
+      );
+
+      if (coordinators.length === 0) {
+        this.logger.warn(
+          `Volunteer ${volunteer.volunteerId} has no active assigned coordinators; no match email sent for match ${match.matchId}.`,
+        );
+        return;
+      }
+
+      const volunteerName = escapeHtml(
+        `${volunteer.firstName} ${volunteer.lastName}`,
+      );
+
+      // Placeholder copy - TODO: put real template here later.
       await this.emailsService.sendEmail({
         toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
         ccEmails: coordinators.map((c) => c.email),

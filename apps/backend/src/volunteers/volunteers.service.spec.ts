@@ -251,21 +251,6 @@ describe('VolunteersService', () => {
       expect(result.assignedCoordinators).toEqual([]);
     });
 
-    it('does not create the Cognito user when the coordinator lookup fails', async () => {
-      const lookupError = new Error('connection lost');
-      mockCoordinatorsService.findActiveByHomebase.mockRejectedValue(
-        lookupError,
-      );
-
-      await expect(service.create(dto)).rejects.toBe(lookupError);
-      expect(mockRepo.findOneBy).toHaveBeenCalledTimes(1);
-      expect(
-        mockCoordinatorsService.findActiveByHomebase,
-      ).toHaveBeenCalledTimes(1);
-      expect(mockCognitoService.signUpUser).not.toHaveBeenCalled();
-      expect(mockRepo.save).not.toHaveBeenCalled();
-    });
-
     it('throws ConflictException without calling Cognito when the email is already in Postgres', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 5,

@@ -324,6 +324,31 @@ describe('MatchesService', () => {
       );
     });
 
+    it('creates the match and logs an error when assignedCoordinators is not loaded', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue({
+        ...volunteerWithCoordinator,
+        assignedCoordinators: undefined,
+      } as unknown as FosterVolunteer);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const match = await service.create({
+        volunteerId: 1,
+        chameleonAnimalId: 42,
+      });
+
+      expect(match.matchId).toEqual(10);
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        'Failed to send match creation email for match 10.',
+        expect.any(String),
+      );
+    });
+
     it('throws when the volunteer does not exist', async () => {
       volunteersService.findActiveOrFail.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),

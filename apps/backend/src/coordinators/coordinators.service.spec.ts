@@ -82,6 +82,25 @@ describe('CoordinatorsService', () => {
       });
     });
 
+    it('does not return coordinators from other homebases', async () => {
+      const coordinators = [
+        { coordinatorId: 1, homebase: Homebase.BOSTON, active: true },
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 3, homebase: Homebase.CAPE_COD, active: true },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(
+        async ({ where }: { where: Partial<FosterCoordinator> }) =>
+          coordinators.filter(
+            (c) => c.homebase === where.homebase && c.active === where.active,
+          ),
+      );
+
+      const result = await service.findActiveByHomebase(Homebase.SALEM);
+
+      expect(result).toEqual([coordinators[1]]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+    });
+
     it('returns an empty array when the homebase has no active coordinators', async () => {
       repo.find.mockResolvedValue([]);
 
