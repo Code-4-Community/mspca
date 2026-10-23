@@ -1,8 +1,15 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  Unique,
+} from 'typeorm';
 import { Homebase } from '../types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 
 @Entity('foster_coordinators')
+@Unique('UQ_foster_coordinators_email', ['email'])
 export class FosterCoordinator {
   @PrimaryGeneratedColumn({ name: 'coordinator_id' })
   coordinatorId!: number;
@@ -24,7 +31,7 @@ export class FosterCoordinator {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255 })
   email!: string;
 
   @Column({ type: 'enum', enum: Homebase })
@@ -33,7 +40,12 @@ export class FosterCoordinator {
   @Column({ type: 'boolean' })
   active!: boolean;
 
-  @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
+  @Column({
+    name: 'cognito_sub',
+    type: 'varchar',
+    length: 255,
+    default: '',
+  })
   cognitoSub!: string;
 
   @OneToMany(

@@ -112,6 +112,9 @@ export class VolunteersService {
    * so this stops someone who signed up directly with Cognito (skipping
    * {@link create}) from getting the role without a Volunteer profile.
    *
+   * CognitoService handles both email confirmation and role assignment.
+   * If role assignment fails, CognitoService handles Cognito user cleanup.
+   *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
    * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
@@ -161,7 +164,7 @@ export class VolunteersService {
    *
    * @param id - The Volunteer's ID.
    * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If the Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Inactive.
    */
   async reactivate(id: number): Promise<FosterVolunteer> {

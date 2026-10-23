@@ -7,10 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { FosterCoordinator } from './coordinators.entity';
-import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
+import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 
@@ -21,90 +21,84 @@ export class CoordinatorsService {
   constructor(
     @InjectRepository(FosterCoordinator)
     private repo: Repository<FosterCoordinator>,
-    @InjectRepository(FosterVolunteer)
-    private volunteerRepo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
   ) {}
 
   /**
-   * Creates a Foster Coordinator and assigns currently unassigned volunteers
-   * at their homebase.
-   *
-   * @param dto - Coordinator profile data.
-   * @returns The saved coordinator.
-   * @throws {ConflictException} If the coordinator email already exists.
+   * Registers a coordinator with Cognito and saves their profile.
+   * Coordinators are active immediately and do not require approval.
    */
   async create(dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
-    const email = dto.email.trim().toLowerCase();
+    const { password, ...profile } = dto;
+    const email = profile.email.trim().toLowerCase();
 
-    if (!/^[^\s@]+@mspca\.org$/.test(email)) {
-      throw new BadRequestException('Email must end in @mspca.org');
-    }
+    const existing = await this.repo.findOneBy({ email });
 
-    if (await this.repo.findOneBy({ email })) {
+    if (existing) {
       throw new ConflictException(
         'A coordinator with this email already exists',
       );
     }
 
-    const cognitoSub = await this.cognitoService.createUser({
-      firstName: dto.firstName,
-      lastName: dto.lastName,
+    const cognitoSub = await this.cognitoService.signUpUser({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
       email,
-      role: CognitoRole.FosterCoordinator,
+      password,
     });
 
-    let coordinator: FosterCoordinator;
-
     try {
-      coordinator = await this.repo.save(
-        this.repo.create({
-          ...dto,
-          email,
-          active: true,
-          assignedVolunteers: [],
-          cognitoSub,
-        }),
-      );
+      return await this.repo.save({
+        ...profile,
+        email,
+        active: true,
+        cognitoSub,
+      });
     } catch (error) {
-      this.logger.error(`Failed to save coordinator ${email}`, error);
+      this.logger.error(
+        `Failed to save coordinator ${email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
 
       try {
         await this.cognitoService.deleteUser(email);
-      } catch (cleanupError) {
+      } catch {
         this.logger.error(
-          `Failed to clean up Cognito user for ${email}`,
-          cleanupError,
+          `Created Cognito user ${cognitoSub} for ${email}, but failed to save the coordinator or delete the Cognito user`,
         );
       }
 
-      throw new InternalServerErrorException('Failed to save the Coordinator');
+      throw new InternalServerErrorException('Failed to save the coordinator');
     }
-
-    await this.volunteerRepo.update(
-      { homebase: dto.homebase, assignedCoordinator: IsNull() },
-      { assignedCoordinator: coordinator },
-    );
-
-    coordinator.assignedVolunteers = await this.volunteerRepo.find({
-      where: {
-        assignedCoordinator: { coordinatorId: coordinator.coordinatorId },
-      },
-    });
-
-    return coordinator;
   }
 
   /**
-   * Fetches a Coordinator by ID.
-   *
-   * @param id - The Coordinator's ID.
-   * @returns The Coordinator.
-   * @throws {NotFoundException} If no Coordinator with the ID exists.
+   * Confirms the coordinator's email and assigns the
+   * FosterCoordinator Cognito role.
+   */
+  async confirm(dto: ConfirmCoordinatorDto): Promise<void> {
+    const email = dto.email.trim().toLowerCase();
+
+    const coordinator = await this.repo.findOneBy({ email });
+
+    if (!coordinator) {
+      throw new NotFoundException('No coordinator with this email exists');
+    }
+
+    await this.cognitoService.confirmUser(
+      email,
+      dto.code,
+      CognitoRole.FosterCoordinator,
+    );
+  }
+
+  /**
+   * Retrieves a coordinator by ID.
    */
   async findByIdOrFail(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.repo.findOne({
       where: { coordinatorId: id },
+      relations: ['assignedVolunteers'],
     });
 
     if (!coordinator) {
@@ -115,12 +109,7 @@ export class CoordinatorsService {
   }
 
   /**
-   * Deactivates a Coordinator.
-   *
-   * @param id - The Coordinator's ID.
-   * @returns The updated Coordinator.
-   * @throws {NotFoundException} If no Coordinator with the ID exists.
-   * @throws {BadRequestException} If the Coordinator is already inactive.
+   * Deactivates an active coordinator.
    */
   async deactivate(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.findByIdOrFail(id);
@@ -137,12 +126,7 @@ export class CoordinatorsService {
   }
 
   /**
-   * Activates a Coordinator.
-   *
-   * @param id - The Coordinator's ID.
-   * @returns The updated Coordinator.
-   * @throws {NotFoundException} If no Coordinator with the ID exists.
-   * @throws {BadRequestException} If the Coordinator is already active.
+   * Reactivates an inactive coordinator.
    */
   async activate(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.findByIdOrFail(id);

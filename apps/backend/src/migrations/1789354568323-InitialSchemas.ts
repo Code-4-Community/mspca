@@ -53,7 +53,7 @@ export class InitialSchemas1789354568323 implements MigrationInterface {
         "last_name" varchar(255) NOT NULL,
         "phone" varchar(20) NOT NULL,
         "secondary_phone" varchar(20),
-        "email" varchar(255) NOT NULL,
+        "email" varchar(255) NOT NULL UNIQUE,
         "active" boolean NOT NULL
       )
     `);

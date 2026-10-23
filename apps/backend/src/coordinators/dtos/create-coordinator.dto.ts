@@ -1,38 +1,32 @@
 import {
   IsEmail,
   IsEnum,
-  IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
-  IsString,
+  IsStrongPassword,
   Matches,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Homebase } from '../../types';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 export class CreateCoordinatorDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   firstName!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   lastName!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
-  @MaxLength(20)
   phone!: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
-  @MaxLength(20)
   secondaryPhone?: string | null;
 
   @Transform(({ value }) =>
@@ -44,6 +38,17 @@ export class CreateCoordinatorDto {
     message: 'Email must end in @mspca.org',
   })
   email!: string;
+
+  @IsNonEmptyString()
+  @IsStrongPassword({
+    minLength: 8,
+    minLowercase: 1,
+    minUppercase: 1,
+    minNumbers: 1,
+    minSymbols: 1,
+  })
+  @MaxLength(256)
+  password!: string;
 
   @IsEnum(Homebase)
   homebase!: Homebase;

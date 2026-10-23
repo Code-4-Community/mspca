@@ -35,11 +35,13 @@ describe('VolunteersService', () => {
     save: jest.Mock;
     delete: jest.Mock;
   };
+
   let mockCognitoService: {
     signUpUser: jest.Mock;
     confirmUser: jest.Mock;
     deleteUser: jest.Mock;
   };
+
   let emailsService: { sendEmail: jest.Mock };
 
   const mockVolunteers = [
@@ -55,11 +57,13 @@ describe('VolunteersService', () => {
       save: jest.fn(),
       delete: jest.fn(),
     };
+
     mockCognitoService = {
       signUpUser: jest.fn(),
       confirmUser: jest.fn(),
       deleteUser: jest.fn(),
     };
+
     emailsService = { sendEmail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -319,6 +323,8 @@ describe('VolunteersService', () => {
         '123456',
         CognitoRole.FosterVolunteer,
       );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException without calling Cognito when no volunteer has the email', async () => {
@@ -344,6 +350,29 @@ describe('VolunteersService', () => {
         service.confirm({ email: 'jane@example.com', code: '000000' }),
       ).rejects.toBe(error);
       expect(mockCognitoService.confirmUser).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('propagates group assignment failures from Cognito without attempting duplicate cleanup', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+      } as FosterVolunteer);
+
+      const error = new InternalServerErrorException('Failed to confirm user');
+      mockCognitoService.confirmUser.mockRejectedValue(error);
+
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '123456' }),
+      ).rejects.toBe(error);
+
+      expect(mockCognitoService.confirmUser).toHaveBeenCalledWith(
+        'jane@example.com',
+        '123456',
+        CognitoRole.FosterVolunteer,
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
     });
   });
 

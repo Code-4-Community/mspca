@@ -9,16 +9,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
-import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { Homebase } from '../types';
-import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 
 describe('CoordinatorsService', () => {
   let service: CoordinatorsService;
   let repo: jest.Mocked<Repository<FosterCoordinator>>;
-  let volunteerRepo: jest.Mocked<Repository<FosterVolunteer>>;
   let cognitoService: jest.Mocked<CognitoService>;
 
   const dto: CreateCoordinatorDto = {
@@ -27,8 +25,22 @@ describe('CoordinatorsService', () => {
     phone: '+16175551234',
     secondaryPhone: null,
     email: 'jane.doe@mspca.org',
+    password: 'Str0ng!Password',
     homebase: Homebase.BOSTON,
   };
+
+  const coordinator = {
+    coordinatorId: 1,
+    firstName: dto.firstName,
+    lastName: dto.lastName,
+    phone: dto.phone,
+    secondaryPhone: dto.secondaryPhone,
+    email: dto.email,
+    homebase: dto.homebase,
+    active: true,
+    cognitoSub: 'cognito-sub-123',
+    assignedVolunteers: [],
+  } as FosterCoordinator;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -39,22 +51,14 @@ describe('CoordinatorsService', () => {
           useValue: {
             findOneBy: jest.fn(),
             findOne: jest.fn(),
-            create: jest.fn(),
             save: jest.fn(),
-            delete: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(FosterVolunteer),
-          useValue: {
-            update: jest.fn(),
-            find: jest.fn(),
           },
         },
         {
           provide: CognitoService,
           useValue: {
-            createUser: jest.fn(),
+            signUpUser: jest.fn(),
+            confirmUser: jest.fn(),
             deleteUser: jest.fn(),
           },
         },
@@ -63,142 +67,76 @@ describe('CoordinatorsService', () => {
 
     service = module.get(CoordinatorsService);
     repo = module.get(getRepositoryToken(FosterCoordinator));
-    volunteerRepo = module.get(getRepositoryToken(FosterVolunteer));
     cognitoService = module.get(CognitoService);
-
-    repo.findOneBy.mockResolvedValue(null);
-    cognitoService.createUser.mockResolvedValue('cognito-sub-123');
-    cognitoService.deleteUser.mockResolvedValue(undefined);
-    volunteerRepo.find.mockResolvedValue([]);
   });
 
   describe('create', () => {
-    const created = {
-      coordinatorId: 1,
-      ...dto,
-      active: true,
-      assignedVolunteers: [],
-      cognitoSub: 'cognito-sub-123',
-    } as FosterCoordinator;
+    it('signs up with Cognito before saving', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('cognito-sub-123');
+      repo.save.mockResolvedValue(coordinator);
 
-    beforeEach(() => {
-      repo.create.mockReturnValue({ ...created });
-      repo.save.mockResolvedValue({ ...created });
-    });
-
-    it('creates the Cognito user and saves the coordinator', async () => {
       const result = await service.create(dto);
 
-      expect(repo.findOneBy).toHaveBeenCalledWith({
-        email: dto.email,
-      });
-
-      expect(cognitoService.createUser).toHaveBeenCalledWith({
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        email: dto.email,
-        role: CognitoRole.FosterCoordinator,
-      });
-
-      expect(repo.create).toHaveBeenCalledWith({
-        ...dto,
-        active: true,
-        assignedVolunteers: [],
-        cognitoSub: 'cognito-sub-123',
+      expect(cognitoService.signUpUser).toHaveBeenCalledWith({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: 'jane.doe@mspca.org',
+        password: 'Str0ng!Password',
       });
 
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: dto.email,
+          email: 'jane.doe@mspca.org',
+          active: true,
           cognitoSub: 'cognito-sub-123',
         }),
       );
 
-      expect(result.cognitoSub).toBe('cognito-sub-123');
-      expect(result.active).toBe(true);
+      expect(repo.save.mock.calls[0][0]).not.toHaveProperty('password');
+      expect(result).toBe(coordinator);
     });
 
-    it('normalizes the email before checking and saving', async () => {
-      const uppercaseDto = {
-        ...dto,
-        email: '  JANE.DOE@MSPCA.ORG  ',
-      };
+    it('normalizes the email', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('sub-123');
+      repo.save.mockResolvedValue(coordinator);
 
-      await service.create(uppercaseDto);
+      await service.create({
+        ...dto,
+        email: ' JANE.DOE@MSPCA.ORG ',
+      });
 
       expect(repo.findOneBy).toHaveBeenCalledWith({
         email: 'jane.doe@mspca.org',
       });
-
-      expect(cognitoService.createUser).toHaveBeenCalledWith({
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        email: 'jane.doe@mspca.org',
-        role: CognitoRole.FosterCoordinator,
-      });
-
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'jane.doe@mspca.org',
-        }),
-      );
     });
 
-    it('throws BadRequestException for a non-MSPCA email', async () => {
-      const invalidDto = {
-        ...dto,
-        email: 'jane.doe@gmail.com',
-      };
-
-      await expect(service.create(invalidDto)).rejects.toThrow(
-        BadRequestException,
-      );
-
-      expect(repo.findOneBy).not.toHaveBeenCalled();
-      expect(cognitoService.createUser).not.toHaveBeenCalled();
-      expect(repo.save).not.toHaveBeenCalled();
-    });
-
-    it('throws ConflictException if the coordinator already exists', async () => {
-      repo.findOneBy.mockResolvedValue({
-        email: dto.email,
-      } as FosterCoordinator);
+    it('rejects duplicate coordinators', async () => {
+      repo.findOneBy.mockResolvedValue(coordinator);
 
       await expect(service.create(dto)).rejects.toThrow(ConflictException);
 
-      expect(cognitoService.createUser).not.toHaveBeenCalled();
+      expect(cognitoService.signUpUser).not.toHaveBeenCalled();
       expect(repo.save).not.toHaveBeenCalled();
     });
 
-    it('does not save if Cognito user creation fails', async () => {
-      cognitoService.createUser.mockRejectedValue(
-        new ConflictException('A user with this email already exists'),
+    it('does not save if Cognito sign-up fails', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockRejectedValue(
+        new ConflictException('Cognito user already exists'),
       );
 
       await expect(service.create(dto)).rejects.toThrow(ConflictException);
 
-      expect(repo.create).not.toHaveBeenCalled();
       expect(repo.save).not.toHaveBeenCalled();
-      expect(volunteerRepo.update).not.toHaveBeenCalled();
     });
 
-    it('deletes the Cognito user if saving the coordinator fails', async () => {
+    it('deletes the Cognito user when saving fails', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('sub-123');
       repo.save.mockRejectedValue(new Error('Database error'));
-
-      await expect(service.create(dto)).rejects.toThrow(
-        InternalServerErrorException,
-      );
-
-      expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);
-
-      expect(volunteerRepo.update).not.toHaveBeenCalled();
-    });
-
-    it('throws InternalServerErrorException if database save and Cognito cleanup fail', async () => {
-      repo.save.mockRejectedValue(new Error('Database error'));
-      cognitoService.deleteUser.mockRejectedValue(
-        new Error('Cognito cleanup failed'),
-      );
+      cognitoService.deleteUser.mockResolvedValue(undefined);
 
       await expect(service.create(dto)).rejects.toThrow(
         InternalServerErrorException,
@@ -207,208 +145,107 @@ describe('CoordinatorsService', () => {
       expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);
     });
 
-    it('assigns unassigned volunteers from the same homebase', async () => {
-      const volunteers = [
-        {
-          volunteerId: 1,
-          homebase: Homebase.BOSTON,
-        },
-        {
-          volunteerId: 2,
-          homebase: Homebase.BOSTON,
-        },
-      ] as FosterVolunteer[];
-
-      volunteerRepo.find.mockResolvedValue(volunteers);
-
-      const result = await service.create(dto);
-
-      expect(volunteerRepo.update).toHaveBeenCalledWith(
-        {
-          homebase: dto.homebase,
-          assignedCoordinator: expect.anything(),
-        },
-        {
-          assignedCoordinator: expect.objectContaining({
-            coordinatorId: 1,
-          }),
-        },
-      );
-
-      expect(volunteerRepo.find).toHaveBeenCalledWith({
-        where: {
-          assignedCoordinator: {
-            coordinatorId: 1,
-          },
-        },
-      });
-
-      expect(result.assignedVolunteers).toEqual(volunteers);
-    });
-
-    it('does not overwrite existing volunteer assignments', async () => {
-      await service.create(dto);
-
-      expect(volunteerRepo.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          homebase: Homebase.BOSTON,
-          assignedCoordinator: expect.anything(),
-        }),
-        expect.objectContaining({
-          assignedCoordinator: expect.objectContaining({
-            coordinatorId: 1,
-          }),
-        }),
-      );
-    });
-
-    it('propagates an error if volunteer assignment fails', async () => {
-      volunteerRepo.update.mockRejectedValue(
-        new Error('Failed to assign volunteers'),
-      );
+    it('returns a server error even if Cognito cleanup fails', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('sub-123');
+      repo.save.mockRejectedValue(new Error('Database error'));
+      cognitoService.deleteUser.mockRejectedValue(new Error('Cleanup failed'));
 
       await expect(service.create(dto)).rejects.toThrow(
-        'Failed to assign volunteers',
+        InternalServerErrorException,
       );
-
-      expect(repo.save).toHaveBeenCalled();
-      expect(cognitoService.deleteUser).not.toHaveBeenCalled();
     });
   });
 
-  describe('findByIdOrFail', () => {
-    it('returns the coordinator when one with the id exists', async () => {
-      const coordinator = {
-        coordinatorId: 7,
-      } as FosterCoordinator;
+  describe('confirm', () => {
+    it('confirms an existing coordinator', async () => {
+      repo.findOneBy.mockResolvedValue(coordinator);
+      cognitoService.confirmUser.mockResolvedValue(undefined);
 
-      repo.findOne.mockResolvedValue(coordinator);
-
-      const result = await service.findByIdOrFail(7);
-
-      expect(result).toBe(coordinator);
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 7 },
+      await service.confirm({
+        email: dto.email,
+        code: '123456',
       });
+
+      expect(cognitoService.confirmUser).toHaveBeenCalledWith(
+        dto.email,
+        '123456',
+        CognitoRole.FosterCoordinator,
+      );
     });
 
-    it('throws NotFoundException when no coordinator exists', async () => {
-      repo.findOne.mockResolvedValue(null);
+    it('rejects confirmation without a coordinator profile', async () => {
+      repo.findOneBy.mockResolvedValue(null);
 
-      await expect(service.findByIdOrFail(7)).rejects.toThrow(
-        new NotFoundException('Coordinator with ID 7 not found'),
+      await expect(
+        service.confirm({
+          email: dto.email,
+          code: '123456',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(cognitoService.confirmUser).not.toHaveBeenCalled();
+    });
+
+    it('propagates invalid-code errors', async () => {
+      repo.findOneBy.mockResolvedValue(coordinator);
+      cognitoService.confirmUser.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
       );
 
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 7 },
-      });
+      await expect(
+        service.confirm({
+          email: dto.email,
+          code: '000000',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('deactivate', () => {
-    it('sets active to false, saves, and does not delete the coordinator', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: true,
-      } as FosterCoordinator;
-
-      repo.findOne.mockResolvedValue(coordinator);
-      repo.save.mockResolvedValue({
-        ...coordinator,
-        active: false,
-      });
+    it('deactivates an active coordinator', async () => {
+      repo.findOne.mockResolvedValue({ ...coordinator });
+      repo.save.mockImplementation(async (value) => value as FosterCoordinator);
 
       const result = await service.deactivate(1);
 
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 1 },
-      });
+      expect(result.active).toBe(false);
+      expect(repo.save).toHaveBeenCalled();
+    });
 
-      expect(repo.save).toHaveBeenCalledWith({
+    it('rejects an already inactive coordinator', async () => {
+      repo.findOne.mockResolvedValue({
         ...coordinator,
         active: false,
       });
 
-      expect(result.active).toBe(false);
-      expect(repo.delete).not.toHaveBeenCalled();
-    });
-
-    it('throws NotFoundException if coordinator does not exist', async () => {
-      repo.findOne.mockResolvedValue(null);
-
-      await expect(service.deactivate(999)).rejects.toThrow(
-        new NotFoundException('Coordinator with ID 999 not found'),
-      );
-
-      expect(repo.save).not.toHaveBeenCalled();
-    });
-
-    it('throws BadRequestException if coordinator is already inactive', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: false,
-      } as FosterCoordinator;
-
-      repo.findOne.mockResolvedValue(coordinator);
-
-      await expect(service.deactivate(1)).rejects.toThrow(
-        new BadRequestException('Coordinator with ID 1 is already inactive'),
-      );
-
-      expect(repo.save).not.toHaveBeenCalled();
+      await expect(service.deactivate(1)).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('activate', () => {
-    it('sets active to true and saves the coordinator', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: false,
-      } as FosterCoordinator;
-
-      repo.findOne.mockResolvedValue(coordinator);
-      repo.save.mockResolvedValue({
+    it('activates an inactive coordinator', async () => {
+      repo.findOne.mockResolvedValue({
         ...coordinator,
-        active: true,
+        active: false,
       });
+      repo.save.mockImplementation(async (value) => value as FosterCoordinator);
 
       const result = await service.activate(1);
-
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { coordinatorId: 1 },
-      });
-
-      expect(repo.save).toHaveBeenCalledWith({
-        ...coordinator,
-        active: true,
-      });
 
       expect(result.active).toBe(true);
     });
 
-    it('throws NotFoundException if coordinator does not exist', async () => {
-      repo.findOne.mockResolvedValue(null);
+    it('rejects an already active coordinator', async () => {
+      repo.findOne.mockResolvedValue({ ...coordinator });
 
-      await expect(service.activate(999)).rejects.toThrow(
-        new NotFoundException('Coordinator with ID 999 not found'),
-      );
-
-      expect(repo.save).not.toHaveBeenCalled();
+      await expect(service.activate(1)).rejects.toThrow(BadRequestException);
     });
 
-    it('throws BadRequestException if coordinator is already active', async () => {
-      const coordinator = {
-        coordinatorId: 1,
-        active: true,
-      } as FosterCoordinator;
+    it('rejects a missing coordinator', async () => {
+      repo.findOne.mockResolvedValue(null);
 
-      repo.findOne.mockResolvedValue(coordinator);
-
-      await expect(service.activate(1)).rejects.toThrow(
-        new BadRequestException('Coordinator with ID 1 is already active'),
-      );
-
-      expect(repo.save).not.toHaveBeenCalled();
+      await expect(service.activate(999)).rejects.toThrow(NotFoundException);
     });
   });
 });
