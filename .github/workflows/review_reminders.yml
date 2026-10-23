@@ -2,11 +2,11 @@ name: Review reminders
 
 on:
   schedule:
-    - cron: "0 14 * * *" 
-  workflow_dispatch: 
+    - cron: "0 1,13 * * *"
+  workflow_dispatch:
     inputs:
       test_user:
-        description: "Test mode: GitHub username to DM right now"
+        description: "Test mode: GitHub username to DM right now (skips the 48h rule, DMs only them)"
         required: false
         default: ""
 
@@ -37,9 +37,9 @@ jobs:
 
             // Group PRs by reviewer who still hasn't reviewed
             // (GitHub drops people from requested_reviewers once they review).
-            // Only include a PR when a reminder is due: 2, 4, 6... days after
-            // the reviewer was assigned, i.e. every ~48 hours.
-            const DAY = 24 * 60 * 60 * 1000;
+            // Only include a PR when a reminder is due: 36, 72, 108... hours after
+            // the reviewer was assigned, i.e. every ~36 hours.
+            const HALF_DAY = 12 * 60 * 60 * 1000;
             const pending = {};
             for (const pr of prs) {
               if (pr.draft || pr.requested_reviewers.length === 0) continue;
@@ -62,9 +62,9 @@ jobs:
               for (const r of pr.requested_reviewers) {
                 if (testUser && r.login !== testUser) continue;
                 const since = requestedAt[r.login];
-                const days = since ? Math.round((Date.now() - since) / DAY) : 0;
-                if (testUser || (since && days >= 2 && days % 2 === 0)) {
-                  (pending[r.login] ??= []).push({ ...pr, days });
+                const halfDays = since ? Math.round((Date.now() - since) / HALF_DAY) : 0;
+                if (testUser || (since && halfDays >= 3 && halfDays % 3 === 0)) {
+                  (pending[r.login] ??= []).push({ ...pr, hours: halfDays * 12 });
                 }
               }
             }
@@ -82,7 +82,7 @@ jobs:
                 continue;
               }
 
-              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}> (assigned ${p.days} days ago)`).join('\n');
+              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}> (assigned ~${p.hours}h ago)`).join('\n');
 
               const res = await fetch('https://slack.com/api/chat.postMessage', {
                 method: 'POST',
