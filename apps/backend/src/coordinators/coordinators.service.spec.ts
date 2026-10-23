@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -10,6 +11,7 @@ import { Repository } from 'typeorm';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
+import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { Homebase } from '../types';
@@ -18,6 +20,7 @@ describe('CoordinatorsService', () => {
   let service: CoordinatorsService;
   let repo: jest.Mocked<Repository<FosterCoordinator>>;
   let cognitoService: jest.Mocked<CognitoService>;
+  let loggerSpy: jest.SpyInstance;
 
   const dto: CreateCoordinatorDto = {
     firstName: 'Jane',
@@ -27,6 +30,11 @@ describe('CoordinatorsService', () => {
     email: 'jane.doe@mspca.org',
     password: 'Str0ng!Password',
     homebase: Homebase.BOSTON,
+  };
+
+  const confirmDto: ConfirmCoordinatorDto = {
+    email: dto.email,
+    code: '123456',
   };
 
   const coordinator = {
@@ -68,6 +76,12 @@ describe('CoordinatorsService', () => {
     service = module.get(CoordinatorsService);
     repo = module.get(getRepositoryToken(FosterCoordinator));
     cognitoService = module.get(CognitoService);
+
+    loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('create', () => {
@@ -78,16 +92,20 @@ describe('CoordinatorsService', () => {
 
       const result = await service.create(dto);
 
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        email: dto.email,
+      });
+
       expect(cognitoService.signUpUser).toHaveBeenCalledWith({
-        firstName: 'Jane',
-        lastName: 'Doe',
-        email: 'jane.doe@mspca.org',
-        password: 'Str0ng!Password',
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email,
+        password: dto.password,
       });
 
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: 'jane.doe@mspca.org',
+          email: dto.email,
           active: true,
           cognitoSub: 'cognito-sub-123',
         }),
@@ -95,21 +113,6 @@ describe('CoordinatorsService', () => {
 
       expect(repo.save.mock.calls[0][0]).not.toHaveProperty('password');
       expect(result).toBe(coordinator);
-    });
-
-    it('normalizes the email', async () => {
-      repo.findOneBy.mockResolvedValue(null);
-      cognitoService.signUpUser.mockResolvedValue('sub-123');
-      repo.save.mockResolvedValue(coordinator);
-
-      await service.create({
-        ...dto,
-        email: ' JANE.DOE@MSPCA.ORG ',
-      });
-
-      expect(repo.findOneBy).toHaveBeenCalledWith({
-        email: 'jane.doe@mspca.org',
-      });
     });
 
     it('rejects duplicate coordinators', async () => {
@@ -132,10 +135,12 @@ describe('CoordinatorsService', () => {
       expect(repo.save).not.toHaveBeenCalled();
     });
 
-    it('deletes the Cognito user when saving fails', async () => {
+    it('deletes the Cognito user when saving fails and logs the error', async () => {
+      const databaseError = new Error('Database error');
+
       repo.findOneBy.mockResolvedValue(null);
       cognitoService.signUpUser.mockResolvedValue('sub-123');
-      repo.save.mockRejectedValue(new Error('Database error'));
+      repo.save.mockRejectedValue(databaseError);
       cognitoService.deleteUser.mockResolvedValue(undefined);
 
       await expect(service.create(dto)).rejects.toThrow(
@@ -143,16 +148,35 @@ describe('CoordinatorsService', () => {
       );
 
       expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to save coordinator ${dto.email}`,
+        databaseError,
+      );
     });
 
-    it('returns a server error even if Cognito cleanup fails', async () => {
+    it('returns a server error and logs when Cognito cleanup fails', async () => {
+      const databaseError = new Error('Database error');
+      const cleanupError = new Error('Cleanup failed');
+
       repo.findOneBy.mockResolvedValue(null);
       cognitoService.signUpUser.mockResolvedValue('sub-123');
-      repo.save.mockRejectedValue(new Error('Database error'));
-      cognitoService.deleteUser.mockRejectedValue(new Error('Cleanup failed'));
+      repo.save.mockRejectedValue(databaseError);
+      cognitoService.deleteUser.mockRejectedValue(cleanupError);
 
       await expect(service.create(dto)).rejects.toThrow(
         InternalServerErrorException,
+      );
+
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to save coordinator ${dto.email}`,
+        databaseError,
+      );
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Created Cognito user sub-123 for ${dto.email}, but failed to save the coordinator or delete the Cognito user`,
       );
     });
   });
@@ -162,43 +186,60 @@ describe('CoordinatorsService', () => {
       repo.findOneBy.mockResolvedValue(coordinator);
       cognitoService.confirmUser.mockResolvedValue(undefined);
 
-      await service.confirm({
-        email: dto.email,
-        code: '123456',
+      await expect(service.confirm(confirmDto)).resolves.toBeUndefined();
+
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        email: confirmDto.email,
       });
 
       expect(cognitoService.confirmUser).toHaveBeenCalledWith(
-        dto.email,
-        '123456',
+        confirmDto.email,
+        confirmDto.code,
         CognitoRole.FosterCoordinator,
       );
     });
 
-    it('rejects confirmation without a coordinator profile', async () => {
+    it('rejects confirmation when the coordinator does not exist', async () => {
       repo.findOneBy.mockResolvedValue(null);
 
-      await expect(
-        service.confirm({
-          email: dto.email,
-          code: '123456',
-        }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.confirm(confirmDto)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(cognitoService.confirmUser).not.toHaveBeenCalled();
     });
 
-    it('propagates invalid-code errors', async () => {
-      repo.findOneBy.mockResolvedValue(coordinator);
-      cognitoService.confirmUser.mockRejectedValue(
-        new BadRequestException('Invalid verification code'),
-      );
+    it('propagates an invalid verification code error', async () => {
+      const error = new BadRequestException('Invalid verification code');
 
-      await expect(
-        service.confirm({
-          email: dto.email,
-          code: '000000',
-        }),
-      ).rejects.toThrow(BadRequestException);
+      repo.findOneBy.mockResolvedValue(coordinator);
+      cognitoService.confirmUser.mockRejectedValue(error);
+
+      await expect(service.confirm(confirmDto)).rejects.toBe(error);
+
+      expect(cognitoService.confirmUser).toHaveBeenCalledWith(
+        confirmDto.email,
+        confirmDto.code,
+        CognitoRole.FosterCoordinator,
+      );
+    });
+
+    it('propagates an expired verification code error', async () => {
+      const error = new BadRequestException('Verification code expired');
+
+      repo.findOneBy.mockResolvedValue(coordinator);
+      cognitoService.confirmUser.mockRejectedValue(error);
+
+      await expect(service.confirm(confirmDto)).rejects.toBe(error);
+    });
+
+    it('propagates Cognito server errors', async () => {
+      const error = new InternalServerErrorException('Failed to confirm user');
+
+      repo.findOneBy.mockResolvedValue(coordinator);
+      cognitoService.confirmUser.mockRejectedValue(error);
+
+      await expect(service.confirm(confirmDto)).rejects.toBe(error);
     });
   });
 

@@ -27,10 +27,15 @@ export class CoordinatorsService {
   /**
    * Registers a coordinator with Cognito and saves their profile.
    * Coordinators are active immediately and do not require approval.
+   *
+   * @param dto - The coordinator's registration information.
+   * @returns The newly created coordinator.
+   * @throws {ConflictException} If a coordinator with the email already exists.
+   * @throws {InternalServerErrorException} If saving the coordinator fails.
    */
   async create(dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
     const { password, ...profile } = dto;
-    const email = profile.email.trim().toLowerCase();
+    const { email } = profile;
 
     const existing = await this.repo.findOneBy({ email });
 
@@ -50,15 +55,11 @@ export class CoordinatorsService {
     try {
       return await this.repo.save({
         ...profile,
-        email,
         active: true,
         cognitoSub,
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to save coordinator ${email}`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error(`Failed to save coordinator ${email}`, error);
 
       try {
         await this.cognitoService.deleteUser(email);
@@ -73,11 +74,15 @@ export class CoordinatorsService {
   }
 
   /**
-   * Confirms the coordinator's email and assigns the
-   * FosterCoordinator Cognito role.
+   * Confirms a coordinator's email and assigns the FosterCoordinator Cognito role.
+   *
+   * @param dto - The coordinator's email and verification code.
+   * @returns A promise that resolves when confirmation is complete.
+   * @throws {NotFoundException} If no coordinator exists with the given email.
+   * @throws {BadRequestException} If the verification code is invalid or expired.
    */
   async confirm(dto: ConfirmCoordinatorDto): Promise<void> {
-    const email = dto.email.trim().toLowerCase();
+    const { email } = dto;
 
     const coordinator = await this.repo.findOneBy({ email });
 
@@ -93,7 +98,11 @@ export class CoordinatorsService {
   }
 
   /**
-   * Retrieves a coordinator by ID.
+   * Fetches a coordinator by their ID, including their assigned volunteers.
+   *
+   * @param id - The ID of the coordinator to retrieve.
+   * @returns The coordinator with their assigned volunteers.
+   * @throws {NotFoundException} If no coordinator exists with the given ID.
    */
   async findByIdOrFail(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.repo.findOne({
@@ -110,6 +119,11 @@ export class CoordinatorsService {
 
   /**
    * Deactivates an active coordinator.
+   *
+   * @param id - The ID of the coordinator to deactivate.
+   * @returns The updated coordinator.
+   * @throws {NotFoundException} If the coordinator does not exist.
+   * @throws {BadRequestException} If the coordinator is already inactive.
    */
   async deactivate(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.findByIdOrFail(id);
@@ -127,6 +141,11 @@ export class CoordinatorsService {
 
   /**
    * Reactivates an inactive coordinator.
+   *
+   * @param id - The ID of the coordinator to activate.
+   * @returns The updated coordinator.
+   * @throws {NotFoundException} If the coordinator does not exist.
+   * @throws {BadRequestException} If the coordinator is already active.
    */
   async activate(id: number): Promise<FosterCoordinator> {
     const coordinator = await this.findByIdOrFail(id);

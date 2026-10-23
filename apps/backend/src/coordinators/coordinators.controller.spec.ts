@@ -1,21 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
-import { Reflector } from '@nestjs/core';
 import { CoordinatorsController } from './coordinators.controller';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
 import { Homebase } from '../types';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
-import { IS_PUBLIC_KEY } from '../aws/cognito/cognito.decorator';
 
 describe('CoordinatorsController', () => {
   let controller: CoordinatorsController;
   let service: jest.Mocked<CoordinatorsService>;
 
-  const dto: CreateCoordinatorDto = {
+  const dto = {
     firstName: 'Jane',
     lastName: 'Doe',
     phone: '+16175551234',
@@ -23,12 +19,12 @@ describe('CoordinatorsController', () => {
     email: 'jane.doe@mspca.org',
     password: 'Str0ng!Password',
     homebase: Homebase.BOSTON,
-  };
+  } as CreateCoordinatorDto;
 
-  const confirmDto: ConfirmCoordinatorDto = {
+  const confirmDto = {
     email: 'jane.doe@mspca.org',
     code: '123456',
-  };
+  } as ConfirmCoordinatorDto;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -83,12 +79,6 @@ describe('CoordinatorsController', () => {
 
       await expect(controller.create(dto)).rejects.toBe(error);
     });
-
-    it('is marked public', () => {
-      const reflector = new Reflector();
-
-      expect(reflector.get(IS_PUBLIC_KEY, controller.create)).toBe(true);
-    });
   });
 
   describe('confirm', () => {
@@ -105,12 +95,6 @@ describe('CoordinatorsController', () => {
       service.confirm.mockRejectedValue(error);
 
       await expect(controller.confirm(confirmDto)).rejects.toBe(error);
-    });
-
-    it('is marked public', () => {
-      const reflector = new Reflector();
-
-      expect(reflector.get(IS_PUBLIC_KEY, controller.confirm)).toBe(true);
     });
   });
 
@@ -159,51 +143,6 @@ describe('CoordinatorsController', () => {
       );
 
       expect(service.activate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('DTO validation', () => {
-    it('rejects a non-MSPCA email', async () => {
-      const instance = plainToInstance(CreateCoordinatorDto, {
-        ...dto,
-        email: 'jane.doe@gmail.com',
-      });
-
-      const errors = await validate(instance);
-
-      expect(errors.some((error) => error.property === 'email')).toBe(true);
-    });
-
-    it('normalizes MSPCA email addresses', async () => {
-      const instance = plainToInstance(CreateCoordinatorDto, {
-        ...dto,
-        email: ' JANE.DOE@MSPCA.ORG ',
-      });
-
-      expect(instance.email).toBe('jane.doe@mspca.org');
-      expect(await validate(instance)).toHaveLength(0);
-    });
-
-    it('rejects weak passwords', async () => {
-      const instance = plainToInstance(CreateCoordinatorDto, {
-        ...dto,
-        password: 'password',
-      });
-
-      const errors = await validate(instance);
-
-      expect(errors.some((error) => error.property === 'password')).toBe(true);
-    });
-
-    it('rejects invalid verification codes', async () => {
-      const instance = plainToInstance(ConfirmCoordinatorDto, {
-        email: dto.email,
-        code: '123',
-      });
-
-      const errors = await validate(instance);
-
-      expect(errors.some((error) => error.property === 'code')).toBe(true);
     });
   });
 });

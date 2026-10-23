@@ -1,15 +1,8 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToMany,
-  Unique,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 
 @Entity('foster_coordinators')
-@Unique('UQ_foster_coordinators_email', ['email'])
 export class FosterCoordinator {
   @PrimaryGeneratedColumn({ name: 'coordinator_id' })
   coordinatorId!: number;
@@ -31,7 +24,7 @@ export class FosterCoordinator {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'enum', enum: Homebase })

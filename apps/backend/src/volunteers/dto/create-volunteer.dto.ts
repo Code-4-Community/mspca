@@ -6,6 +6,7 @@ import {
   IsStrongPassword,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
@@ -30,6 +31,9 @@ export class CreateVolunteerDto {
   @MaxLength(20)
   secondaryPhone?: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(255)
   email!: string;

@@ -11,15 +11,15 @@ export class AddCognitoSubToCoordinators1791234567890
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "admin_users"
-        ADD CONSTRAINT "UQ_admin_users_email" UNIQUE ("email")
+      ALTER TABLE "foster_volunteers"
+        ADD CONSTRAINT "UQ_foster_volunteers_email" UNIQUE ("email")
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      ALTER TABLE "admin_users"
-        DROP CONSTRAINT "UQ_admin_users_email"
+      ALTER TABLE "foster_volunteers"
+        DROP CONSTRAINT "UQ_foster_volunteers_email"
     `);
 
     await queryRunner.query(`
