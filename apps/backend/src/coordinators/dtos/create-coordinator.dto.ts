@@ -1,9 +1,11 @@
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
   IsStrongPassword,
+  IsString,
   Matches,
   MaxLength,
 } from 'class-validator';
@@ -39,7 +41,8 @@ export class CreateCoordinatorDto {
   })
   email!: string;
 
-  @IsNonEmptyString()
+  @IsString()
+  @IsNotEmpty()
   @IsStrongPassword({
     minLength: 8,
     minLowercase: 1,
