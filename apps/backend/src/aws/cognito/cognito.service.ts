@@ -1,8 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import {
@@ -12,11 +16,15 @@ import {
   AdminRemoveUserFromGroupCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { AccessTokenPayload, CognitoConfig } from './cognito.types';
 import { getCognitoConfig, isAuthDisabled } from './cognito.config';
 import { CreateCognitoUserDto } from './dtos/create-cognito-user.dto';
+import { SignUpCognitoUserDto } from './dtos/sign-up-cognito-user.dto';
 
 @Injectable()
 export class CognitoService {
@@ -89,10 +97,18 @@ export class CognitoService {
   }
 
   /**
-   * Creates a user in the Cognito user pool and assigns them to a group (role).
-   * Cognito sends a temporary-password email to the user automatically.
+   * Creates a user on someone else's behalf (e.g. an admin creating a Foster
+   * Coordinator) and assigns them to a group (role).
    *
+   * Uses an admin command, so the email is marked verified up front and Cognito
+   * emails the user a temporary password. Self-service sign-ups should use
+   * {@link signUpUser} instead so the user verifies their own email.
+   * If the user is created but can't be added to the group, they are deleted.
+   *
+   * @param dto - The user's name, email, and the role (group) to assign.
    * @returns The Cognito `sub` (unique user ID) for the newly created user.
+   * @throws {ConflictException} If a user with the email already exists.
+   * @throws {InternalServerErrorException} If the user could not be created or added to the group.
    */
   async createUser({
     firstName,
@@ -114,23 +130,177 @@ export class CognitoService {
       DesiredDeliveryMediums: ['EMAIL'],
     });
 
+    let sub: string | undefined;
     try {
       const response = await client.send(command);
-      const sub = response.User?.Attributes?.find(
+      sub = response.User?.Attributes?.find(
         (attr) => attr.Name === 'sub',
       )?.Value;
-
-      await this.addUserToGroup(email, role);
-
-      return sub ?? '';
     } catch (error) {
       if (error instanceof Error && error.name === 'UsernameExistsException') {
         throw new ConflictException('A user with this email already exists');
       }
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to create user: ${reason}`,
-      );
+      this.logger.error(`Failed to create user ${email}`, error);
+      throw new InternalServerErrorException('Failed to create user');
+    }
+
+    // Cognito should always return a sub for a created user; a missing one would
+    // only come from an AWS outage or internal bug.
+    if (!sub) {
+      this.logger.error(`Cognito returned no sub when creating ${email}`);
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
+      throw new InternalServerErrorException('Failed to create user');
+    }
+
+    try {
+      await this.addUserToGroup(email, role);
+    } catch (error) {
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
+      throw error;
+    }
+
+    return sub;
+  }
+
+  /**
+   * Registers a self-service user with the email and password they chose.
+   *
+   * Cognito emails the user a verification code; they can't sign in until it is
+   * passed to {@link confirmUser}. The user is not added to a group here, since
+   * that should only happen once their email is verified.
+   *
+   * @param dto - The user's name, email, and chosen password.
+   * @returns The Cognito `sub` (unique user ID) for the new, unconfirmed user.
+   * @throws {ConflictException} If a user with the email already exists.
+   * @throws {BadRequestException} If the password doesn't meet the policy, or Cognito rejects the email or password format.
+   * @throws {InternalServerErrorException} If the user could not be registered (the user is deleted if Cognito returned no sub).
+   */
+  async signUpUser({
+    firstName,
+    lastName,
+    email,
+    password,
+  }: SignUpCognitoUserDto): Promise<string> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new SignUpCommand({
+      ClientId: config.clientId,
+      Username: email,
+      Password: password,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'name', Value: `${firstName} ${lastName}` },
+      ],
+    });
+
+    let sub: string | undefined;
+    try {
+      const response = await client.send(command);
+      sub = response.UserSub;
+    } catch (error) {
+      // These messages go back to the client, so they're kept generic rather
+      // than passing through Cognito's own error text.
+      const name = error instanceof Error ? error.name : '';
+      if (name === 'UsernameExistsException') {
+        throw new ConflictException('A user with this email already exists');
+      }
+      if (name === 'InvalidPasswordException') {
+        throw new BadRequestException(
+          'Password does not meet the requirements',
+        );
+      }
+      // Thrown when a value fails Cognito's own format checks rather than the
+      // password policy: e.g. the email doesn't match the pool's username
+      // format, the password has leading or trailing spaces, or an attribute
+      // doesn't fit the pool's schema.
+      if (name === 'InvalidParameterException') {
+        throw new BadRequestException('Invalid email or password');
+      }
+      this.logger.error(`Failed to sign up user ${email}`, error);
+      throw new InternalServerErrorException('Failed to sign up user');
+    }
+
+    // Cognito should always return a sub for a registered user; a missing one
+    // would only come from an AWS outage or internal bug.
+    if (!sub) {
+      this.logger.error(`Cognito returned no sub when signing up ${email}`);
+      try {
+        await this.deleteUser(email);
+      } catch {
+        this.logger.error(`Failed to delete partially created user ${email}`);
+      }
+      throw new InternalServerErrorException('Failed to sign up user');
+    }
+
+    return sub;
+  }
+
+  /**
+   * Confirms a self-service user's email with the code Cognito sent them.
+   *
+   * @param email - The user's email (their Cognito username).
+   * @param code - The verification code from the sign-up email.
+   * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed (e.g. they already are).
+   * @throws {NotFoundException} If no user with the email exists.
+   * @throws {HttpException} 429 if there have been too many attempts.
+   * @throws {InternalServerErrorException} If confirmation fails.
+   */
+  async confirmUser(email: string, code: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new ConfirmSignUpCommand({
+      ClientId: config.clientId,
+      Username: email,
+      ConfirmationCode: code,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      // These messages go back to the client, so they're kept generic rather
+      // than passing through Cognito's own error text.
+      const name = error instanceof Error ? error.name : '';
+      if (name === 'CodeMismatchException') {
+        throw new BadRequestException('Invalid verification code');
+      }
+      if (name === 'ExpiredCodeException') {
+        throw new BadRequestException('Verification code has expired');
+      }
+      if (name === 'UserNotFoundException') {
+        throw new NotFoundException('No user with this email exists');
+      }
+      // Thrown when the user is already confirmed, or is in a state that can't
+      // be confirmed (e.g. disabled).
+      if (name === 'NotAuthorizedException') {
+        throw new BadRequestException(
+          'User cannot be confirmed, or is already confirmed',
+        );
+      }
+      // LimitExceededException: Cognito's attempt limit was hit after repeated
+      // wrong codes ("Attempt limit exceeded, please try after some time").
+      // TooManyFailedAttemptsException: too many failed attempts at this action
+      // for the user. Both clear after a cool-down, so the client should retry later.
+      if (
+        name === 'LimitExceededException' ||
+        name === 'TooManyFailedAttemptsException'
+      ) {
+        throw new HttpException(
+          'Too many attempts, please try again later',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      this.logger.error(`Failed to confirm user ${email}`, error);
+      throw new InternalServerErrorException('Failed to confirm user');
     }
   }
 
@@ -151,9 +321,8 @@ export class CognitoService {
         `Failed to add user ${username} to group ${groupName}`,
         error,
       );
-      const reason = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(
-        `Failed to add user to group ${groupName}: ${reason}`,
+        `Failed to add user to group ${groupName}`,
       );
     }
   }
@@ -174,9 +343,12 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to remove user ${username} from group ${groupName}`,
+        error,
+      );
       throw new InternalServerErrorException(
-        `Failed to remove user from group ${groupName}: ${reason}`,
+        `Failed to remove user from group ${groupName}`,
       );
     }
   }
@@ -193,10 +365,8 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to disable user: ${reason}`,
-      );
+      this.logger.error(`Failed to disable user ${email}`, error);
+      throw new InternalServerErrorException('Failed to disable user');
     }
   }
 
@@ -212,10 +382,34 @@ export class CognitoService {
     try {
       await client.send(command);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to enable user: ${reason}`,
-      );
+      this.logger.error(`Failed to enable user ${email}`, error);
+      throw new InternalServerErrorException('Failed to enable user');
+    }
+  }
+
+  /**
+   * Permanently deletes a user from the Cognito user pool.
+   *
+   * Also used to roll back users left half-created by {@link createUser},
+   * {@link signUpUser}, {@link confirmUser}, or a failed Volunteer save.
+   *
+   * @param email - The user's email (their Cognito username).
+   * @throws {InternalServerErrorException} If Cognito fails to delete the user.
+   */
+  async deleteUser(email: string): Promise<void> {
+    const config = this.requireConfig();
+    const client = this.getProviderClient();
+
+    const command = new AdminDeleteUserCommand({
+      UserPoolId: config.userPoolId,
+      Username: email,
+    });
+
+    try {
+      await client.send(command);
+    } catch (error) {
+      this.logger.error(`Failed to delete user ${email}`, error);
+      throw new InternalServerErrorException('Failed to delete user');
     }
   }
 }
