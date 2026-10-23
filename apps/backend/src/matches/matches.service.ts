@@ -14,7 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
-import { matchCanceledEmail } from '../emails/bodies/matchCanceled';
+import { matchCanceledEmail } from '../emails/matchCanceled';
 
 @Injectable()
 export class MatchesService {
@@ -179,13 +179,15 @@ export class MatchesService {
         match.status = MatchStatus.ACTIVE;
         const approvedMatch = await matchRepo.save(match);
 
+        if (otherMatches.length === 0) {
+          return { approvedMatch, applicantEmails: [] };
+        }
+
         for (const otherMatch of otherMatches) {
           otherMatch.status = MatchStatus.CANCELED;
         }
 
-        if (otherMatches.length > 0) {
-          await matchRepo.save(otherMatches);
-        }
+        await matchRepo.save(otherMatches);
 
         const applicantEmails = [
           ...new Set(
@@ -201,7 +203,7 @@ export class MatchesService {
 
       if (!senderEmail) {
         this.logger.error(
-          'Failed to send match cancellation emails: AWS_SES_SENDER_EMAIL is not configured',
+          `Failed to send match cancellation emails for approved match ${approvedMatch.matchId}: AWS_SES_SENDER_EMAIL is not configured`,
         );
       } else {
         const batchSize = 50;
@@ -220,7 +222,7 @@ export class MatchesService {
               `Failed to send match cancellation email batch ${
                 Math.floor(i / batchSize) + 1
               }.`,
-              error instanceof Error ? error.stack : String(error),
+              error,
             );
           }
         }

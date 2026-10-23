@@ -495,49 +495,56 @@ describe('MatchesService', () => {
         expect.stringContaining(
           'Failed to send match cancellation email batch',
         ),
-        expect.stringContaining('SES is down'),
+        expect.any(Error),
       );
     });
 
-    it('should not cancel matches for other animals', async () => {
-      const sameAnimalMatch = {
-        matchId: 2,
-        chameleonAnimalId: 42,
-        status: MatchStatus.PENDING,
-        volunteer: { email: 'volunteer2@gmail.com' },
-      } as Match;
+    it('should roll back approval if saving cancellations fails', async () => {
+      const persistedMatches = [
+        { ...mockMatch },
+        {
+          matchId: 2,
+          chameleonAnimalId: 42,
+          status: MatchStatus.PENDING,
+          volunteer: { email: 'volunteer2@gmail.com' },
+        },
+      ] as Match[];
 
-      const differentAnimalMatch = {
-        matchId: 3,
-        chameleonAnimalId: 43,
-        status: MatchStatus.PENDING,
-        volunteer: { email: 'volunteer3@gmail.com' },
-      } as Match;
+      const originalMatches = persistedMatches.map((match) => ({ ...match }));
 
-      const allMatches = [sameAnimalMatch, differentAnimalMatch];
+      transactionRepo.findOneBy.mockResolvedValue({ ...persistedMatches[0] });
+      transactionRepo.find.mockResolvedValue([{ ...persistedMatches[1] }]);
 
-      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
-      transactionRepo.find.mockImplementation(async (options) => {
-        expect(options.where.chameleonAnimalId).toBe(42);
+      transactionRepo.save.mockImplementation(async (value) => {
+        if (Array.isArray(value)) {
+          throw new Error('Cancellation save failed');
+        }
 
-        return allMatches.filter(
-          (match) =>
-            match.chameleonAnimalId === options.where.chameleonAnimalId &&
-            match.status === MatchStatus.PENDING &&
-            match.matchId !== 1,
-        );
+        persistedMatches[0] = { ...value };
+        return value;
       });
 
-      await service.approveMatch(1);
+      matchRepo.manager.transaction.mockImplementation(async (callback) => {
+        try {
+          return await callback(transactionManager);
+        } catch (error) {
+          persistedMatches.splice(
+            0,
+            persistedMatches.length,
+            ...originalMatches,
+          );
+          throw error;
+        }
+      });
 
-      expect(sameAnimalMatch.status).toBe(MatchStatus.CANCELED);
-      expect(differentAnimalMatch.status).toBe(MatchStatus.PENDING);
-      expect(transactionRepo.save).toHaveBeenCalledWith([sameAnimalMatch]);
-      expect(emailsService.sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          bccEmails: ['volunteer2@gmail.com'],
-        }),
+      await expect(service.approveMatch(1)).rejects.toThrow(
+        'Cancellation save failed',
       );
+
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+      expect(persistedMatches[0].status).toBe(MatchStatus.PENDING);
+      expect(persistedMatches[1].status).toBe(MatchStatus.PENDING);
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
     it('should send cancellation emails in batches of 50', async () => {
@@ -613,7 +620,7 @@ describe('MatchesService', () => {
       expect(error).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining('batch 2'),
-        expect.stringContaining('SES is down'),
+        expect.any(Error),
       );
 
       expect(transactionRepo.save).toHaveBeenCalledTimes(2);
