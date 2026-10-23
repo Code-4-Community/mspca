@@ -16,9 +16,11 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
-import { FosterVolunteer } from './volunteers.entity';
+import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
 import { CreateVolunteerDto } from './dto/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
+import { FosterVolunteer } from './volunteers.entity';
+import { FosterType } from './volunteers.types';
 import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
@@ -105,9 +107,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<Match[]> {
     validateId(volunteerId, 'Volunteer');
-
     await this.volunteersService.findByIdOrFail(volunteerId);
-
     return this.matchesService.findByVolunteerId(volunteerId);
   }
 
@@ -183,6 +183,43 @@ export class VolunteersController {
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
   }
 
+  @Patch('/:volunteerId/species-preferences')
+  @ApiOperation({ summary: "Update a volunteer's foster type preferences" })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of foster types",
+    schema: {
+      type: 'array',
+      items: { type: 'string', enum: Object.values(FosterType) },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid ID, inactive volunteer, empty request, overlapping changes, nonexistent removal, or duplicate addition',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async updateFosterTypePreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateFosterTypePreferencesDto,
+  ): Promise<FosterType[]> {
+    validateId(volunteerId, 'Volunteer');
+    if (!dto.added?.length && !dto.removed?.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
+    return this.volunteersService.updateFosterTypePreferences(volunteerId, dto);
+  }
+
   @ApiOperation({ summary: 'Approve a pending foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
@@ -190,10 +227,7 @@ export class VolunteersController {
     description: 'The volunteer was approved and emailed',
     type: FosterVolunteer,
   })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid ID',
-  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid ID' })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'The volunteer does not exist',
