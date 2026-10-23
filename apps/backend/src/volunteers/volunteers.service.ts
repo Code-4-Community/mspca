@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,7 +10,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { CognitoService } from '../aws/cognito/cognito.service';
+import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
 
@@ -20,6 +26,7 @@ export class VolunteersService {
   constructor(
     @InjectRepository(FosterVolunteer)
     private repo: Repository<FosterVolunteer>,
+    private cognitoService: CognitoService,
     private emailsService: EmailsService,
   ) {}
 
@@ -43,6 +50,113 @@ export class VolunteersService {
     }
 
     return volunteer;
+  }
+
+  /**
+   * Signs up a Volunteer account.
+   *
+   * The Cognito user is registered first; the Postgres row is only saved once
+   * that succeeds, so a Cognito failure never leaves a Volunteer without a login.
+   * If the save fails, the Cognito user is deleted so the email can be reused.
+   * Cognito emails the Volunteer a verification code, which they pass to
+   * {@link confirm}. New Volunteers are pending until a coordinator approves them.
+   *
+   * @param dto - The Volunteer's profile fields and chosen password.
+   * @returns The saved Volunteer.
+   * @throws {ConflictException} If a Volunteer or Cognito user with the email already exists.
+   * @throws {BadRequestException} If Cognito rejects the password.
+   * @throws {InternalServerErrorException} If the Cognito user could not be registered.
+   * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
+   */
+  async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+    // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
+    const { password, ...profile } = dto;
+    const email = profile.email.toLowerCase();
+
+    const existing = await this.repo.findOneBy({ email });
+    if (existing) {
+      throw new ConflictException('A volunteer with this email already exists');
+    }
+
+    const cognitoSub = await this.cognitoService.signUpUser({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email,
+      password,
+    });
+
+    try {
+      return await this.repo.save({
+        ...profile,
+        email,
+        status: VolunteerStatus.PENDING,
+        mostRecentWaiverSigned: true,
+        cognitoSub,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to save Volunteer ${email}`, error);
+      try {
+        await this.cognitoService.deleteUser(email);
+      } catch {
+        this.logger.error(
+          `Created Cognito user ${cognitoSub} for ${email} but failed to save the Volunteer or delete the Cognito user`,
+        );
+      }
+      throw new InternalServerErrorException('Failed to save the Volunteer');
+    }
+  }
+
+  /**
+   * Confirms a signed-up Volunteer's email and gives them the FosterVolunteer role.
+   *
+   * Only emails with a Volunteer row can be confirmed. The app client is public,
+   * so this stops someone who signed up directly with Cognito (skipping
+   * {@link create}) from getting the role without a Volunteer profile.
+   *
+   * If the role can't be added, both the Cognito user and the Volunteer are
+   * deleted so the Volunteer can sign up again with the same email.
+   *
+   * @param dto - The Volunteer's email and the verification code Cognito emailed them.
+   * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
+   * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
+   * @throws {HttpException} 429 if there have been too many attempts.
+   * @throws {InternalServerErrorException} If confirmation fails.
+   * @throws {InternalServerErrorException} If adding the role fails (the Cognito user and Volunteer are deleted).
+   */
+  async confirm(dto: ConfirmVolunteerDto): Promise<void> {
+    const email = dto.email.toLowerCase();
+
+    const volunteer = await this.repo.findOneBy({ email });
+    if (!volunteer) {
+      throw new NotFoundException('No volunteer with this email exists');
+    }
+
+    await this.cognitoService.confirmUser(email, dto.code);
+
+    try {
+      await this.cognitoService.addUserToGroup(
+        email,
+        CognitoRole.FosterVolunteer,
+      );
+    } catch {
+      // addUserToGroup already logs the Cognito error.
+      try {
+        await this.cognitoService.deleteUser(email);
+      } catch {
+        this.logger.error(
+          `Failed to delete Cognito user ${email} after adding the role failed`,
+        );
+      }
+      try {
+        await this.repo.delete({ volunteerId: volunteer.volunteerId });
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete Volunteer ${volunteer.volunteerId} after adding the role failed`,
+          error,
+        );
+      }
+      throw new InternalServerErrorException('Failed to confirm the Volunteer');
+    }
   }
 
   /**
@@ -181,5 +295,59 @@ export class VolunteersService {
    */
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.repo.find();
+  }
+
+  /**
+   * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
+   *
+   * Removals are applied first, then additions. Adding an ID that is already in the
+   * list does not create a duplicate.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The animal IDs to add and/or remove.
+   * @returns The Volunteer's updated list of animal IDs.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is not active, animals are removed from
+   * an empty list, an ID is in both the added and removed lists, or a removed ID is not in
+   * the Volunteer's preferences.
+   */
+  async updateAnimalPreferences(
+    id: number,
+    dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    // TODO: validate that all animals being added actually exist in our database
+    const volunteer = await this.findActiveOrFail(id);
+    const { added = [], removed = [] } = dto;
+    const removedSet = new Set(removed);
+    const preferences = new Set(volunteer.animalPreferences);
+
+    if (removed.length > 0 && preferences.size === 0) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} has no animal preferences to remove`,
+      );
+    }
+
+    const overlapping = added.filter((animalId) => removedSet.has(animalId));
+    if (overlapping.length > 0) {
+      throw new BadRequestException(
+        `Animal IDs cannot be both added and removed: ${overlapping.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    const missing = removed.filter((animalId) => !preferences.has(animalId));
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Animal IDs not in the volunteer's preferences: ${missing.join(', ')}`,
+      );
+    }
+
+    removed.forEach((animalId) => preferences.delete(animalId));
+    added.forEach((animalId) => preferences.add(animalId));
+
+    volunteer.animalPreferences = [...preferences];
+    const saved = await this.repo.save(volunteer);
+    return saved.animalPreferences;
   }
 }

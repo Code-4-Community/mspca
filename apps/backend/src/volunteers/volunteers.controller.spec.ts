@@ -10,8 +10,12 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { FosterType, VolunteerStatus } from './volunteers.types';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { Homebase } from '../types';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -24,12 +28,15 @@ describe('VolunteersController', () => {
   } as FosterVolunteer;
 
   let mockVolunteersService: {
+    create: jest.Mock;
+    confirm: jest.Mock;
     findByIdOrFail: jest.Mock;
     deactivate: jest.Mock;
     reactivate: jest.Mock;
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
     getAllVolunteers: jest.Mock;
+    updateAnimalPreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -40,12 +47,15 @@ describe('VolunteersController', () => {
 
   beforeEach(async () => {
     mockVolunteersService = {
+      create: jest.fn(),
+      confirm: jest.fn(),
       findByIdOrFail: jest.fn(),
       deactivate: jest.fn(),
       reactivate: jest.fn(),
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
       getAllVolunteers: jest.fn(),
+      updateAnimalPreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -62,6 +72,74 @@ describe('VolunteersController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('create', () => {
+    const dto = {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      phone: '617-555-0100',
+      email: 'jane@example.com',
+      address: '350 S Huntington Ave',
+      city: 'Boston',
+      zipcode: '02130',
+      homebase: Homebase.BOSTON,
+      residentAnimals: 'One cat',
+      fosterType: FosterType.CAT,
+      password: 'Str0ng!Password',
+    } as CreateVolunteerDto;
+
+    it('creates the volunteer through the service and returns it', async () => {
+      const volunteer = {
+        volunteerId: 1,
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer;
+      mockVolunteersService.create.mockResolvedValue(volunteer);
+
+      const result = await controller.create(dto);
+
+      expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+      expect(result).toBe(volunteer);
+    });
+
+    it.each([
+      new ConflictException('A volunteer with this email already exists'),
+      new BadRequestException('Password does not meet the requirements'),
+    ])('propagates %s thrown by the service', async (error) => {
+      mockVolunteersService.create.mockRejectedValue(error);
+
+      await expect(controller.create(dto)).rejects.toThrow(error);
+      expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+    });
+  });
+
+  describe('confirm', () => {
+    const dto = {
+      email: 'jane@example.com',
+      code: '123456',
+    } as ConfirmVolunteerDto;
+
+    it('confirms the volunteer through the service', async () => {
+      mockVolunteersService.confirm.mockResolvedValue(undefined);
+
+      await expect(controller.confirm(dto)).resolves.toBeUndefined();
+
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      mockVolunteersService.confirm.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
+      );
+
+      await expect(controller.confirm(dto)).rejects.toThrow(
+        new BadRequestException('Invalid verification code'),
+      );
+      expect(mockVolunteersService.confirm).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.confirm).toHaveBeenCalledWith(dto);
+    });
   });
 
   describe('getVolunteerMatches', () => {
@@ -272,6 +350,51 @@ describe('VolunteersController', () => {
       const result = await controller.getAllVolunteers();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('updateAnimalPreferences', () => {
+    it('returns the updated list from the service', async () => {
+      const dto = { added: [55], removed: [107] };
+      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([42, 55]);
+
+      const result = await controller.updateAnimalPreferences(1, dto);
+
+      expect(result).toEqual([42, 55]);
+      expect(
+        mockVolunteersService.updateAnimalPreferences,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(
+      'throws BadRequestException when neither list has IDs: %j',
+      async (body) => {
+        await expect(
+          controller.updateAnimalPreferences(
+            1,
+            body as UpdateAnimalPreferencesDto,
+          ),
+        ).rejects.toThrow(
+          new BadRequestException(
+            'At least one of added or removed must be provided',
+          ),
+        );
+        expect(
+          mockVolunteersService.updateAnimalPreferences,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('propagates errors thrown by the service', async () => {
+      mockVolunteersService.updateAnimalPreferences.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(
+        controller.updateAnimalPreferences(999, { added: [42] }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
     });
   });
 });
