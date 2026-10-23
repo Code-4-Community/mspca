@@ -365,9 +365,7 @@ describe('VolunteersController', () => {
     });
 
     it('rejects an invalid ID', async () => {
-      await expect(controller.approve(0)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(controller.approve(0)).rejects.toThrow(BadRequestException);
 
       expect(mockVolunteersService.approve).not.toHaveBeenCalled();
     });
