@@ -119,9 +119,6 @@ describe('MatchesService', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
@@ -212,6 +209,7 @@ describe('MatchesService', () => {
       matchRepo.save.mockImplementation((match) =>
         Promise.resolve({ matchId: 10, ...match }),
       );
+
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       const match = await service.create({
@@ -233,6 +231,7 @@ describe('MatchesService', () => {
       matchRepo.save.mockImplementation((match) =>
         Promise.resolve({ matchId: 10, ...match }),
       );
+
       const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
       const match = await service.create({
@@ -252,6 +251,7 @@ describe('MatchesService', () => {
       await expect(
         service.create({ volunteerId: 999, chameleonAnimalId: 42 }),
       ).rejects.toThrow(NotFoundException);
+
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
@@ -264,6 +264,7 @@ describe('MatchesService', () => {
       await expect(
         service.create({ volunteerId: 1, chameleonAnimalId: 42 }),
       ).rejects.toThrow(BadRequestException);
+
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
@@ -420,7 +421,7 @@ describe('MatchesService', () => {
 
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
       expect(emailsService.sendEmail).toHaveBeenCalledWith({
-        toEmail: 'test-sender@example.com',
+        toEmail: process.env.AWS_SES_SENDER_EMAIL,
         bccEmails: ['volunteer2@gmail.com', 'volunteer3@gmail.com'],
         subject: 'Foster Application Update',
         bodyHtml: expect.stringContaining('another'),
@@ -467,7 +468,7 @@ describe('MatchesService', () => {
       );
     });
 
-    it('should propagate an email failure through the transaction', async () => {
+    it('should approve and cancel matches even when email sending fails', async () => {
       const otherMatches = [
         {
           matchId: 2,
@@ -481,37 +482,169 @@ describe('MatchesService', () => {
       transactionRepo.find.mockResolvedValue(otherMatches);
       emailsService.sendEmail.mockRejectedValue(new Error('SES is down'));
 
-      await expect(service.approveMatch(1)).rejects.toThrow('SES is down');
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
+      const result = await service.approveMatch(1);
+
+      expect(result.status).toBe(MatchStatus.ACTIVE);
+      expect(otherMatches[0].status).toBe(MatchStatus.CANCELED);
       expect(matchRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(transactionRepo.save).toHaveBeenCalledTimes(2);
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to send match cancellation email batch',
+        ),
+        expect.stringContaining('SES is down'),
+      );
     });
 
-    it('should not affect matches for other animals', async () => {
-      const otherAnimalMatch = {
-        matchId: 4,
-        chameleonAnimalId: 43,
+    it('should not cancel matches for other animals', async () => {
+      const sameAnimalMatch = {
+        matchId: 2,
+        chameleonAnimalId: 42,
         status: MatchStatus.PENDING,
+        volunteer: { email: 'volunteer2@gmail.com' },
       } as Match;
 
+      const differentAnimalMatch = {
+        matchId: 3,
+        chameleonAnimalId: 43,
+        status: MatchStatus.PENDING,
+        volunteer: { email: 'volunteer3@gmail.com' },
+      } as Match;
+
+      const allMatches = [sameAnimalMatch, differentAnimalMatch];
+
       transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
-      transactionRepo.find.mockResolvedValue([]);
+      transactionRepo.find.mockImplementation(async (options) => {
+        expect(options.where.chameleonAnimalId).toBe(42);
+
+        return allMatches.filter(
+          (match) =>
+            match.chameleonAnimalId === options.where.chameleonAnimalId &&
+            match.status === MatchStatus.PENDING &&
+            match.matchId !== 1,
+        );
+      });
 
       await service.approveMatch(1);
 
-      expect(otherAnimalMatch.status).toBe(MatchStatus.PENDING);
-      expect(transactionRepo.find).toHaveBeenCalledWith({
-        where: {
+      expect(sameAnimalMatch.status).toBe(MatchStatus.CANCELED);
+      expect(differentAnimalMatch.status).toBe(MatchStatus.PENDING);
+      expect(transactionRepo.save).toHaveBeenCalledWith([sameAnimalMatch]);
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bccEmails: ['volunteer2@gmail.com'],
+        }),
+      );
+    });
+
+    it('should send cancellation emails in batches of 50', async () => {
+      const otherMatches = Array.from({ length: 105 }, (_, index) => ({
+        matchId: index + 2,
+        chameleonAnimalId: 42,
+        status: MatchStatus.PENDING,
+        volunteer: { email: `volunteer${index + 2}@gmail.com` },
+      })) as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      await service.approveMatch(1);
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(3);
+
+      const calls = emailsService.sendEmail.mock.calls;
+
+      expect(calls[0][0].bccEmails).toHaveLength(50);
+      expect(calls[1][0].bccEmails).toHaveLength(50);
+      expect(calls[2][0].bccEmails).toHaveLength(5);
+
+      expect(calls[0][0].toEmail).toBe(process.env.AWS_SES_SENDER_EMAIL);
+
+      const allRecipients = calls.flatMap((call) => call[0].bccEmails);
+
+      expect(allRecipients).toHaveLength(105);
+      expect(new Set(allRecipients).size).toBe(105);
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+      expect(
+        otherMatches.every((match) => match.status === MatchStatus.CANCELED),
+      ).toBe(true);
+    });
+
+    it('should continue sending batches when one batch fails', async () => {
+      const otherMatches = Array.from({ length: 105 }, (_, index) => ({
+        matchId: index + 2,
+        chameleonAnimalId: 42,
+        status: MatchStatus.PENDING,
+        volunteer: { email: `volunteer${index + 2}@gmail.com` },
+      })) as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      emailsService.sendEmail
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('SES is down'))
+        .mockResolvedValueOnce(undefined);
+
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const result = await service.approveMatch(1);
+
+      expect(result.status).toBe(MatchStatus.ACTIVE);
+      expect(
+        otherMatches.every((match) => match.status === MatchStatus.CANCELED),
+      ).toBe(true);
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(3);
+
+      const calls = emailsService.sendEmail.mock.calls;
+
+      expect(calls[0][0].bccEmails).toHaveLength(50);
+      expect(calls[1][0].bccEmails).toHaveLength(50);
+      expect(calls[2][0].bccEmails).toHaveLength(5);
+
+      expect(calls[0][0].bccEmails).toContain('volunteer2@gmail.com');
+      expect(calls[1][0].bccEmails).toContain('volunteer52@gmail.com');
+      expect(calls[2][0].bccEmails).toContain('volunteer102@gmail.com');
+
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('batch 2'),
+        expect.stringContaining('SES is down'),
+      );
+
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('should log a missing sender email without affecting approval', async () => {
+      delete process.env.AWS_SES_SENDER_EMAIL;
+
+      const otherMatches = [
+        {
+          matchId: 2,
           chameleonAnimalId: 42,
           status: MatchStatus.PENDING,
-          matchId: expect.objectContaining({
-            _type: 'not',
-            _value: 1,
-          }),
+          volunteer: { email: 'volunteer2@gmail.com' },
         },
-        relations: ['volunteer'],
-      });
+      ] as Match[];
+
+      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
+      transactionRepo.find.mockResolvedValue(otherMatches);
+
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      const result = await service.approveMatch(1);
+
+      expect(result.status).toBe(MatchStatus.ACTIVE);
+      expect(otherMatches[0].status).toBe(MatchStatus.CANCELED);
+      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('AWS_SES_SENDER_EMAIL is not configured'),
+      );
     });
 
     it('should throw NotFoundException when match does not exist', async () => {
@@ -520,6 +653,7 @@ describe('MatchesService', () => {
       await expect(service.approveMatch(999)).rejects.toThrow(
         new NotFoundException('Match with id 999 not found'),
       );
+
       expect(transactionRepo.findOneBy).toHaveBeenCalledWith({ matchId: 999 });
       expect(transactionRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
@@ -534,6 +668,7 @@ describe('MatchesService', () => {
       await expect(service.approveMatch(1)).rejects.toThrow(
         new BadRequestException('Match with id 1 is not pending'),
       );
+
       expect(transactionRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
       expect(transactionRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
@@ -563,6 +698,7 @@ describe('MatchesService', () => {
       await expect(service.denyMatch(999, 'Some reason')).rejects.toThrow(
         new NotFoundException('Match with id 999 not found'),
       );
+
       expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 999 });
       expect(matchRepo.save).not.toHaveBeenCalled();
     });
@@ -576,6 +712,7 @@ describe('MatchesService', () => {
       await expect(service.denyMatch(1, 'Some reason')).rejects.toThrow(
         new BadRequestException('Match with id 1 is not pending'),
       );
+
       expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
       expect(matchRepo.save).not.toHaveBeenCalled();
     });

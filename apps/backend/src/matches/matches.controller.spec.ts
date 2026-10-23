@@ -89,6 +89,7 @@ describe('MatchesController', () => {
       await expect(
         pipe.transform(body, { type: 'body', metatype: CreateMatchDto }),
       ).rejects.toThrow(BadRequestException);
+
       expect(service.create).not.toHaveBeenCalled();
     });
   });
@@ -141,40 +142,6 @@ describe('MatchesController', () => {
       expect(service.approveMatch).toHaveBeenCalledWith(1);
     });
 
-    it('should approve a match with multiple applicants', async () => {
-      const approvedMatch = {
-        ...mockMatch,
-        status: MatchStatus.ACTIVE,
-      } as Match;
-      service.approveMatch.mockResolvedValue(approvedMatch);
-
-      const result = await controller.approveMatch(1);
-
-      expect(result.status).toBe(MatchStatus.ACTIVE);
-      expect(service.approveMatch).toHaveBeenCalledTimes(1);
-      expect(service.approveMatch).toHaveBeenCalledWith(1);
-    });
-
-    it('should approve a match with only one applicant', async () => {
-      const approvedMatch = {
-        ...mockMatch,
-        status: MatchStatus.ACTIVE,
-      } as Match;
-      service.approveMatch.mockResolvedValue(approvedMatch);
-
-      const result = await controller.approveMatch(1);
-
-      expect(result.status).toBe(MatchStatus.ACTIVE);
-      expect(service.approveMatch).toHaveBeenCalledWith(1);
-    });
-
-    it('should propagate an email failure from the service', async () => {
-      service.approveMatch.mockRejectedValue(new Error('SES is down'));
-
-      await expect(controller.approveMatch(1)).rejects.toThrow('SES is down');
-      expect(service.approveMatch).toHaveBeenCalledWith(1);
-    });
-
     it('should throw NotFoundException when match does not exist', async () => {
       service.approveMatch.mockRejectedValue(
         new NotFoundException('Match with id 999 not found'),
@@ -215,6 +182,7 @@ describe('MatchesController', () => {
       );
 
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
+
       await expect(controller.denyMatch(999, dto)).rejects.toThrow(
         NotFoundException,
       );
@@ -222,9 +190,11 @@ describe('MatchesController', () => {
 
     it('should throw BadRequestException when id is invalid', async () => {
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
+
       await expect(controller.denyMatch(0, dto)).rejects.toThrow(
         BadRequestException,
       );
+
       expect(service.denyMatch).not.toHaveBeenCalled();
     });
   });

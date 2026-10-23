@@ -144,9 +144,8 @@ export class MatchesService {
 
   /**
    * Approves a pending match and cancels other pending matches for the same animal.
-   * Sends one email to the other applicants using BCC to protect their privacy.
-   * Approval and cancellation are performed in a transaction so that an email
-   * failure rolls back all status changes.
+   * Sends cancellation emails to affected applicants in batches of up to 50.
+   * Email failures are logged without affecting the committed match statuses.
    *
    * @param id - ID of the match to approve
    * @returns The updated match with status Active
@@ -154,37 +153,39 @@ export class MatchesService {
    * @throws BadRequestException if the match is not Pending
    */
   async approveMatch(id: number): Promise<Match> {
-    return this.repo.manager.transaction(async (manager) => {
-      const matchRepo = manager.getRepository(Match);
+    const { approvedMatch, applicantEmails } =
+      await this.repo.manager.transaction(async (manager) => {
+        const matchRepo = manager.getRepository(Match);
 
-      const match = await matchRepo.findOneBy({ matchId: id });
+        const match = await matchRepo.findOneBy({ matchId: id });
 
-      if (!match) {
-        throw new NotFoundException(`Match with id ${id} not found`);
-      }
+        if (!match) {
+          throw new NotFoundException(`Match with id ${id} not found`);
+        }
 
-      if (match.status !== MatchStatus.PENDING) {
-        throw new BadRequestException(`Match with id ${id} is not pending`);
-      }
+        if (match.status !== MatchStatus.PENDING) {
+          throw new BadRequestException(`Match with id ${id} is not pending`);
+        }
 
-      const otherMatches = await matchRepo.find({
-        where: {
-          chameleonAnimalId: match.chameleonAnimalId,
-          status: MatchStatus.PENDING,
-          matchId: Not(id),
-        },
-        relations: ['volunteer'],
-      });
+        const otherMatches = await matchRepo.find({
+          where: {
+            chameleonAnimalId: match.chameleonAnimalId,
+            status: MatchStatus.PENDING,
+            matchId: Not(id),
+          },
+          relations: ['volunteer'],
+        });
 
-      match.status = MatchStatus.ACTIVE;
-      const approvedMatch = await matchRepo.save(match);
+        match.status = MatchStatus.ACTIVE;
+        const approvedMatch = await matchRepo.save(match);
 
-      if (otherMatches.length > 0) {
         for (const otherMatch of otherMatches) {
           otherMatch.status = MatchStatus.CANCELED;
         }
 
-        await matchRepo.save(otherMatches);
+        if (otherMatches.length > 0) {
+          await matchRepo.save(otherMatches);
+        }
 
         const applicantEmails = [
           ...new Set(
@@ -192,21 +193,41 @@ export class MatchesService {
           ),
         ];
 
-        const senderEmail = process.env.AWS_SES_SENDER_EMAIL;
+        return { approvedMatch, applicantEmails };
+      });
 
-        if (!senderEmail) {
-          throw new Error('AWS_SES_SENDER_EMAIL is not configured');
+    if (applicantEmails.length > 0) {
+      const senderEmail = process.env.AWS_SES_SENDER_EMAIL;
+
+      if (!senderEmail) {
+        this.logger.error(
+          'Failed to send match cancellation emails: AWS_SES_SENDER_EMAIL is not configured',
+        );
+      } else {
+        const batchSize = 50;
+
+        for (let i = 0; i < applicantEmails.length; i += batchSize) {
+          const batch = applicantEmails.slice(i, i + batchSize);
+
+          try {
+            await this.emailsService.sendEmail({
+              toEmail: senderEmail,
+              bccEmails: batch,
+              ...matchCanceledEmail(),
+            });
+          } catch (error) {
+            this.logger.error(
+              `Failed to send match cancellation email batch ${
+                Math.floor(i / batchSize) + 1
+              }.`,
+              error instanceof Error ? error.stack : String(error),
+            );
+          }
         }
-
-        await this.emailsService.sendEmail({
-          toEmail: senderEmail,
-          bccEmails: applicantEmails,
-          ...matchCanceledEmail(),
-        });
       }
+    }
 
-      return approvedMatch;
-    });
+    return approvedMatch;
   }
 
   /**
@@ -221,15 +242,18 @@ export class MatchesService {
    */
   async denyMatch(id: number, deniedReason: string): Promise<Match> {
     const match = await this.repo.findOneBy({ matchId: id });
+
     if (!match) {
       throw new NotFoundException(`Match with id ${id} not found`);
     }
+
     if (match.status !== MatchStatus.PENDING) {
       throw new BadRequestException(`Match with id ${id} is not pending`);
     }
 
     match.status = MatchStatus.DENIED;
     match.deniedReason = deniedReason;
+
     return this.repo.save(match);
   }
 }
