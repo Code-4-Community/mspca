@@ -1,0 +1,101 @@
+name: Review reminders
+
+on:
+  schedule:
+    - cron: "0 14 * * *" 
+  workflow_dispatch: 
+    inputs:
+      test_user:
+        description: "Test mode: GitHub username to DM right now"
+        required: false
+        default: ""
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          REVIEWER_SLACK_IDS: ${{ vars.REVIEWER_SLACK_IDS }}
+          TEST_USER: ${{ inputs.test_user }}
+        with:
+          script: |
+            const slackIds = JSON.parse(process.env.REVIEWER_SLACK_IDS || '{}');
+            const testUser = (process.env.TEST_USER || '').trim();
+
+            // All open PRs in this repo
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            // Group PRs by reviewer who still hasn't reviewed
+            // (GitHub drops people from requested_reviewers once they review).
+            // Only include a PR when a reminder is due: 2, 4, 6... days after
+            // the reviewer was assigned, i.e. every ~48 hours.
+            const DAY = 24 * 60 * 60 * 1000;
+            const pending = {};
+            for (const pr of prs) {
+              if (pr.draft || pr.requested_reviewers.length === 0) continue;
+
+              // When was each reviewer (most recently) requested on this PR?
+              // Read-only: this never assigns or changes reviewers.
+              const events = await github.paginate(github.rest.issues.listEvents, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              });
+              const requestedAt = {};
+              for (const e of events) {
+                if (e.event === 'review_requested' && e.requested_reviewer) {
+                  requestedAt[e.requested_reviewer.login] = new Date(e.created_at); // re-requests overwrite
+                }
+              }
+
+              for (const r of pr.requested_reviewers) {
+                if (testUser && r.login !== testUser) continue;
+                const since = requestedAt[r.login];
+                const days = since ? Math.round((Date.now() - since) / DAY) : 0;
+                if (testUser || (since && days >= 2 && days % 2 === 0)) {
+                  (pending[r.login] ??= []).push({ ...pr, days });
+                }
+              }
+            }
+
+            if (Object.keys(pending).length === 0) {
+              core.info('No reminders due today 🎉');
+              return;
+            }
+
+            // DM each person; only people in the REVIEWER_SLACK_IDS mapping get pinged
+            for (const [login, list] of Object.entries(pending)) {
+              const slackId = slackIds[login];
+              if (!slackId) {
+                core.info(`Skipping ${login} (not in REVIEWER_SLACK_IDS)`);
+                continue;
+              }
+
+              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}> (assigned ${p.days} days ago)`).join('\n');
+
+              const res = await fetch('https://slack.com/api/chat.postMessage', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json; charset=utf-8',
+                  Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+                },
+                body: JSON.stringify({
+                  channel: slackId, // a user ID here sends a DM from the bot
+                  text: `:eyes: Hey! These PRs are still waiting on your review:\n${links}`,
+                }),
+              });
+
+              const data = await res.json();
+              if (!data.ok) core.warning(`Slack error for ${login}: ${data.error}`);
+            }
