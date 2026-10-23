@@ -1,12 +1,14 @@
 import {
-  Controller,
-  Patch,
-  Get,
-  Param,
-  Body,
-  HttpStatus,
-  ParseIntPipe,
   BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { VolunteersService } from './volunteers.service';
@@ -16,6 +18,9 @@ import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -24,6 +29,66 @@ export class VolunteersController {
     private volunteersService: VolunteersService,
     private matchesService: MatchesService,
   ) {}
+
+  @Public()
+  @Post()
+  @ApiOperation({ summary: 'Create a foster volunteer account' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description:
+      'The volunteer was created and is pending approval; a verification code was emailed to them',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'A required field is missing or invalid, or the password does not meet the policy',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'A volunteer with this email already exists',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description:
+      'The Cognito user could not be created; or the volunteer could not be saved and the Cognito user was deleted; ' +
+      'or the save and the Cognito cleanup both failed (the orphaned Cognito user is logged)',
+  })
+  async create(@Body() dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+    return this.volunteersService.create(dto);
+  }
+
+  @Public()
+  @Post('/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Confirm a foster volunteer's email with their verification code",
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The email was confirmed and the volunteer can sign in',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The code is not 6 digits, is wrong or has expired, or the volunteer cannot be confirmed or is already confirmed',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No volunteer with this email exists',
+  })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many attempts; try again later',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description:
+      'Confirmation failed, or the volunteer could not be given their role and their Cognito user was deleted',
+  })
+  async confirm(@Body() dto: ConfirmVolunteerDto): Promise<void> {
+    await this.volunteersService.confirm(dto);
+  }
 
   @Get('/:volunteerId/matches')
   @ApiOperation({ summary: 'Get all Matches for a Volunteer' })
