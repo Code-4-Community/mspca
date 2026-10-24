@@ -227,16 +227,21 @@ export class VolunteersService {
    *
    * @param id - The Volunteer's ID.
    * @param homebase - The new homebase.
-   * @returns The updated Volunteer, with their new assigned coordinators.
+   * @returns The updated Volunteer, with their new homebase and assigned coordinators.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
-   * @throws {BadRequestException} If the Volunteer is not active, or is already
+   * @throws {BadRequestException} If the Volunteer is inactive, or is already
    * at the homebase.
    */
   async changeHomebase(
     id: number,
     homebase: Homebase,
   ): Promise<FosterVolunteer> {
-    const volunteer = await this.findActiveOrFail(id);
+    const volunteer = await this.findByIdOrFail(id);
+
+    // Pending Volunteers can still fix the homebase they picked at sign-up.
+    if (volunteer.status === VolunteerStatus.INACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is inactive`);
+    }
 
     if (volunteer.homebase === homebase) {
       throw new BadRequestException(
@@ -252,16 +257,18 @@ export class VolunteersService {
     const saved = await this.repo.save(volunteer);
 
     // A coordinator has one homebase, so the old and new lists never overlap.
-    await this.notifyCoordinators(
-      previous,
-      coordinatorLostVolunteerEmail(saved, homebase),
-      saved.volunteerId,
-    );
-    await this.notifyCoordinators(
-      next,
-      coordinatorGainedVolunteerEmail(saved),
-      saved.volunteerId,
-    );
+    await Promise.all([
+      this.notifyCoordinators(
+        previous,
+        coordinatorLostVolunteerEmail(saved, homebase),
+        saved.volunteerId,
+      ),
+      this.notifyCoordinators(
+        next,
+        coordinatorGainedVolunteerEmail(saved),
+        saved.volunteerId,
+      ),
+    ]);
 
     return saved;
   }
@@ -270,6 +277,10 @@ export class VolunteersService {
    * Sends one email to the sender address with the coordinators cc'd.
    * Logs a warning and sends nothing when there are no coordinators, and logs
    * a failed send instead of throwing.
+   *
+   * @param coordinators - The coordinators to cc.
+   * @param email - The email's subject and body.
+   * @param volunteerId - The Volunteer the email is about, for log messages.
    */
   private async notifyCoordinators(
     coordinators: FosterCoordinator[],

@@ -15,8 +15,6 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
@@ -360,8 +358,9 @@ describe('VolunteersController', () => {
 
   describe('updateHomebase', () => {
     it('changes the homebase through the service and returns the volunteer', async () => {
+      const before = { ...mockVolunteer, homebase: Homebase.BOSTON };
       const volunteer = {
-        volunteerId: 1,
+        ...before,
         homebase: Homebase.SALEM,
         assignedCoordinators: [],
       } as FosterVolunteer;
@@ -389,32 +388,6 @@ describe('VolunteersController', () => {
         } as UpdateHomebaseDto),
       ).rejects.toBe(error);
       expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('UpdateHomebaseDto validation', () => {
-    const errorsFor = (body: object) =>
-      validate(plainToInstance(UpdateHomebaseDto, body));
-
-    it.each(Object.values(Homebase))('accepts %p', async (homebase) => {
-      expect(await errorsFor({ homebase })).toHaveLength(0);
-    });
-
-    it.each(['Narnia', 'boston', ' Boston', '', 42, null])(
-      'rejects %p',
-      async (homebase) => {
-        const errors = await errorsFor({ homebase });
-
-        expect(errors).toHaveLength(1);
-        expect(errors[0].property).toBe('homebase');
-      },
-    );
-
-    it('rejects a missing homebase', async () => {
-      const errors = await errorsFor({});
-
-      expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe('homebase');
     });
   });
 

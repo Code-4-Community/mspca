@@ -257,6 +257,7 @@ export class VolunteersController {
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 
+  @Patch('/:id/homebase')
   @ApiOperation({
     summary:
       "Change a foster volunteer's homebase and reassign their coordinators",
@@ -271,13 +272,12 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'The homebase is missing, invalid, or the same as the current homebase',
+      'The volunteer ID is invalid, the volunteer is inactive, or the homebase is missing, invalid, or the same as the current homebase',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'No volunteer exists with the ID',
   })
-  @Patch('/:id/homebase')
   async updateHomebase(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateHomebaseDto,

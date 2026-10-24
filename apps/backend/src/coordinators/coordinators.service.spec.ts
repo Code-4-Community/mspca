@@ -87,6 +87,7 @@ describe('CoordinatorsService', () => {
         { coordinatorId: 1, homebase: Homebase.BOSTON, active: true },
         { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
         { coordinatorId: 3, homebase: Homebase.CAPE_COD, active: true },
+        { coordinatorId: 4, homebase: Homebase.CAPE_COD, active: false },
       ] as FosterCoordinator[];
       repo.find.mockImplementation(
         async ({ where }: { where: Partial<FosterCoordinator> }) =>
