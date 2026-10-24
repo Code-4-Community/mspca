@@ -88,6 +88,7 @@ export class FosterVolunteer {
   @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
+    { onDelete: 'CASCADE' },
   )
   @JoinTable({
     name: 'volunteer_coordinator_assignments',
