@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterCoordinator } from './coordinators.entity';
+import { Homebase } from '../types';
 
 @Injectable()
 export class CoordinatorsService {
@@ -31,6 +32,19 @@ export class CoordinatorsService {
     }
 
     return coordinator;
+  }
+
+  /**
+   * Fetches the active Coordinators at a homebase.
+   *
+   * @param homebase - The homebase to look up.
+   * @returns The active Coordinators, ordered by ID, or an empty array if none.
+   */
+  findActiveByHomebase(homebase: Homebase): Promise<FosterCoordinator[]> {
+    return this.repo.find({
+      where: { homebase, active: true },
+      order: { coordinatorId: 'ASC' },
+    });
   }
 
   /**

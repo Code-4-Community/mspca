@@ -15,6 +15,7 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
+import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
 describe('VolunteersController', () => {
@@ -36,6 +37,7 @@ describe('VolunteersController', () => {
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
     getAllVolunteers: jest.Mock;
+    changeHomebase: jest.Mock;
     updateAnimalPreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
@@ -55,6 +57,7 @@ describe('VolunteersController', () => {
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
       getAllVolunteers: jest.fn(),
+      changeHomebase: jest.fn(),
       updateAnimalPreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
@@ -350,6 +353,41 @@ describe('VolunteersController', () => {
       const result = await controller.getAllVolunteers();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('updateHomebase', () => {
+    it('changes the homebase through the service and returns the volunteer', async () => {
+      const before = { ...mockVolunteer, homebase: Homebase.BOSTON };
+      const volunteer = {
+        ...before,
+        homebase: Homebase.SALEM,
+        assignedCoordinators: [],
+      } as FosterVolunteer;
+      mockVolunteersService.changeHomebase.mockResolvedValue(volunteer);
+
+      const result = await controller.updateHomebase(1, {
+        homebase: Homebase.SALEM,
+      } as UpdateHomebaseDto);
+
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledWith(
+        1,
+        Homebase.SALEM,
+      );
+      expect(result).toBe(volunteer);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      const error = new NotFoundException('Volunteer with ID 1 not found');
+      mockVolunteersService.changeHomebase.mockRejectedValue(error);
+
+      await expect(
+        controller.updateHomebase(1, {
+          homebase: Homebase.SALEM,
+        } as UpdateHomebaseDto),
+      ).rejects.toBe(error);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
     });
   });
 

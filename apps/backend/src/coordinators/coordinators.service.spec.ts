@@ -3,14 +3,21 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
+import { Homebase } from '../types';
 
 describe('CoordinatorsService', () => {
   let service: CoordinatorsService;
-  let repo: { findOne: jest.Mock; save: jest.Mock; delete: jest.Mock };
+  let repo: {
+    findOne: jest.Mock;
+    find: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
 
   beforeEach(async () => {
     repo = {
       findOne: jest.fn(),
+      find: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
     };
@@ -54,6 +61,54 @@ describe('CoordinatorsService', () => {
       expect(repo.findOne).toHaveBeenCalledWith({
         where: { coordinatorId: 7 },
       });
+    });
+  });
+
+  describe('findActiveByHomebase', () => {
+    it('returns the active coordinators at the homebase ordered by id', async () => {
+      const coordinators = [
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 5, homebase: Homebase.SALEM, active: true },
+      ] as FosterCoordinator[];
+      repo.find.mockResolvedValue(coordinators);
+
+      const result = await service.findActiveByHomebase(Homebase.SALEM);
+
+      expect(result).toBe(coordinators);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+      expect(repo.find).toHaveBeenCalledWith({
+        where: { homebase: Homebase.SALEM, active: true },
+        order: { coordinatorId: 'ASC' },
+      });
+    });
+
+    it('does not return coordinators from other homebases', async () => {
+      const coordinators = [
+        { coordinatorId: 1, homebase: Homebase.BOSTON, active: true },
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 3, homebase: Homebase.CAPE_COD, active: true },
+        { coordinatorId: 4, homebase: Homebase.CAPE_COD, active: false },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(
+        async ({ where }: { where: Partial<FosterCoordinator> }) =>
+          coordinators.filter(
+            (c) => c.homebase === where.homebase && c.active === where.active,
+          ),
+      );
+
+      const result = await service.findActiveByHomebase(Homebase.SALEM);
+
+      expect(result).toEqual([coordinators[1]]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns an empty array when the homebase has no active coordinators', async () => {
+      repo.find.mockResolvedValue([]);
+
+      const result = await service.findActiveByHomebase(Homebase.CAPE_COD);
+
+      expect(result).toEqual([]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
     });
   });
 
