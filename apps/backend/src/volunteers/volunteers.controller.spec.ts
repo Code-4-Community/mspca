@@ -11,13 +11,14 @@ import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
-import { CreateVolunteerDto } from './dto/create-volunteer.dto';
-import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { UpdateHomebaseDto } from './dto/update-homebase.dto';
+import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -39,6 +40,7 @@ describe('VolunteersController', () => {
     approve: jest.Mock;
     getAllVolunteers: jest.Mock;
     changeHomebase: jest.Mock;
+    updateAnimalPreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -58,6 +60,7 @@ describe('VolunteersController', () => {
       approve: jest.fn(),
       getAllVolunteers: jest.fn(),
       changeHomebase: jest.fn(),
+      updateAnimalPreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -412,6 +415,51 @@ describe('VolunteersController', () => {
 
       expect(errors).toHaveLength(1);
       expect(errors[0].property).toBe('homebase');
+    });
+  });
+
+  describe('updateAnimalPreferences', () => {
+    it('returns the updated list from the service', async () => {
+      const dto = { added: [55], removed: [107] };
+      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([42, 55]);
+
+      const result = await controller.updateAnimalPreferences(1, dto);
+
+      expect(result).toEqual([42, 55]);
+      expect(
+        mockVolunteersService.updateAnimalPreferences,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(
+      'throws BadRequestException when neither list has IDs: %j',
+      async (body) => {
+        await expect(
+          controller.updateAnimalPreferences(
+            1,
+            body as UpdateAnimalPreferencesDto,
+          ),
+        ).rejects.toThrow(
+          new BadRequestException(
+            'At least one of added or removed must be provided',
+          ),
+        );
+        expect(
+          mockVolunteersService.updateAnimalPreferences,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('propagates errors thrown by the service', async () => {
+      mockVolunteersService.updateAnimalPreferences.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(
+        controller.updateAnimalPreferences(999, { added: [42] }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
     });
   });
 });

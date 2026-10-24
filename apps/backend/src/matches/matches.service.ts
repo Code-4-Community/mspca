@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
@@ -15,6 +15,7 @@ import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { escapeHtml } from '../utils/emails.utils';
+import { matchCanceledEmail } from '../emails/matchCanceled';
 
 @Injectable()
 export class MatchesService {
@@ -151,25 +152,93 @@ export class MatchesService {
   }
 
   /**
-   * Approves a pending match.
-   * Sets the match status to Active, meaning the foster placement is now happening.
-   * Only matches that are currently Pending can be approved.
+   * Approves a pending match and cancels other pending matches for the same animal.
+   * Sends cancellation emails to affected applicants in batches of up to 50.
+   * Email failures are logged without affecting the committed match statuses.
+   *
    * @param id - ID of the match to approve
    * @returns The updated match with status Active
    * @throws NotFoundException if no match exists with the given ID
    * @throws BadRequestException if the match is not Pending
    */
   async approveMatch(id: number): Promise<Match> {
-    const match = await this.repo.findOneBy({ matchId: id });
-    if (!match) {
-      throw new NotFoundException(`Match with id ${id} not found`);
-    }
-    if (match.status !== MatchStatus.PENDING) {
-      throw new BadRequestException(`Match with id ${id} is not pending`);
+    const { approvedMatch, applicantEmails } =
+      await this.repo.manager.transaction(async (manager) => {
+        const matchRepo = manager.getRepository(Match);
+
+        const match = await matchRepo.findOneBy({ matchId: id });
+
+        if (!match) {
+          throw new NotFoundException(`Match with id ${id} not found`);
+        }
+
+        if (match.status !== MatchStatus.PENDING) {
+          throw new BadRequestException(`Match with id ${id} is not pending`);
+        }
+
+        const otherMatches = await matchRepo.find({
+          where: {
+            chameleonAnimalId: match.chameleonAnimalId,
+            status: MatchStatus.PENDING,
+            matchId: Not(id),
+          },
+          relations: ['volunteer'],
+        });
+
+        match.status = MatchStatus.ACTIVE;
+        const approvedMatch = await matchRepo.save(match);
+
+        if (otherMatches.length === 0) {
+          return { approvedMatch, applicantEmails: [] };
+        }
+
+        for (const otherMatch of otherMatches) {
+          otherMatch.status = MatchStatus.CANCELED;
+        }
+
+        await matchRepo.save(otherMatches);
+
+        const applicantEmails = [
+          ...new Set(
+            otherMatches.map((otherMatch) => otherMatch.volunteer.email),
+          ),
+        ];
+
+        return { approvedMatch, applicantEmails };
+      });
+
+    if (applicantEmails.length > 0) {
+      const senderEmail = process.env.AWS_SES_SENDER_EMAIL;
+
+      if (!senderEmail) {
+        this.logger.error(
+          `Failed to send match cancellation emails for approved match ${approvedMatch.matchId}: AWS_SES_SENDER_EMAIL is not configured`,
+        );
+      } else {
+        const batchSize = 50;
+
+        for (let i = 0; i < applicantEmails.length; i += batchSize) {
+          const batch = applicantEmails.slice(i, i + batchSize);
+
+          try {
+            await this.emailsService.sendEmail({
+              toEmail: senderEmail,
+              bccEmails: batch,
+              ...matchCanceledEmail(),
+            });
+          } catch (error) {
+            this.logger.error(
+              `Failed to send match cancellation email batch ${
+                Math.floor(i / batchSize) + 1
+              }.`,
+              error,
+            );
+          }
+        }
+      }
     }
 
-    match.status = MatchStatus.ACTIVE;
-    return this.repo.save(match);
+    return approvedMatch;
   }
 
   /**
@@ -184,15 +253,18 @@ export class MatchesService {
    */
   async denyMatch(id: number, deniedReason: string): Promise<Match> {
     const match = await this.repo.findOneBy({ matchId: id });
+
     if (!match) {
       throw new NotFoundException(`Match with id ${id} not found`);
     }
+
     if (match.status !== MatchStatus.PENDING) {
       throw new BadRequestException(`Match with id ${id} is not pending`);
     }
 
     match.status = MatchStatus.DENIED;
     match.deniedReason = deniedReason;
+
     return this.repo.save(match);
   }
 }

@@ -77,6 +77,14 @@ export class FosterVolunteer {
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
 
+  @Column({
+    name: 'animal_preferences',
+    type: 'int',
+    array: true,
+    default: () => "'{}'",
+  })
+  animalPreferences!: number[];
+
   @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,

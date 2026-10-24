@@ -15,11 +15,12 @@ import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
-import { CreateVolunteerDto } from './dto/create-volunteer.dto';
-import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
-import { UpdateHomebaseDto } from './dto/update-homebase.dto';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Volunteers')
@@ -220,6 +221,40 @@ export class VolunteersController {
   })
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.volunteersService.getAllVolunteers();
+  }
+
+  @Patch('/:volunteerId/animal-preferences')
+  @ApiOperation({ summary: "Update a volunteer's animal preferences" })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of Chameleon animal IDs",
+    type: [Number],
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Invalid volunteer or animal IDs, the volunteer is not active, neither list has IDs, an ID is in both lists, or a removed ID is not in the volunteer's preferences",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async updateAnimalPreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    validateId(volunteerId, 'Volunteer');
+    if (!dto.added?.length && !dto.removed?.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
+    return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 
   @ApiOperation({
