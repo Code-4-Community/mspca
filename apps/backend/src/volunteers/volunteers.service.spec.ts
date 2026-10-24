@@ -277,6 +277,9 @@ describe('VolunteersService', () => {
 
       await expect(service.create(dto)).rejects.toBe(error);
       expect(mockCognitoService.signUpUser).toHaveBeenCalledTimes(1);
+      expect(
+        mockCoordinatorsService.findActiveByHomebase,
+      ).not.toHaveBeenCalled();
       expect(mockRepo.save).not.toHaveBeenCalled();
       expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
     });

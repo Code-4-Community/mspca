@@ -86,10 +86,6 @@ export class VolunteersService {
       throw new ConflictException('A volunteer with this email already exists');
     }
 
-    // Looked up before Cognito so a failure here leaves nothing to roll back.
-    const assignedCoordinators =
-      await this.coordinatorsService.findActiveByHomebase(profile.homebase);
-
     const cognitoSub = await this.cognitoService.signUpUser({
       firstName: profile.firstName,
       lastName: profile.lastName,
@@ -97,7 +93,11 @@ export class VolunteersService {
       password,
     });
 
+    // Inside the try so a failed lookup also deletes the Cognito user.
     try {
+      const assignedCoordinators =
+        await this.coordinatorsService.findActiveByHomebase(profile.homebase);
+
       return await this.repo.save({
         ...profile,
         email,
