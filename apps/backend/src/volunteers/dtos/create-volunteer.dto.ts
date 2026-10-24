@@ -1,8 +1,10 @@
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
+  IsString,
   IsStrongPassword,
   MaxLength,
 } from 'class-validator';
@@ -22,7 +24,7 @@ export class CreateVolunteerDto {
 
   @IsNonEmptyString()
   @IsPhoneNumber('US')
-  @MaxLength(20)
+  @MaxLength(255)
   phone!: string;
 
   @IsOptional()
@@ -38,7 +40,8 @@ export class CreateVolunteerDto {
   @MaxLength(255)
   email!: string;
 
-  // Mirrors the Cognito user pool's password policy.
+  @IsString()
+  @IsNotEmpty()
   @IsStrongPassword({
     minLength: 8,
     minLowercase: 1,

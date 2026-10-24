@@ -24,10 +24,12 @@ export class CreateCoordinatorDto {
 
   @IsNonEmptyString()
   @IsPhoneNumber('US')
+  @MaxLength(20)
   phone!: string;
 
   @IsOptional()
   @IsNonEmptyString()
+  @MaxLength(20)
   @IsPhoneNumber('US')
   secondaryPhone?: string | null;
 

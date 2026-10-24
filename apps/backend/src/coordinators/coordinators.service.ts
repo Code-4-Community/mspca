@@ -30,8 +30,9 @@ export class CoordinatorsService {
    *
    * @param dto - The coordinator's registration information.
    * @returns The newly created coordinator.
-   * @throws {ConflictException} If a coordinator with the email already exists.
-   * @throws {InternalServerErrorException} If saving the coordinator fails.
+   * @throws {ConflictException} If a coordinator with the email already exists in the database.
+   * @throws {BadRequestException} If Cognito rejects the registration request.
+   * @throws {InternalServerErrorException} If saving the coordinator to the database fails.
    */
   async create(dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
     const { password, ...profile } = dto;
@@ -78,8 +79,9 @@ export class CoordinatorsService {
    *
    * @param dto - The coordinator's email and verification code.
    * @returns A promise that resolves when confirmation is complete.
-   * @throws {NotFoundException} If no coordinator exists with the given email.
-   * @throws {BadRequestException} If the verification code is invalid or expired.
+   * @throws {NotFoundException} If no coordinator exists with the given email in the database.
+   * @throws {BadRequestException} If Cognito rejects the verification code or confirmation request.
+   * @throws {InternalServerErrorException} If Cognito fails to complete the confirmation.
    */
   async confirm(dto: ConfirmCoordinatorDto): Promise<void> {
     const { email } = dto;

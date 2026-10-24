@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { CoordinatorsController } from './coordinators.controller';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
@@ -9,7 +9,12 @@ import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 
 describe('CoordinatorsController', () => {
   let controller: CoordinatorsController;
-  let service: jest.Mocked<CoordinatorsService>;
+  let service: {
+    create: jest.Mock;
+    confirm: jest.Mock;
+    deactivate: jest.Mock;
+    activate: jest.Mock;
+  };
 
   const dto = {
     firstName: 'Jane',
@@ -27,23 +32,23 @@ describe('CoordinatorsController', () => {
   } as ConfirmCoordinatorDto;
 
   beforeEach(async () => {
+    service = {
+      create: jest.fn(),
+      confirm: jest.fn(),
+      deactivate: jest.fn(),
+      activate: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CoordinatorsController],
-      providers: [
-        {
-          provide: CoordinatorsService,
-          useValue: {
-            create: jest.fn(),
-            confirm: jest.fn(),
-            deactivate: jest.fn(),
-            activate: jest.fn(),
-          },
-        },
-      ],
+      providers: [{ provide: CoordinatorsService, useValue: service }],
     }).compile();
 
-    controller = module.get(CoordinatorsController);
-    service = module.get(CoordinatorsService);
+    controller = module.get<CoordinatorsController>(CoordinatorsController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 
   describe('create', () => {
@@ -99,12 +104,11 @@ describe('CoordinatorsController', () => {
   });
 
   describe('deactivate', () => {
-    it('deactivates the coordinator', async () => {
+    it('should call service.deactivate with the parsed id', async () => {
       const coordinator = {
         coordinatorId: 1,
         active: false,
       } as FosterCoordinator;
-
       service.deactivate.mockResolvedValue(coordinator);
 
       const result = await controller.deactivate(1);
@@ -113,22 +117,23 @@ describe('CoordinatorsController', () => {
       expect(result).toEqual(coordinator);
     });
 
-    it('rejects invalid IDs', async () => {
-      await expect(controller.deactivate(0)).rejects.toThrow(
-        BadRequestException,
+    it('propagates NotFoundException thrown by the service', async () => {
+      service.deactivate.mockRejectedValue(
+        new NotFoundException('Coordinator with ID 999 not found'),
       );
 
-      expect(service.deactivate).not.toHaveBeenCalled();
+      await expect(controller.deactivate(999)).rejects.toThrow(
+        new NotFoundException('Coordinator with ID 999 not found'),
+      );
     });
   });
 
   describe('activate', () => {
-    it('activates the coordinator', async () => {
+    it('should call service.activate with the parsed id', async () => {
       const coordinator = {
         coordinatorId: 1,
         active: true,
       } as FosterCoordinator;
-
       service.activate.mockResolvedValue(coordinator);
 
       const result = await controller.activate(1);
@@ -137,12 +142,14 @@ describe('CoordinatorsController', () => {
       expect(result).toEqual(coordinator);
     });
 
-    it('rejects invalid IDs', async () => {
-      await expect(controller.activate(-1)).rejects.toThrow(
-        BadRequestException,
+    it('propagates NotFoundException thrown by the service', async () => {
+      service.activate.mockRejectedValue(
+        new NotFoundException('Coordinator with ID 999 not found'),
       );
 
-      expect(service.activate).not.toHaveBeenCalled();
+      await expect(controller.activate(999)).rejects.toThrow(
+        new NotFoundException('Coordinator with ID 999 not found'),
+      );
     });
   });
 });

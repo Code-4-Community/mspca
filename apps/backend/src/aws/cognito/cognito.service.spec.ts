@@ -34,6 +34,8 @@ const ENV_KEYS = [
   'COGNITO_REGION',
 ] as const;
 
+// Snapshot the auth env once so each test can mutate it freely without
+// clobbering a value the developer had set in their own shell.
 const ORIGINAL_ENV: Record<string, string | undefined> = Object.fromEntries(
   ENV_KEYS.map((key) => [key, process.env[key]]),
 );
@@ -49,6 +51,8 @@ function restoreEnv(): void {
   });
 }
 
+// Only the user pool ID and client ID are required to enable auth. COGNITO_REGION
+// is optional: when unset it is derived from the user pool ID (format <region>_<id>).
 const REQUIRED_ENV_KEYS = [
   'COGNITO_USER_POOL_ID',
   'COGNITO_CLIENT_ID',
@@ -66,16 +70,23 @@ describe('CognitoService', () => {
       service = new CognitoService();
     });
 
+    // Restore environment variables after each test
     afterEach(() => {
       restoreEnv();
     });
 
+    // Auth is only ever off by explicit opt-in, in which case there is no user
+    // to return regardless of the request.
     it('returns null when auth is explicitly disabled', () => {
       process.env.AUTH_DISABLED = 'true';
 
       expect(service.getUser({ headers: {} } as TestRequest)).toBeNull();
     });
 
+    // getUser reads the AUTH_DISABLED flag rather than re-resolving the config, so
+    // an unusable config is not its problem to report: CognitoModule already failed
+    // startup over it, and CognitoJWTGuard resolves the config ahead of its @Public()
+    // branch, so every request 401s before any handler can call getUser.
     it.each(REQUIRED_ENV_KEYS)(
       'returns null rather than throwing when %s is missing (the guard owns that rejection)',
       (missingKey) => {
@@ -85,6 +96,8 @@ describe('CognitoService', () => {
       },
     );
 
+    // The flag itself is still parsed strictly: a typo must never be read as
+    // "not disabled" and silently return a user.
     it('throws when AUTH_DISABLED has an unrecognized value', () => {
       process.env.AUTH_DISABLED = 'ture';
 
@@ -93,6 +106,8 @@ describe('CognitoService', () => {
       );
     });
 
+    // COGNITO_REGION is optional (derived from the user pool ID), so auth stays
+    // enabled without it and getUser still returns an attached payload.
     it('returns the JWT payload when COGNITO_REGION is missing (region derived)', () => {
       delete process.env.COGNITO_REGION;
 
@@ -139,6 +154,7 @@ describe('CognitoService', () => {
       process.env.COGNITO_REGION = 'us-east-2';
       service = new CognitoService();
 
+      // Force the lazy client to initialize, then spy on send
       const mockClient = { send: jest.fn().mockResolvedValue({}) };
       service['providerClient'] =
         mockClient as unknown as CognitoIdentityProviderClient;
@@ -158,7 +174,7 @@ describe('CognitoService', () => {
               Attributes: [{ Name: 'sub', Value: 'test-sub-123' }],
             },
           })
-          .mockResolvedValueOnce({});
+          .mockResolvedValueOnce({}); // addUserToGroup
 
         const sub = await service.createUser({
           firstName: 'Jane',

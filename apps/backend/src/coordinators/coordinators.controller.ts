@@ -93,6 +93,14 @@ export class CoordinatorsController {
     description: 'The coordinator was deactivated',
     type: FosterCoordinator,
   })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid coordinator ID or coordinator is already inactive',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Coordinator with the given ID does not exist',
+  })
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterCoordinator> {
@@ -113,6 +121,14 @@ export class CoordinatorsController {
     status: HttpStatus.OK,
     description: 'The coordinator was activated',
     type: FosterCoordinator,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid coordinator ID or coordinator is already active',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Coordinator with the given ID does not exist',
   })
   async activate(
     @Param('id', ParseIntPipe) id: number,
