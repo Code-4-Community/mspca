@@ -70,7 +70,7 @@ jobs:
             }
 
             if (Object.keys(pending).length === 0) {
-              core.info('No reminders due today 🎉');
+              core.info('No reminders due today');
               return;
             }
 
@@ -82,7 +82,7 @@ jobs:
                 continue;
               }
 
-              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}> (assigned ~${p.hours}h ago)`).join('\n');
+              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}>;
 
               const res = await fetch('https://slack.com/api/chat.postMessage', {
                 method: 'POST',
@@ -92,7 +92,7 @@ jobs:
                 },
                 body: JSON.stringify({
                   channel: slackId, // a user ID here sends a DM from the bot
-                  text: `:eyes: Hey! These PRs are still waiting on your review:\n${links}`,
+                  text: `Hey! These PRs are still waiting on your review:\n${links}`,
                 }),
               });
 
