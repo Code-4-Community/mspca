@@ -31,8 +31,8 @@ export class VolunteersController {
     private matchesService: MatchesService,
   ) {}
 
-  @Public()
   @Post()
+  @Public()
   @ApiOperation({ summary: 'Create a foster volunteer account' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -59,8 +59,8 @@ export class VolunteersController {
     return this.volunteersService.create(dto);
   }
 
-  @Public()
   @Post('/confirm')
+  @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: "Confirm a foster volunteer's email with their verification code",
@@ -113,6 +113,7 @@ export class VolunteersController {
     return this.matchesService.findByVolunteerId(volunteerId);
   }
 
+  @Patch('/:id/deactivate')
   @ApiOperation({ summary: 'Deactivate an active foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
@@ -120,7 +121,6 @@ export class VolunteersController {
     description: 'The volunteer was deactivated',
     type: FosterVolunteer,
   })
-  @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {
@@ -128,6 +128,7 @@ export class VolunteersController {
     return this.volunteersService.deactivate(id);
   }
 
+  @Patch('/:id/reactivate')
   @ApiOperation({ summary: 'Reactivate an inactive foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
@@ -135,7 +136,6 @@ export class VolunteersController {
     description: 'The volunteer was reactivated',
     type: FosterVolunteer,
   })
-  @Patch('/:id/reactivate')
   async reactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {
@@ -185,6 +185,7 @@ export class VolunteersController {
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
   }
 
+  @Patch('/:id/approve')
   @ApiOperation({ summary: 'Approve a pending foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
@@ -204,7 +205,6 @@ export class VolunteersController {
     status: HttpStatus.CONFLICT,
     description: 'The volunteer is not pending',
   })
-  @Patch('/:id/approve')
   async approve(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterVolunteer> {

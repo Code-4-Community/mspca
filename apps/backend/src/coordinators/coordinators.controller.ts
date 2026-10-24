@@ -15,6 +15,7 @@ import { FosterCoordinator } from './coordinators.entity';
 export class CoordinatorsController {
   constructor(private coordinatorsService: CoordinatorsService) {}
 
+  @Patch('/:id/deactivate')
   @ApiOperation({ summary: 'Deactivate a foster coordinator' })
   @ApiParam({ name: 'id', type: Number, description: 'Coordinator ID' })
   @ApiResponse({
@@ -22,7 +23,6 @@ export class CoordinatorsController {
     description: 'The coordinator was deactivated',
     type: FosterCoordinator,
   })
-  @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterCoordinator> {
@@ -30,6 +30,7 @@ export class CoordinatorsController {
     return this.coordinatorsService.deactivate(id);
   }
 
+  @Patch('/:id/activate')
   @ApiOperation({ summary: 'Activate a foster coordinator' })
   @ApiParam({ name: 'id', type: Number, description: 'Coordinator ID' })
   @ApiResponse({
@@ -37,7 +38,6 @@ export class CoordinatorsController {
     description: 'The coordinator was activated',
     type: FosterCoordinator,
   })
-  @Patch('/:id/activate')
   async activate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<FosterCoordinator> {
