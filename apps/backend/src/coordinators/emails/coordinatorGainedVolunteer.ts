@@ -1,6 +1,5 @@
-import { escapeHtml } from '../../utils/emails.utils';
+import { EmailContent, escapeHtml } from '../../utils/emails.utils';
 import { FosterVolunteer } from '../../volunteers/volunteers.entity';
-import { EmailContent } from './volunteerApproved';
 
 // Placeholder copy - TODO: put real template here later.
 

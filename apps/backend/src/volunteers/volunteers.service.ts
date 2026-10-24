@@ -17,12 +17,10 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
-import {
-  EmailContent,
-  volunteerApprovedEmail,
-} from '../emails/bodies/volunteerApproved';
-import { coordinatorGainedVolunteerEmail } from '../emails/bodies/coordinatorGainedVolunteer';
-import { coordinatorLostVolunteerEmail } from '../emails/bodies/coordinatorLostVolunteer';
+import { volunteerApprovedEmail } from './emails/volunteerApproved';
+import { EmailContent } from '../utils/emails.utils';
+import { coordinatorGainedVolunteerEmail } from '../coordinators/emails/coordinatorGainedVolunteer';
+import { coordinatorLostVolunteerEmail } from '../coordinators/emails/coordinatorLostVolunteer';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
