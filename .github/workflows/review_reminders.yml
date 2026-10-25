@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       test_user:
-        description: "Test mode: GitHub username to DM right now (skips the 48h rule, DMs only them)"
+        description: "Test mode: GitHub username to DM right now"
         required: false
         default: ""
 
