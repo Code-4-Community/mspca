@@ -99,4 +99,3 @@ jobs:
               const data = await res.json();
               if (!data.ok) core.warning(`Slack error for ${login}: ${data.error}`);
             }
-
