@@ -21,6 +21,7 @@ import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
+import { AnimalsService } from '../animals/animals.service';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -28,6 +29,7 @@ export class VolunteersController {
   constructor(
     private volunteersService: VolunteersService,
     private matchesService: MatchesService,
+    private animalsService: AnimalsService,
   ) {}
 
   @Public()
@@ -241,7 +243,7 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'The volunteer does not exist',
+    description: 'The volunteer or an added animal does not exist',
   })
   async updateAnimalPreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
@@ -253,6 +255,7 @@ export class VolunteersController {
         'At least one of added or removed must be provided',
       );
     }
+    await this.animalsService.checkAllExistOrFail(dto.added ?? []);
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 }

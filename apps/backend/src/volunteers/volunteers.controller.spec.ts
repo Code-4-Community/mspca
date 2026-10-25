@@ -16,6 +16,7 @@ import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { AnimalsService } from '../animals/animals.service';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -39,6 +40,7 @@ describe('VolunteersController', () => {
     updateAnimalPreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
+  let mockAnimalsService: { checkAllExistOrFail: jest.Mock };
 
   const mockVolunteers = [
     { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
@@ -58,12 +60,14 @@ describe('VolunteersController', () => {
       updateAnimalPreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
+    mockAnimalsService = { checkAllExistOrFail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
         { provide: VolunteersService, useValue: mockVolunteersService },
         { provide: MatchesService, useValue: mockMatchesService },
+        { provide: AnimalsService, useValue: mockAnimalsService },
       ],
     }).compile();
 
@@ -361,9 +365,27 @@ describe('VolunteersController', () => {
       const result = await controller.updateAnimalPreferences(1, dto);
 
       expect(result).toEqual([42, 55]);
+      expect(mockAnimalsService.checkAllExistOrFail).toHaveBeenCalledWith([55]);
       expect(
         mockVolunteersService.updateAnimalPreferences,
       ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('does not update preferences when an added animal does not exist', async () => {
+      const error = new NotFoundException(
+        'Animals with Chameleon IDs not found: 998, 999',
+      );
+      mockAnimalsService.checkAllExistOrFail.mockRejectedValue(error);
+
+      await expect(
+        controller.updateAnimalPreferences(1, { added: [55, 998, 999] }),
+      ).rejects.toThrow(error);
+      expect(mockAnimalsService.checkAllExistOrFail).toHaveBeenCalledWith([
+        55, 998, 999,
+      ]);
+      expect(
+        mockVolunteersService.updateAnimalPreferences,
+      ).not.toHaveBeenCalled();
     });
 
     it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(

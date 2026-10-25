@@ -6,6 +6,7 @@ import { VolunteersService } from './volunteers.service';
 import { CoordinatorsModule } from '../coordinators/coordinators.module';
 import { MatchesModule } from '../matches/matches.module';
 import { AWSSESModule } from '../aws/ses/email.module';
+import { AnimalsModule } from '../animals/animals.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AWSSESModule } from '../aws/ses/email.module';
     CoordinatorsModule,
     forwardRef(() => MatchesModule),
     AWSSESModule,
+    AnimalsModule,
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],

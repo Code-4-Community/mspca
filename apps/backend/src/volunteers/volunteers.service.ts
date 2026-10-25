@@ -315,7 +315,6 @@ export class VolunteersService {
     id: number,
     dto: UpdateAnimalPreferencesDto,
   ): Promise<number[]> {
-    // TODO: validate that all animals being added actually exist in our database
     const volunteer = await this.findActiveOrFail(id);
     const { added = [], removed = [] } = dto;
     const removedSet = new Set(removed);
