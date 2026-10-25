@@ -82,7 +82,7 @@ jobs:
                 continue;
               }
 
-              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}>;
+                            const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}>`).join('\n');
 
               const res = await fetch('https://slack.com/api/chat.postMessage', {
                 method: 'POST',
