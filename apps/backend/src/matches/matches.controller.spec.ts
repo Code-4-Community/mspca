@@ -89,6 +89,7 @@ describe('MatchesController', () => {
       await expect(
         pipe.transform(body, { type: 'body', metatype: CreateMatchDto }),
       ).rejects.toThrow(BadRequestException);
+
       expect(service.create).not.toHaveBeenCalled();
     });
   });
@@ -181,6 +182,7 @@ describe('MatchesController', () => {
       );
 
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
+
       await expect(controller.denyMatch(999, dto)).rejects.toThrow(
         NotFoundException,
       );
@@ -188,9 +190,11 @@ describe('MatchesController', () => {
 
     it('should throw BadRequestException when id is invalid', async () => {
       const dto: DenyMatchDto = { deniedReason: 'Some reason' };
+
       await expect(controller.denyMatch(0, dto)).rejects.toThrow(
         BadRequestException,
       );
+
       expect(service.denyMatch).not.toHaveBeenCalled();
     });
   });
