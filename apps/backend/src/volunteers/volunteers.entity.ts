@@ -33,7 +33,7 @@ export class FosterVolunteer {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -86,6 +86,14 @@ export class FosterVolunteer {
 
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
+
+  @Column({
+    name: 'animal_preferences',
+    type: 'int',
+    array: true,
+    default: () => "'{}'",
+  })
+  animalPreferences!: number[];
 
   @ManyToOne(
     () => FosterCoordinator,

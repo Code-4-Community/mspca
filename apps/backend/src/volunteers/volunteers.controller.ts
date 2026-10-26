@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -15,10 +16,11 @@ import { VolunteersService } from './volunteers.service';
 import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
-import { UpdateFosterTypePreferencesDto } from './dto/update-foster-type-preferences.dto';
-import { CreateVolunteerDto } from './dto/create-volunteer.dto';
-import { ConfirmVolunteerDto } from './dto/confirm-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateFosterTypePreferencesDto } from './dtos/update-foster-type-preferences.dto';
+import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType } from './volunteers.types';
 import { Public } from '../aws/cognito/cognito.decorator';
@@ -201,7 +203,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Invalid ID, inactive volunteer, empty request, overlapping changes, nonexistent removal, or duplicate addition',
+      'Invalid ID, inactive volunteer, empty request, overlapping changes, nonexistent removal',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -212,11 +214,6 @@ export class VolunteersController {
     @Body() dto: UpdateFosterTypePreferencesDto,
   ): Promise<FosterType[]> {
     validateId(volunteerId, 'Volunteer');
-    if (!dto.added?.length && !dto.removed?.length) {
-      throw new BadRequestException(
-        'At least one of added or removed must be provided',
-      );
-    }
     return this.volunteersService.updateFosterTypePreferences(volunteerId, dto);
   }
 
@@ -244,6 +241,40 @@ export class VolunteersController {
     return this.volunteersService.approve(id);
   }
 
+  @ApiOperation({
+    summary: 'Deny a pending foster volunteer',
+    description:
+      'Permanently deletes the volunteer from Cognito and the database. No email is sent.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The volunteer was denied and deleted',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'The volunteer is not pending',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description:
+      'Cognito deletion failed, or a partial deletion occurred (Cognito deleted, database not)',
+  })
+  @Delete('/:id/deny')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deny(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.deny(id);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all volunteers' })
   @ApiResponse({
@@ -253,5 +284,39 @@ export class VolunteersController {
   })
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
     return this.volunteersService.getAllVolunteers();
+  }
+
+  @Patch('/:volunteerId/animal-preferences')
+  @ApiOperation({ summary: "Update a volunteer's animal preferences" })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of Chameleon animal IDs",
+    type: [Number],
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Invalid volunteer or animal IDs, the volunteer is not active, neither list has IDs, an ID is in both lists, or a removed ID is not in the volunteer's preferences",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async updateAnimalPreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateAnimalPreferencesDto,
+  ): Promise<number[]> {
+    validateId(volunteerId, 'Volunteer');
+    if (!dto.added?.length && !dto.removed?.length) {
+      throw new BadRequestException(
+        'At least one of added or removed must be provided',
+      );
+    }
+    return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 }
