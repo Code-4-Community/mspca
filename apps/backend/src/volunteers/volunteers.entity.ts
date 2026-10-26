@@ -74,6 +74,16 @@ export class FosterVolunteer {
   })
   status!: VolunteerStatus;
 
+  @Column({
+    name: 'foster_type_preferences',
+    type: 'enum',
+    enum: FosterType,
+    enumName: 'foster_type_enum',
+    array: true,
+    default: () => "'{}'",
+  })
+  fosterTypePreferences!: FosterType[];
+
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
 
