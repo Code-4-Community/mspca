@@ -3,12 +3,14 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
 @Unique('UQ_foster_volunteers_email', ['email'])
@@ -90,6 +92,9 @@ export class FosterVolunteer {
     (coordinator) => coordinator.assignedVolunteers,
     { nullable: true },
   )
+  @OneToMany(() => Match, (match) => match.volunteer)
+  matches!: Match[];
+
   @JoinColumn({ name: 'assigned_coordinator_id' })
   assignedCoordinator!: FosterCoordinator | null;
 }

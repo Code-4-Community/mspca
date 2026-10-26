@@ -18,6 +18,7 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { MatchStatus } from '../matches/matches.types';
 
 @Injectable()
 export class VolunteersService {
@@ -308,7 +309,15 @@ export class VolunteersService {
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo.find();
+    return this.repo
+      .createQueryBuilder('volunteer')
+      .leftJoinAndSelect(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      )
+      .getMany();
   }
 
   /**
