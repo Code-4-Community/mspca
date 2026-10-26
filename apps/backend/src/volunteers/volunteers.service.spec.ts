@@ -699,23 +699,108 @@ describe('VolunteersService', () => {
     });
   });
 
-  describe('getAllVolunteers', () => {
-    it('should return all volunteers', async () => {
-      mockRepo.find.mockResolvedValue(mockVolunteers);
+  describe('deny', () => {
+    const pendingVolunteer = () =>
+      ({
+        volunteerId: 1,
+        firstName: 'Jane',
+        email: 'jane@example.com',
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer);
 
-      const result = await service.getAllVolunteers();
+    it('deletes the volunteer from Cognito, then from the database', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      mockCognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
+      const findSpy = jest.spyOn(service, 'findByIdOrFail');
 
-      expect(result).toEqual(mockVolunteers);
-      expect(mockRepo.find).toHaveBeenCalled();
+      await service.deny(1);
+
+      expect(findSpy).toHaveBeenCalledWith(1);
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(mockRepo.delete).toHaveBeenCalledTimes(1);
+      expect(mockRepo.delete).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(
+        mockCognitoService.deleteUser.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockRepo.delete.mock.invocationCallOrder[0]);
     });
 
-    it('should return an empty array when there are no volunteers', async () => {
-      mockRepo.find.mockResolvedValue([]);
+    it('throws NotFoundException and deletes nothing if the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
 
-      const result = await service.getAllVolunteers();
+      await expect(service.deny(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
 
-      expect(result).toEqual([]);
-      expect(mockRepo.find).toHaveBeenCalled();
+    it('throws ConflictException and deletes nothing if the volunteer is not pending', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.ACTIVE,
+      });
+
+      await expect(service.deny(1)).rejects.toThrow(
+        new ConflictException('Only pending Volunteers can be denied'),
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('propagates the error and does not touch the database if Cognito fails', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      const cognitoError = new InternalServerErrorException(
+        'Failed to delete user: boom',
+      );
+      mockCognitoService.deleteUser.mockRejectedValue(cognitoError);
+
+      await expect(service.deny(1)).rejects.toBe(cognitoError);
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws a PARTIAL DELETION error if the database delete fails after Cognito succeeds', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      mockCognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockRejectedValue(new Error('connection lost'));
+      const loggerSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => undefined);
+
+      const promise = service.deny(1);
+      await expect(promise).rejects.toThrow(InternalServerErrorException);
+      await expect(promise).rejects.toThrow(
+        new InternalServerErrorException(
+          'Volunteer: { volunteerId: 1, email: jane@example.com } was deleted from Cognito but not from database',
+        ),
+      );
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(loggerSpy).toHaveBeenCalledTimes(1);
+    });
+
+    describe('getAllVolunteers', () => {
+      it('should return all volunteers', async () => {
+        mockRepo.find.mockResolvedValue(mockVolunteers);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual(mockVolunteers);
+        expect(mockRepo.find).toHaveBeenCalled();
+      });
+
+      it('should return an empty array when there are no volunteers', async () => {
+        mockRepo.find.mockResolvedValue([]);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual([]);
+        expect(mockRepo.find).toHaveBeenCalled();
+      });
     });
   });
 

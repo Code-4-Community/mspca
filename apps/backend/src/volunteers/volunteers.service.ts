@@ -289,6 +289,42 @@ export class VolunteersService {
   }
 
   /**
+   * Denies a pending Volunteer by permanently deleting them from both Cognito
+   * and the database. No email is sent.
+   *
+   * Cognito is deleted first so that a Cognito failure leaves everything
+   * untouched. If Cognito succeeds but the database delete fails, the
+   * Volunteer is left in a partial state (no login, but a database row), so
+   * a loud error with the Volunteer's ID is logged and thrown for manual cleanup.
+   *
+   * @param id - The Volunteer's ID.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   * @throws {InternalServerErrorException} If the Cognito deletion fails, or
+   *   if the database deletion fails after Cognito succeeded (partial deletion).
+   */
+  async deny(id: number): Promise<void> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be denied`);
+    }
+
+    await this.cognitoService.deleteUser(volunteer.email);
+
+    try {
+      await this.repo.delete({ volunteerId: id });
+    } catch (err) {
+      const message = `Volunteer: { volunteerId: ${id}, email: ${volunteer.email} } was deleted from Cognito but not from database`;
+      this.logger.error(
+        message,
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(message);
+    }
+  }
+
+  /**
    * Gets all foster volunteers.
    * Returns every volunteer regardless of match status, or an empty array if there are none.
    * @returns A list of all volunteers

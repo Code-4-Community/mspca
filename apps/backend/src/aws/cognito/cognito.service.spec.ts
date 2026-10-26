@@ -744,6 +744,14 @@ describe('CognitoService', () => {
           error,
         );
       });
+      it('throws when auth is disabled and does not call Cognito', async () => {
+        process.env.AUTH_DISABLED = 'true';
+
+        await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+        expect(sendSpy).not.toHaveBeenCalled();
+      });
     });
 
     describe('enableUser', () => {
