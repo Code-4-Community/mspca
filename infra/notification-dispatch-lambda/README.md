@@ -44,7 +44,81 @@ The backend also needs `SES_ENABLED=true` and a verified `AWS_SES_SENDER_EMAIL`.
 
 ---
 
-## Setup (CLI)
+## Use the existing dev setup
+
+The dev resources above already exist, so you don't create anything. You only connect to them.
+
+- **Immediate sends** (no `sendAt`) need no Scheduler setup. The usual SES vars are enough.
+- **Scheduled sends** need these 3 vars in your `.env`. Ask the ticket owner for the values over DM, and never commit them:
+  ```
+  AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN=
+  AWS_SCHEDULER_ROLE_ARN=
+  NOTIFICATIONS_DISPATCH_SECRET=
+  ```
+- Your `.env` AWS key's IAM user needs the `mspca-notif-create-schedules` policy. If you use the same dev key the setup was tested with, it already has it. Otherwise run [step 4](#4-backend-iam-user).
+
+> **There is one Lambda, and it calls one URL.** Right now that URL is whoever last pointed it at their tunnel. To test scheduled sends end to end from your laptop, point the Lambda at your own tunnel, and tell the team, because this breaks it for whoever had it before:
+>
+> ```bash
+> export AWS_REGION=us-east-2
+> export DISPATCH_URL=https://<your tunnel>/api/notifications/send-scheduled
+> export DISPATCH_SECRET=<same value as your .env>
+> aws lambda update-function-configuration --region ${AWS_REGION} --function-name mspca-notif-dispatch \
+>   --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
+> ```
+>
+> This goes away once the backend is deployed and the Lambda points there for good.
+
+---
+
+## Local testing
+
+The Lambda runs in AWS and can't reach `localhost`, so you need a public tunnel to your laptop:
+
+```
+Lambda / curl ──> https://<tunnel host> ──> tunnel on your Mac ──> localhost:3000
+```
+
+| Tunnel                                                                                                                                    | Command                                          | Notes                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| [ngrok](https://ngrok.com/docs/getting-started/)                                                                                          | `ngrok http 3000`                                | Free account. One fixed domain, so the URL survives restarts.                                      |
+| [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/) | `cloudflared tunnel --url http://localhost:3000` | No account. The URL changes on every restart, so repoint the Lambda each time (see the box above). |
+
+Run three tabs: A `yarn serve:backend`, B the tunnel, C the commands below. Local auth is off (`AUTH_DISABLED=true`). Tab C needs the `AWS_REGION`, `DISPATCH_URL` and `DISPATCH_SECRET` shell variables from the box above (or from [step 0](#0-shell-variables)).
+
+| #   | Tests                      | Command                                                                                                                                                                                                    | Expect                                                      |
+| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| T0  | Tunnel reaches the backend | `curl -i -X POST ${DISPATCH_URL}`                                                                                                                                                                          | 401 (no secret sent)                                        |
+| T1  | Secret matches             | `curl -i -X POST ${DISPATCH_URL} -H "x-notifications-dispatch-secret: ${DISPATCH_SECRET}" -H 'content-type: application/json' -d '{}'`                                                                     | 400 (guard passed, DTO failed)                              |
+| T2  | Wrong secret is rejected   | same as T1 with `-H 'x-notifications-dispatch-secret: wrong'` and a valid body                                                                                                                             | 401, no email                                               |
+| T3  | Send now with a filter     | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                          | 202. Only Dog volunteers get it.                            |
+| T4  | Lambda to backend          | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json`      | `StatusCode 200`, `null` in out.json, the tunnel logs `204` |
+| T5  | Full chain                 | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d "{\"subject\":\"t5\",\"body\":\"<p>t5</p>\",\"filters\":[],\"sendAt\":\"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)\"}"` | 202. About 2 min later every Active volunteer gets it.      |
+| T6  | Lambda retries             | Stop the backend, then run T4 with `--invocation-type Event`. Check `aws logs tail /aws/lambda/mspca-notif-dispatch --region ${AWS_REGION} --since 10m`.                                                   | 3 `Dispatch failed` lines (1 try + 2 retries), no email     |
+| T7  | Validation                 | `sendAt` in the past, or `filters:["Horse"]`                                                                                                                                                               | 400                                                         |
+
+`date -u -v+2M` is macOS syntax. On Linux use `date -u -d '+2 min' ...`.
+
+### Dev run, 2026-10-26
+
+| Test                                                        | Result                                                     |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| Unit tests (`npx jest apps/backend/src/notifications`)      | ✅ 4 suites, 43 tests (2026-10-27)                         |
+| T0 no secret / T2 wrong secret                              | ✅ 401 / 401                                               |
+| T1 right secret, empty body                                 | ✅ 400                                                     |
+| T3 send now, `filters: ["Dog"]`                             | ✅ 202, no send errors logged                              |
+| T4 Lambda to backend, `filters: ["Cat"]`                    | ✅ `StatusCode 200`, `null`                                |
+| T5 full chain, `filters: []`                                | ✅ All 4 seeded Active volunteers received it              |
+| T7 past `sendAt` / bad filter / missing body / CRLF subject | ✅ 400 ×4                                                  |
+| T6 Lambda retries, backend down                             | ✅ 3 attempts (07:24, 07:25, 07:27 UTC), all 502, no email |
+
+Seeded test rows: `foster_volunteers` ids 82–85, one per foster type. Remove them with `DELETE FROM foster_volunteers WHERE volunteer_id BETWEEN 82 AND 85;`.
+
+---
+
+## Create from scratch (prod / rebuild)
+
+Only needed for a new environment (prod, staging, another AWS account), or if the dev resources are deleted. For prod, use new names (for example `mspca-notif-dispatch-prod`) and a new secret.
 
 > **zsh users:** always write `${VAR}` with braces. zsh reads `$ACCOUNT_ID:role` as the `:r` modifier and silently produces `...177ole`.
 
@@ -130,51 +204,6 @@ echo "NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}"
 ```
 
 Paste these into `.env` (locally) or the host's config (deployed), then restart the backend. It reads env only at startup.
-
----
-
-## Local testing
-
-The Lambda runs in AWS and can't reach `localhost`, so you need a public tunnel to your laptop:
-
-```
-Lambda / curl ──> https://<tunnel host> ──> tunnel on your Mac ──> localhost:3000
-```
-
-| Tunnel                                                                                                                                    | Command                                          | Notes                                                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| [ngrok](https://ngrok.com/docs/getting-started/)                                                                                          | `ngrok http 3000`                                | Free account. One fixed domain, so the URL survives restarts.                           |
-| [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/) | `cloudflared tunnel --url http://localhost:3000` | No account. The URL changes on every restart, so rerun the step 2 env update each time. |
-
-Run three tabs: A `yarn serve:backend`, B the tunnel, C the commands below. Local auth is off (`AUTH_DISABLED=true`).
-
-| #   | Tests                      | Command                                                                                                                                                                                                    | Expect                                                      |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| T0  | Tunnel reaches the backend | `curl -i -X POST ${DISPATCH_URL}`                                                                                                                                                                          | 401 (no secret sent)                                        |
-| T1  | Secret matches             | `curl -i -X POST ${DISPATCH_URL} -H "x-notifications-dispatch-secret: ${DISPATCH_SECRET}" -H 'content-type: application/json' -d '{}'`                                                                     | 400 (guard passed, DTO failed)                              |
-| T2  | Wrong secret is rejected   | same as T1 with `-H 'x-notifications-dispatch-secret: wrong'` and a valid body                                                                                                                             | 401, no email                                               |
-| T3  | Send now with a filter     | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                          | 202. Only Dog volunteers get it.                            |
-| T4  | Lambda to backend          | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json`      | `StatusCode 200`, `null` in out.json, the tunnel logs `204` |
-| T5  | Full chain                 | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d "{\"subject\":\"t5\",\"body\":\"<p>t5</p>\",\"filters\":[],\"sendAt\":\"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)\"}"` | 202. About 2 min later every Active volunteer gets it.      |
-| T6  | Lambda retries             | Stop the backend, then run T4 with `--invocation-type Event`. Check `aws logs tail /aws/lambda/mspca-notif-dispatch --region ${AWS_REGION} --since 10m`.                                                   | 3 `Dispatch failed` lines (1 try + 2 retries), no email     |
-| T7  | Validation                 | `sendAt` in the past, or `filters:["Horse"]`                                                                                                                                                               | 400                                                         |
-
-`date -u -v+2M` is macOS syntax. On Linux use `date -u -d '+2 min' ...`.
-
-### Dev run, 2026-10-26
-
-| Test                                                        | Result                                                     |
-| ----------------------------------------------------------- | ---------------------------------------------------------- |
-| Unit tests (`npx jest apps/backend/src/notifications`)      | ✅ 4 suites, 43 tests (2026-10-27)                         |
-| T0 no secret / T2 wrong secret                              | ✅ 401 / 401                                               |
-| T1 right secret, empty body                                 | ✅ 400                                                     |
-| T3 send now, `filters: ["Dog"]`                             | ✅ 202, no send errors logged                              |
-| T4 Lambda to backend, `filters: ["Cat"]`                    | ✅ `StatusCode 200`, `null`                                |
-| T5 full chain, `filters: []`                                | ✅ All 4 seeded Active volunteers received it              |
-| T7 past `sendAt` / bad filter / missing body / CRLF subject | ✅ 400 ×4                                                  |
-| T6 Lambda retries, backend down                             | ✅ 3 attempts (07:24, 07:25, 07:27 UTC), all 502, no email |
-
-Seeded test rows: `foster_volunteers` ids 82–85, one per foster type. Remove them with `DELETE FROM foster_volunteers WHERE volunteer_id BETWEEN 82 AND 85;`.
 
 ---
 
