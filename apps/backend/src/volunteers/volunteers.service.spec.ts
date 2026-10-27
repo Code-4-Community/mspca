@@ -176,8 +176,18 @@ describe('VolunteersService', () => {
     const { password, ...profile } = dto;
 
     const bostonCoordinators = [
-      { coordinatorId: 3, email: 'c3@example.com', active: true },
-      { coordinatorId: 4, email: 'c4@example.com', active: true },
+      {
+        coordinatorId: 3,
+        email: 'c3@example.com',
+        homebase: Homebase.BOSTON,
+        active: true,
+      },
+      {
+        coordinatorId: 4,
+        email: 'c4@example.com',
+        homebase: Homebase.BOSTON,
+        active: true,
+      },
     ] as FosterCoordinator[];
 
     beforeEach(() => {
@@ -323,6 +333,23 @@ describe('VolunteersService', () => {
         'Failed to save Volunteer jane@example.com',
         dbError,
       );
+    });
+
+    it('deletes the Cognito user and throws InternalServerErrorException when the coordinator lookup fails', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      mockCoordinatorsService.findActiveByHomebase.mockRejectedValue(
+        new Error('connection lost'),
+      );
+      mockCognitoService.deleteUser.mockResolvedValue(undefined);
+
+      await expect(service.create(dto)).rejects.toThrow(
+        new InternalServerErrorException('Failed to save the Volunteer'),
+      );
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
     it('also logs the orphaned Cognito sub and still throws InternalServerErrorException when the cleanup fails', async () => {
@@ -805,11 +832,26 @@ describe('VolunteersService', () => {
   describe('changeHomebase', () => {
     const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
     const oldCoordinators = [
-      { coordinatorId: 1, email: 'old1@example.com', active: true },
-      { coordinatorId: 2, email: 'old2@example.com', active: true },
+      {
+        coordinatorId: 1,
+        email: 'old1@example.com',
+        homebase: Homebase.BOSTON,
+        active: true,
+      },
+      {
+        coordinatorId: 2,
+        email: 'old2@example.com',
+        homebase: Homebase.BOSTON,
+        active: true,
+      },
     ] as FosterCoordinator[];
     const newCoordinators = [
-      { coordinatorId: 3, email: 'new3@example.com', active: true },
+      {
+        coordinatorId: 3,
+        email: 'new3@example.com',
+        homebase: Homebase.SALEM,
+        active: true,
+      },
     ] as FosterCoordinator[];
 
     const makeVolunteer = (
@@ -967,7 +1009,7 @@ describe('VolunteersService', () => {
       );
       expect(logWarn).toHaveBeenCalledTimes(1);
       expect(logWarn).toHaveBeenCalledWith(
-        'No coordinators to send "New volunteer assigned to you" email to for volunteer 9.',
+        'No coordinators to send "New volunteer assigned to you" email to for volunteer 9 (Ada Lovelace).',
       );
     });
 
@@ -986,7 +1028,7 @@ describe('VolunteersService', () => {
       );
       expect(logWarn).toHaveBeenCalledTimes(1);
       expect(logWarn).toHaveBeenCalledWith(
-        'No coordinators to send "Volunteer moved to another homebase" email to for volunteer 9.',
+        'No coordinators to send "Volunteer moved to another homebase" email to for volunteer 9 (Ada Lovelace).',
       );
     });
 
@@ -1006,7 +1048,12 @@ describe('VolunteersService', () => {
       mockRepo.findOne.mockResolvedValue(
         makeVolunteer([
           oldCoordinators[0],
-          { coordinatorId: 4, email: 'inactive4@example.com', active: false },
+          {
+            coordinatorId: 4,
+            email: 'inactive4@example.com',
+            homebase: Homebase.BOSTON,
+            active: false,
+          },
         ] as FosterCoordinator[]),
       );
 
@@ -1038,8 +1085,8 @@ describe('VolunteersService', () => {
       );
       expect(logError).toHaveBeenCalledTimes(1);
       expect(logError).toHaveBeenCalledWith(
-        'Failed to send "Volunteer moved to another homebase" email for volunteer 9.',
-        expect.any(String),
+        'Failed to send "Volunteer moved to another homebase" email for volunteer 9 (Ada Lovelace).',
+        expect.any(Error),
       );
     });
 

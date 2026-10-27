@@ -228,6 +228,11 @@ describe('MatchesService', () => {
           ccEmails: [coordinator.email, secondCoordinator.email],
         }),
       );
+      const { ccEmails } = emailsService.sendEmail.mock
+        .calls[0][0] as SendEmailDTO;
+      expect(ccEmails).toEqual(
+        volunteerWithCoordinators.assignedCoordinators.map((c) => c.email),
+      );
     });
 
     it('names the volunteer and the animal in the email body', async () => {
@@ -318,7 +323,7 @@ describe('MatchesService', () => {
       expect(error).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(
         'Failed to send match creation email for match 10.',
-        expect.any(String),
+        expect.any(Error),
       );
     });
 
@@ -343,7 +348,7 @@ describe('MatchesService', () => {
       expect(error).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(
         'Failed to send match creation email for match 10.',
-        expect.any(String),
+        expect.any(Error),
       );
     });
 

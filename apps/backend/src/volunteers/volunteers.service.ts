@@ -237,12 +237,12 @@ export class VolunteersService {
       this.notifyCoordinators(
         previous,
         coordinatorLostVolunteerEmail(saved, homebase),
-        saved.volunteerId,
+        saved,
       ),
       this.notifyCoordinators(
         next,
         coordinatorGainedVolunteerEmail(saved),
-        saved.volunteerId,
+        saved,
       ),
     ]);
 
@@ -256,16 +256,18 @@ export class VolunteersService {
    *
    * @param coordinators - The coordinators to cc.
    * @param email - The email's subject and body.
-   * @param volunteerId - The Volunteer the email is about, for log messages.
+   * @param volunteer - The Volunteer the email is about, for log messages.
    */
   private async notifyCoordinators(
     coordinators: FosterCoordinator[],
     email: EmailContent,
-    volunteerId: number,
+    volunteer: FosterVolunteer,
   ): Promise<void> {
+    const volunteerLabel = `volunteer ${volunteer.volunteerId} (${volunteer.firstName} ${volunteer.lastName})`;
+
     if (coordinators.length === 0) {
       this.logger.warn(
-        `No coordinators to send "${email.subject}" email to for volunteer ${volunteerId}.`,
+        `No coordinators to send "${email.subject}" email to for ${volunteerLabel}.`,
       );
       return;
     }
@@ -278,8 +280,8 @@ export class VolunteersService {
       });
     } catch (error) {
       this.logger.error(
-        `Failed to send "${email.subject}" email for volunteer ${volunteerId}.`,
-        error instanceof Error ? error.stack : String(error),
+        `Failed to send "${email.subject}" email for ${volunteerLabel}.`,
+        error,
       );
     }
   }
@@ -319,7 +321,8 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
-   * The homebase is changed through changeHomebase instead.
+   * The homebase is changed through changeHomebase instead, since changing it
+   * also reassigns coordinators and emails them.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer

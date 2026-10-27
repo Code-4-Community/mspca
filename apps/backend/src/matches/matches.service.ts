@@ -14,7 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
-import { escapeHtml } from '../utils/emails.utils';
+import { matchCreatedEmail } from './emails/matchCreated';
 import { matchCanceledEmail } from '../emails/matchCanceled';
 
 @Injectable()
@@ -118,21 +118,15 @@ export class MatchesService {
         return;
       }
 
-      const volunteerName = escapeHtml(
-        `${volunteer.firstName} ${volunteer.lastName}`,
-      );
-
-      // Placeholder copy - TODO: put real template here later.
       await this.emailsService.sendEmail({
         toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
         ccEmails: coordinators.map((c) => c.email),
-        subject: 'New foster match created',
-        bodyHtml: `<p>A match has been created for ${volunteerName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
+        ...matchCreatedEmail(match, volunteer),
       });
     } catch (error) {
       this.logger.error(
         `Failed to send match creation email for match ${match.matchId}.`,
-        error instanceof Error ? error.stack : String(error),
+        error,
       );
     }
   }
