@@ -198,11 +198,10 @@ Seeded test rows: `foster_volunteers` ids 82–85, one per foster type. Remove t
 **Known gaps (follow-up tickets)**
 
 - [ ] **Failed sends aren't retried.** `sendNow` logs failed SES batches and returns normally (`TODO` in [notifications.service.ts](../../apps/backend/src/notifications/notifications.service.ts)), so `/send-scheduled` returns 204 and the Lambda never retries. Lambda retries cover only "backend unreachable or non-2xx".
-- [ ] **One bad stored email drops its whole batch of 49.** `EmailsService` validates every Bcc address, and the DB has no email format check. Validate on write, as SSF does.
+- [ ] **Invalid stored emails are skipped silently.** `sendNow` drops malformed addresses before sending and only logs a count, because the DB has no email format check. Validate on write, as SSF does.
 - [ ] **Retries can double-send.** A retry after a partial send repeats the earlier batches (at-least-once delivery).
 - [ ] **Role gating.** Any authenticated user can call `POST /notifications`. It should be coordinators only (see the `TODO` in the controller).
 - [ ] **Swap to `ArrayOverlap` when [PR #11](https://github.com/Code-4-Community/mspca/pull/11) merges.** `fosterType` becomes `FosterType[]`, and `In()` on an array column is a SQL error.
-- [ ] **Email dedupe is case-sensitive** (`dup@` and `DUP@` both get Bcc'd).
 
 **Retry budget, end to end**
 
