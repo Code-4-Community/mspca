@@ -17,6 +17,7 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
@@ -163,6 +164,44 @@ export class VolunteersController {
   ): Promise<VolunteerWithoutNotes> {
     validateId(volunteerId, 'Volunteer');
     return this.volunteersService.findByIdOrFail(volunteerId);
+  }
+
+  @Patch('/:volunteerId/coordinator-update-profile')
+  @ApiOperation({
+    summary: "Update a volunteer's profile as a coordinator",
+    description:
+      'Accepts every field a volunteer can edit, plus coordinator-only fields such as coordinatorNotes. Returns the full volunteer, including notes.',
+  })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was updated',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID, invalid field, or no fields provided',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async coordinatorUpdateVolunteerById(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: CoordinatorUpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    validateId(volunteerId, 'Volunteer');
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException('At least one field must be provided');
+    }
+    return this.volunteersService.coordinatorUpdateVolunteerById(
+      volunteerId,
+      dto,
+    );
   }
 
   @Patch('/:volunteerId')

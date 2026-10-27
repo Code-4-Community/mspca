@@ -13,6 +13,7 @@ import { VolunteerStatus, VolunteerWithoutNotes } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
@@ -40,6 +41,28 @@ export class VolunteersService {
   private withoutNotes(volunteer: FosterVolunteer): VolunteerWithoutNotes {
     const { coordinatorNotes: _coordinatorNotes, ...rest } = volunteer;
     return rest;
+  }
+
+  /**
+   * Fetches a full Volunteer by ID, including coordinator-only fields such as
+   * coordinatorNotes. Only use this for coordinator-facing operations;
+   * everything else should use {@link findByIdOrFail}.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The full Volunteer, notes included.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async coordinatorFindByIdOrFail(id: number): Promise<FosterVolunteer> {
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinator'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    return volunteer;
   }
 
   /**
@@ -241,6 +264,25 @@ export class VolunteersService {
     const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.withoutNotes(await this.repo.save(volunteer));
+  }
+
+  /**
+   * Updates a Volunteer's profile as a coordinator. Accepts every field a
+   * Volunteer can edit themselves, plus coordinator-only fields.
+   * Only the fields included in the DTO are changed.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The fields to update.
+   * @returns The updated Volunteer, including coordinator notes.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async coordinatorUpdateVolunteerById(
+    id: number,
+    dto: CoordinatorUpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.coordinatorFindByIdOrFail(id);
+    Object.assign(volunteer, dto);
+    return this.repo.save(volunteer);
   }
 
   /**
