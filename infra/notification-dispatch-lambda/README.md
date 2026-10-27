@@ -57,34 +57,19 @@ The dev resources above already exist, so you don't create anything. You only co
   ```
 - Your `.env` AWS key's IAM user needs the `mspca-notif-create-schedules` policy. If you use the same dev key the setup was tested with, it already has it. Otherwise run [step 4](#4-backend-iam-user).
 
-> **There is one Lambda, and it calls one URL.** Right now that URL is whoever last pointed it at their tunnel. To test scheduled sends end to end from your laptop, point the Lambda at your own tunnel, and tell the team, because this breaks it for whoever had it before:
->
-> ```bash
-> export AWS_REGION=us-east-2
-> export DISPATCH_URL=https://<your tunnel>/api/notifications/send-scheduled
-> export DISPATCH_SECRET=<same value as your .env>
-> aws lambda update-function-configuration --region ${AWS_REGION} --function-name mspca-notif-dispatch \
->   --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
-> ```
->
-> This goes away once the backend is deployed and the Lambda points there for good.
+> **The dev Lambda calls the ticket owner's ngrok tunnel.** Any scheduled send (and T4–T6 below), from anyone's laptop, fires into the owner's local backend, not yours. Test immediate sends and `/send-scheduled` directly on your own `localhost`, and ask the owner to run the full chain. This goes away once the backend is deployed and the Lambda points there.
 
 ---
 
 ## Local testing
 
-The Lambda runs in AWS and can't reach `localhost`, so you need a public tunnel to your laptop:
+The Lambda runs in AWS and can't reach `localhost`, so the owner runs `ngrok http 3000` and the Lambda's URL points at that tunnel:
 
 ```
-Lambda / curl ──> https://<tunnel host> ──> tunnel on your Mac ──> localhost:3000
+Lambda ──> https://<owner's ngrok host> ──> owner's localhost:3000
 ```
 
-| Tunnel                                                                                                                                    | Command                                          | Notes                                                                                              |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| [ngrok](https://ngrok.com/docs/getting-started/)                                                                                          | `ngrok http 3000`                                | Free account. One fixed domain, so the URL survives restarts.                                      |
-| [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/) | `cloudflared tunnel --url http://localhost:3000` | No account. The URL changes on every restart, so repoint the Lambda each time (see the box above). |
-
-Run three tabs: A `yarn serve:backend`, B the tunnel, C the commands below. Local auth is off (`AUTH_DISABLED=true`). Tab C needs the `AWS_REGION`, `DISPATCH_URL` and `DISPATCH_SECRET` shell variables from the box above (or from [step 0](#0-shell-variables)).
+Run `yarn serve:backend` with `AUTH_DISABLED=true`, then in another tab set `export AWS_REGION=us-east-2 DISPATCH_SECRET=<your .env value>` and `DISPATCH_URL`. Use the ngrok URL (owner) or `http://localhost:3000/api/notifications/send-scheduled` (everyone else). T4–T6 only work on the owner's machine.
 
 | #   | Tests                      | Command                                                                                                                                                                                                    | Expect                                                      |
 | --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
