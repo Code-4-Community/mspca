@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
@@ -36,6 +37,7 @@ describe('VolunteersController', () => {
     reactivate: jest.Mock;
     updateVolunteerById: jest.Mock;
     approve: jest.Mock;
+    deny: jest.Mock;
     getAllVolunteers: jest.Mock;
     changeHomebase: jest.Mock;
     updateAnimalPreferences: jest.Mock;
@@ -56,6 +58,7 @@ describe('VolunteersController', () => {
       reactivate: jest.fn(),
       updateVolunteerById: jest.fn(),
       approve: jest.fn(),
+      deny: jest.fn(),
       getAllVolunteers: jest.fn(),
       changeHomebase: jest.fn(),
       updateAnimalPreferences: jest.fn(),
@@ -334,6 +337,27 @@ describe('VolunteersController', () => {
       await expect(controller.approve(1)).rejects.toThrow(
         new ConflictException('Only pending Volunteers can be approved'),
       );
+    });
+  });
+
+  describe('deny', () => {
+    it('calls service.deny with the parsed id and returns nothing', async () => {
+      mockVolunteersService.deny.mockResolvedValue(undefined);
+
+      const result = await controller.deny(1);
+
+      expect(mockVolunteersService.deny).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.deny).toHaveBeenCalledWith(1);
+      expect(result).toBeUndefined();
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      const error = new InternalServerErrorException(
+        'Failed to delete user: boom',
+      );
+      mockVolunteersService.deny.mockRejectedValue(error);
+
+      await expect(controller.deny(1)).rejects.toBe(error);
     });
   });
 

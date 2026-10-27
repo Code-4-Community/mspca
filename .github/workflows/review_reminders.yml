@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       test_user:
-        description: "Test mode: GitHub username to DM right now (skips the 48h rule, DMs only them)"
+        description: "Test mode: GitHub username to DM right now"
         required: false
         default: ""
 
@@ -82,7 +82,7 @@ jobs:
                 continue;
               }
 
-              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}>;
+              const links = list.map(p => `• <${p.html_url}|#${p.number} ${p.title}>`).join('\n');
 
               const res = await fetch('https://slack.com/api/chat.postMessage', {
                 method: 'POST',
