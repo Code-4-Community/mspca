@@ -1,5 +1,9 @@
 import { NotificationsModule } from './notifications.module';
 
+// VolunteersModule reaches CognitoModule, whose guard imports jwks-rsa. Its ESM
+// `jose` dependency cannot be parsed by Jest, so it is stubbed out here.
+jest.mock('jwks-rsa', () => ({ __esModule: true, default: jest.fn() }));
+
 describe('NotificationsModule', () => {
   const REQUIRED_FOR_SCHEDULING = [
     'AWS_REGION',
