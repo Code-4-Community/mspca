@@ -1,11 +1,14 @@
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
+  IsString,
   IsStrongPassword,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
@@ -21,7 +24,7 @@ export class CreateVolunteerDto {
 
   @IsNonEmptyString()
   @IsPhoneNumber('US')
-  @MaxLength(20)
+  @MaxLength(255)
   phone!: string;
 
   @IsOptional()
@@ -30,11 +33,15 @@ export class CreateVolunteerDto {
   @MaxLength(20)
   secondaryPhone?: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(255)
   email!: string;
 
-  // Mirrors the Cognito user pool's password policy.
+  @IsString()
+  @IsNotEmpty()
   @IsStrongPassword({
     minLength: 8,
     minLowercase: 1,

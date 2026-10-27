@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -209,6 +210,40 @@ export class VolunteersController {
   ): Promise<FosterVolunteer> {
     validateId(id, 'Volunteer');
     return this.volunteersService.approve(id);
+  }
+
+  @ApiOperation({
+    summary: 'Deny a pending foster volunteer',
+    description:
+      'Permanently deletes the volunteer from Cognito and the database. No email is sent.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The volunteer was denied and deleted',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'The volunteer is not pending',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description:
+      'Cognito deletion failed, or a partial deletion occurred (Cognito deleted, database not)',
+  })
+  @Delete('/:id/deny')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deny(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.deny(id);
   }
 
   @Get()
