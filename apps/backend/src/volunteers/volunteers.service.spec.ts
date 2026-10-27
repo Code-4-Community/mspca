@@ -34,6 +34,9 @@ describe('VolunteersService', () => {
     find: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    metadata: {
+      columns: { propertyName: string; relationMetadata?: object }[];
+    };
   };
 
   let mockCognitoService: {
@@ -43,7 +46,7 @@ describe('VolunteersService', () => {
   };
 
   let emailsService: { sendEmail: jest.Mock };
-
+  const expectedSelect = ['volunteerId', 'firstName', 'email', 'status'];
   const mockVolunteers = [
     { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
     { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
@@ -56,6 +59,16 @@ describe('VolunteersService', () => {
       find: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
+      metadata: {
+        columns: [
+          { propertyName: 'volunteerId' },
+          { propertyName: 'firstName' },
+          { propertyName: 'email' },
+          { propertyName: 'status' },
+          { propertyName: 'coordinatorNotes' },
+          { propertyName: 'assignedCoordinator', relationMetadata: {} },
+        ],
+      },
     };
 
     mockCognitoService = {
@@ -93,6 +106,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
     });
 
@@ -105,6 +119,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
     });
   });
@@ -410,6 +425,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,
@@ -472,6 +488,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,
@@ -529,6 +546,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,
@@ -554,6 +572,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
         relations: ['assignedCoordinator'],
+        select: expectedSelect,
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,

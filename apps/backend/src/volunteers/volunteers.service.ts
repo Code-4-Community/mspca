@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { VolunteerStatus, VolunteerWithoutNotes } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
@@ -30,6 +30,18 @@ export class VolunteersService {
     private emailsService: EmailsService,
   ) {}
 
+  private get publicColumns(): (keyof FosterVolunteer)[] {
+    return this.repo.metadata.columns
+      .filter((column) => !column.relationMetadata)
+      .map((column) => column.propertyName as keyof FosterVolunteer)
+      .filter((name) => name !== 'coordinatorNotes');
+  }
+
+  private withoutNotes(volunteer: FosterVolunteer): VolunteerWithoutNotes {
+    const { coordinatorNotes: _coordinatorNotes, ...rest } = volunteer;
+    return rest;
+  }
+
   /**
    * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
    *
@@ -39,10 +51,11 @@ export class VolunteersService {
    * @returns The Volunteer.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
-  async findByIdOrFail(id: number): Promise<FosterVolunteer> {
+  async findByIdOrFail(id: number): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
       relations: ['assignedCoordinator'],
+      select: this.publicColumns,
     });
 
     if (!volunteer) {
@@ -68,7 +81,7 @@ export class VolunteersService {
    * @throws {InternalServerErrorException} If the Cognito user could not be registered.
    * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
    */
-  async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+  async create(dto: CreateVolunteerDto): Promise<VolunteerWithoutNotes> {
     // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
     const { password, ...profile } = dto;
     const email = profile.email.toLowerCase();
@@ -86,13 +99,14 @@ export class VolunteersService {
     });
 
     try {
-      return await this.repo.save({
+      const saved = await this.repo.save({
         ...profile,
         email,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
       });
+      return this.withoutNotes(saved);
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
       try {
@@ -145,7 +159,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Active.
    */
-  async deactivate(id: number): Promise<FosterVolunteer> {
+  async deactivate(id: number): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
@@ -154,7 +168,7 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.INACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutNotes(await this.repo.save(volunteer));
   }
 
   /**
@@ -168,7 +182,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If the Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Inactive.
    */
-  async reactivate(id: number): Promise<FosterVolunteer> {
+  async reactivate(id: number): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.INACTIVE) {
@@ -177,7 +191,7 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.ACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutNotes(await this.repo.save(volunteer));
   }
 
   /**
@@ -190,7 +204,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not active.
    */
-  async findActiveOrFail(id: number): Promise<FosterVolunteer> {
+  async findActiveOrFail(id: number): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.findByIdOrFail(id);
 
     this.checkVolunteerActive(volunteer);
@@ -204,7 +218,7 @@ export class VolunteersService {
    * @param volunteer - The Volunteer to check.
    * @throws {BadRequestException} If the Volunteer's status is not Active.
    */
-  checkVolunteerActive(volunteer: FosterVolunteer): void {
+  checkVolunteerActive(volunteer: VolunteerWithoutNotes): void {
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
       throw new BadRequestException(
         `Volunteer with ID ${volunteer.volunteerId} is not active`,
@@ -223,10 +237,10 @@ export class VolunteersService {
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.findByIdOrFail(id);
     Object.assign(volunteer, dto);
-    return this.repo.save(volunteer);
+    return this.withoutNotes(await this.repo.save(volunteer));
   }
 
   /**
@@ -241,7 +255,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {ConflictException} If the Volunteer is not pending.
    */
-  async approve(id: number): Promise<FosterVolunteer> {
+  async approve(id: number): Promise<VolunteerWithoutNotes> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.PENDING) {
@@ -263,7 +277,7 @@ export class VolunteersService {
       );
     }
 
-    return saved;
+    return this.withoutNotes(saved);
   }
 
   /**
@@ -307,8 +321,8 @@ export class VolunteersService {
    * Returns every volunteer regardless of match status, or an empty array if there are none.
    * @returns A list of all volunteers
    */
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo.find();
+  async getAllVolunteers(): Promise<VolunteerWithoutNotes[]> {
+    return this.repo.find({ select: this.publicColumns });
   }
 
   /**

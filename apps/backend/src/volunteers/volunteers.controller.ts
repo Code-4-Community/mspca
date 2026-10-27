@@ -22,6 +22,7 @@ import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
+import { VolunteerWithoutNotes } from './volunteers.types';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -55,7 +56,9 @@ export class VolunteersController {
       'The Cognito user could not be created; or the volunteer could not be saved and the Cognito user was deleted; ' +
       'or the save and the Cognito cleanup both failed (the orphaned Cognito user is logged)',
   })
-  async create(@Body() dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+  async create(
+    @Body() dto: CreateVolunteerDto,
+  ): Promise<VolunteerWithoutNotes> {
     return this.volunteersService.create(dto);
   }
 
@@ -123,7 +126,7 @@ export class VolunteersController {
   @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.deactivate(id);
   }
@@ -138,7 +141,7 @@ export class VolunteersController {
   @Patch('/:id/reactivate')
   async reactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.reactivate(id);
   }
@@ -157,7 +160,7 @@ export class VolunteersController {
   })
   async getVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(volunteerId, 'Volunteer');
     return this.volunteersService.findByIdOrFail(volunteerId);
   }
@@ -177,7 +180,7 @@ export class VolunteersController {
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateVolunteerDto,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(volunteerId, 'Volunteer');
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
@@ -207,7 +210,7 @@ export class VolunteersController {
   @Patch('/:id/approve')
   async approve(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.approve(id);
   }
@@ -253,7 +256,7 @@ export class VolunteersController {
     description: 'All volunteers, regardless of match status',
     type: [FosterVolunteer],
   })
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+  async getAllVolunteers(): Promise<VolunteerWithoutNotes[]> {
     return this.volunteersService.getAllVolunteers();
   }
 
