@@ -113,15 +113,14 @@ export class VolunteersService {
    * so this stops someone who signed up directly with Cognito (skipping
    * {@link create}) from getting the role without a Volunteer profile.
    *
-   * If the role can't be added, both the Cognito user and the Volunteer are
-   * deleted so the Volunteer can sign up again with the same email.
+   * CognitoService handles both email confirmation and role assignment.
+   * If role assignment fails, CognitoService handles Cognito user cleanup.
    *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
    * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
    * @throws {HttpException} 429 if there have been too many attempts.
-   * @throws {InternalServerErrorException} If confirmation fails.
-   * @throws {InternalServerErrorException} If adding the role fails (the Cognito user and Volunteer are deleted).
+   * @throws {InternalServerErrorException} If confirmation or adding the role fails.
    */
   async confirm(dto: ConfirmVolunteerDto): Promise<void> {
     const email = dto.email.toLowerCase();
@@ -131,32 +130,11 @@ export class VolunteersService {
       throw new NotFoundException('No volunteer with this email exists');
     }
 
-    await this.cognitoService.confirmUser(email, dto.code);
-
-    try {
-      await this.cognitoService.addUserToGroup(
-        email,
-        CognitoRole.FosterVolunteer,
-      );
-    } catch {
-      // addUserToGroup already logs the Cognito error.
-      try {
-        await this.cognitoService.deleteUser(email);
-      } catch {
-        this.logger.error(
-          `Failed to delete Cognito user ${email} after adding the role failed`,
-        );
-      }
-      try {
-        await this.repo.delete({ volunteerId: volunteer.volunteerId });
-      } catch (error) {
-        this.logger.error(
-          `Failed to delete Volunteer ${volunteer.volunteerId} after adding the role failed`,
-          error,
-        );
-      }
-      throw new InternalServerErrorException('Failed to confirm the Volunteer');
-    }
+    await this.cognitoService.confirmUser(
+      email,
+      dto.code,
+      CognitoRole.FosterVolunteer,
+    );
   }
 
   /**
@@ -187,7 +165,7 @@ export class VolunteersService {
    *
    * @param id - The Volunteer's ID.
    * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If the Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Inactive.
    */
   async reactivate(id: number): Promise<FosterVolunteer> {
@@ -286,6 +264,42 @@ export class VolunteersService {
     }
 
     return saved;
+  }
+
+  /**
+   * Denies a pending Volunteer by permanently deleting them from both Cognito
+   * and the database. No email is sent.
+   *
+   * Cognito is deleted first so that a Cognito failure leaves everything
+   * untouched. If Cognito succeeds but the database delete fails, the
+   * Volunteer is left in a partial state (no login, but a database row), so
+   * a loud error with the Volunteer's ID is logged and thrown for manual cleanup.
+   *
+   * @param id - The Volunteer's ID.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   * @throws {InternalServerErrorException} If the Cognito deletion fails, or
+   *   if the database deletion fails after Cognito succeeded (partial deletion).
+   */
+  async deny(id: number): Promise<void> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be denied`);
+    }
+
+    await this.cognitoService.deleteUser(volunteer.email);
+
+    try {
+      await this.repo.delete({ volunteerId: id });
+    } catch (err) {
+      const message = `Volunteer: { volunteerId: ${id}, email: ${volunteer.email} } was deleted from Cognito but not from database`;
+      this.logger.error(
+        message,
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(message);
+    }
   }
 
   /**

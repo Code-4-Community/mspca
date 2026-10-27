@@ -24,7 +24,7 @@ export class FosterCoordinator {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'enum', enum: Homebase })
@@ -32,6 +32,14 @@ export class FosterCoordinator {
 
   @Column({ type: 'boolean' })
   active!: boolean;
+
+  @Column({
+    name: 'cognito_sub',
+    type: 'varchar',
+    length: 255,
+    default: '',
+  })
+  cognitoSub!: string;
 
   @OneToMany(
     () => FosterVolunteer,
