@@ -16,6 +16,7 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
 import { EmailsService } from '../aws/ses/email.service';
+import { MatchStatus } from '../matches/matches.types';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -34,6 +35,12 @@ describe('VolunteersService', () => {
     find: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+
+  let mockQueryBuilder: {
+    leftJoinAndSelect: jest.Mock;
+    getMany: jest.Mock;
   };
 
   let mockCognitoService: {
@@ -44,11 +51,6 @@ describe('VolunteersService', () => {
 
   let emailsService: { sendEmail: jest.Mock };
 
-  const mockVolunteers = [
-    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
-    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
-  ] as FosterVolunteer[];
-
   beforeEach(async () => {
     mockRepo = {
       findOne: jest.fn(),
@@ -56,7 +58,15 @@ describe('VolunteersService', () => {
       find: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
+
+    mockQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
+
+    mockRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
     mockCognitoService = {
       signUpUser: jest.fn(),
@@ -732,22 +742,86 @@ describe('VolunteersService', () => {
     });
 
     describe('getAllVolunteers', () => {
-      it('should return all volunteers', async () => {
-        mockRepo.find.mockResolvedValue(mockVolunteers);
+      it('should return volunteers with multiple active matches', async () => {
+        const matches = [
+          {
+            matchId: 1,
+            volunteerId: 1,
+            chameleonAnimalId: 42,
+            status: MatchStatus.ACTIVE,
+          },
+          {
+            matchId: 2,
+            volunteerId: 1,
+            chameleonAnimalId: 55,
+            status: MatchStatus.ACTIVE,
+          },
+        ];
+
+        const volunteers = [{ ...mockVolunteer, matches }];
+        mockQueryBuilder.getMany.mockResolvedValue(volunteers);
 
         const result = await service.getAllVolunteers();
 
-        expect(result).toEqual(mockVolunteers);
-        expect(mockRepo.find).toHaveBeenCalled();
+        expect(result).toEqual(volunteers);
+        expect(result[0].matches).toHaveLength(2);
+        expect(mockRepo.createQueryBuilder).toHaveBeenCalledWith('volunteer');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'volunteer.matches',
+          'match',
+          'match.status = :status',
+          { status: MatchStatus.ACTIVE },
+        );
+        expect(mockQueryBuilder.getMany).toHaveBeenCalledTimes(1);
+      });
+
+      it('should return a volunteer with one active match', async () => {
+        const volunteers = [
+          {
+            ...mockVolunteer,
+            matches: [
+              {
+                matchId: 3,
+                volunteerId: 1,
+                chameleonAnimalId: 42,
+                status: MatchStatus.ACTIVE,
+              },
+            ],
+          },
+        ];
+
+        mockQueryBuilder.getMany.mockResolvedValue(volunteers);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual(volunteers);
+        expect(result[0].matches).toHaveLength(1);
+        expect(result[0].matches[0].status).toBe(MatchStatus.ACTIVE);
+      });
+
+      it('should return an empty matches list when a volunteer has no active matches', async () => {
+        const volunteers = [
+          {
+            ...mockVolunteer,
+            matches: [],
+          },
+        ];
+
+        mockQueryBuilder.getMany.mockResolvedValue(volunteers);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual(volunteers);
+        expect(result[0].matches).toEqual([]);
       });
 
       it('should return an empty array when there are no volunteers', async () => {
-        mockRepo.find.mockResolvedValue([]);
+        mockQueryBuilder.getMany.mockResolvedValue([]);
 
         const result = await service.getAllVolunteers();
 
         expect(result).toEqual([]);
-        expect(mockRepo.find).toHaveBeenCalled();
+        expect(mockQueryBuilder.getMany).toHaveBeenCalledTimes(1);
       });
     });
   });

@@ -247,10 +247,11 @@ export class VolunteersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiOperation({ summary: 'Get all volunteers with their current matches' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'All volunteers, regardless of match status',
+    description:
+      'All volunteers with their active matches, or an empty matches list',
     type: [FosterVolunteer],
   })
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
