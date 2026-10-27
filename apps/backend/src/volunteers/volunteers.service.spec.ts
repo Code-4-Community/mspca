@@ -122,6 +122,17 @@ describe('VolunteersService', () => {
         select: expectedSelect,
       });
     });
+
+    it('never selects coordinatorNotes', async () => {
+      mockRepo.findOne.mockResolvedValue(mockVolunteer);
+
+      await service.findByIdOrFail(1);
+
+      const options = mockRepo.findOne.mock.calls[0][0];
+      expect(options.select).not.toContain('coordinatorNotes');
+      expect(options.select).not.toContain('assignedCoordinator');
+      expect(options.select).toEqual(expectedSelect);
+    });
   });
 
   describe('findActiveOrFail', () => {
@@ -317,6 +328,27 @@ describe('VolunteersService', () => {
         'Created Cognito user cognito-sub-123 for jane@example.com but failed to save the Volunteer or delete the Cognito user',
       );
     });
+
+    it('does not return coordinatorNotes in the saved volunteer', async () => {
+      mockRepo.findOneBy.mockResolvedValue(null);
+      mockCognitoService.signUpUser.mockResolvedValue('sub-123');
+      mockRepo.save.mockResolvedValue({
+        volunteerId: 1,
+        firstName: 'Jane',
+        email: 'jane@example.com',
+        coordinatorNotes: '',
+      });
+
+      const result = await service.create({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: 'jane@example.com',
+        password: 'Password1!',
+      } as unknown as CreateVolunteerDto);
+
+      expect(result).not.toHaveProperty('coordinatorNotes');
+      expect(result).toHaveProperty('firstName', 'Jane');
+    });
   });
 
   describe('confirm', () => {
@@ -468,6 +500,20 @@ describe('VolunteersService', () => {
         new BadRequestException('Volunteer with ID 1 is not active'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('never writes coordinatorNotes when saving', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        status: VolunteerStatus.ACTIVE,
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      await service.deactivate(1);
+
+      expect(mockRepo.save.mock.calls[0][0]).not.toHaveProperty(
+        'coordinatorNotes',
+      );
     });
   });
 
@@ -767,6 +813,14 @@ describe('VolunteersService', () => {
 
         expect(result).toEqual([]);
         expect(mockRepo.find).toHaveBeenCalled();
+      });
+
+      it('excludes coordinatorNotes from the query', async () => {
+        mockRepo.find.mockResolvedValue(mockVolunteers);
+
+        await service.getAllVolunteers();
+
+        expect(mockRepo.find).toHaveBeenCalledWith({ select: expectedSelect });
       });
     });
   });
