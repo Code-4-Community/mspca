@@ -42,8 +42,6 @@ const volunteerWithCoordinators = {
   assignedCoordinators: [coordinator, secondCoordinator],
 } as FosterVolunteer;
 
-const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
-
 describe('MatchesService', () => {
   let service: MatchesService;
   let matchRepo: {
@@ -91,8 +89,6 @@ describe('MatchesService', () => {
   } as Match;
 
   beforeEach(async () => {
-    process.env.AWS_SES_SENDER_EMAIL = 'test-sender@example.com';
-
     transactionRepo = {
       findOneBy: jest.fn(),
       find: jest.fn(),
@@ -135,33 +131,11 @@ describe('MatchesService', () => {
     jest.clearAllMocks();
   });
 
-  afterAll(() => {
-    if (originalSenderEmail === undefined) {
-      delete process.env.AWS_SES_SENDER_EMAIL;
-    } else {
-      process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
-    }
-  });
-
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
   describe('create', () => {
-    const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
-
-    beforeEach(() => {
-      process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
-    });
-
-    afterEach(() => {
-      if (originalSenderEmail === undefined) {
-        delete process.env.AWS_SES_SENDER_EMAIL;
-      } else {
-        process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
-      }
-    });
-
     it('creates the match with a PENDING status', async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinator,
@@ -733,34 +707,6 @@ describe('MatchesService', () => {
       );
 
       expect(transactionRepo.save).toHaveBeenCalledTimes(2);
-    });
-
-    it('should log a missing sender email without affecting approval', async () => {
-      delete process.env.AWS_SES_SENDER_EMAIL;
-
-      const otherMatches = [
-        {
-          matchId: 2,
-          chameleonAnimalId: 42,
-          status: MatchStatus.PENDING,
-          volunteer: { email: 'volunteer2@gmail.com' },
-        },
-      ] as Match[];
-
-      transactionRepo.findOneBy.mockResolvedValue({ ...mockMatch });
-      transactionRepo.find.mockResolvedValue(otherMatches);
-
-      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
-
-      const result = await service.approveMatch(1);
-
-      expect(result.status).toBe(MatchStatus.ACTIVE);
-      expect(otherMatches[0].status).toBe(MatchStatus.CANCELED);
-      expect(transactionRepo.save).toHaveBeenCalledTimes(2);
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('AWS_SES_SENDER_EMAIL is not configured'),
-      );
     });
 
     it('should throw NotFoundException when match does not exist', async () => {

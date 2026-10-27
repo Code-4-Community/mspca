@@ -24,6 +24,7 @@ import { coordinatorLostVolunteerEmail } from '../coordinators/emails/coordinato
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
+import { requireEnv } from '../utils/env';
 
 @Injectable()
 export class VolunteersService {
@@ -225,6 +226,7 @@ export class VolunteersService {
       );
     }
 
+    const previousHomebase = volunteer.homebase;
     const previous = volunteer.assignedCoordinators.filter((c) => c.active);
     const next = await this.coordinatorsService.findActiveByHomebase(homebase);
 
@@ -241,7 +243,7 @@ export class VolunteersService {
       ),
       this.notifyCoordinators(
         next,
-        coordinatorGainedVolunteerEmail(saved),
+        coordinatorGainedVolunteerEmail(saved, previousHomebase),
         saved,
       ),
     ]);
@@ -274,7 +276,7 @@ export class VolunteersService {
 
     try {
       await this.emailsService.sendEmail({
-        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        toEmail: requireEnv('AWS_SES_SENDER_EMAIL'),
         ccEmails: coordinators.map((c) => c.email),
         ...email,
       });

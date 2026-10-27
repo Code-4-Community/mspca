@@ -16,6 +16,7 @@ import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCreatedEmail } from './emails/matchCreated';
 import { matchCanceledEmail } from '../emails/matchCanceled';
+import { requireEnv } from '../utils/env';
 
 @Injectable()
 export class MatchesService {
@@ -119,7 +120,7 @@ export class MatchesService {
       }
 
       await this.emailsService.sendEmail({
-        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        toEmail: requireEnv('AWS_SES_SENDER_EMAIL'),
         ccEmails: coordinators.map((c) => c.email),
         ...matchCreatedEmail(match, volunteer),
       });
@@ -201,34 +202,24 @@ export class MatchesService {
         return { approvedMatch, applicantEmails };
       });
 
-    if (applicantEmails.length > 0) {
-      const senderEmail = process.env.AWS_SES_SENDER_EMAIL;
+    const batchSize = 50;
 
-      if (!senderEmail) {
+    for (let i = 0; i < applicantEmails.length; i += batchSize) {
+      const batch = applicantEmails.slice(i, i + batchSize);
+
+      try {
+        await this.emailsService.sendEmail({
+          toEmail: requireEnv('AWS_SES_SENDER_EMAIL'),
+          bccEmails: batch,
+          ...matchCanceledEmail(),
+        });
+      } catch (error) {
         this.logger.error(
-          `Failed to send match cancellation emails for approved match ${approvedMatch.matchId}: AWS_SES_SENDER_EMAIL is not configured`,
+          `Failed to send match cancellation email batch ${
+            Math.floor(i / batchSize) + 1
+          }.`,
+          error,
         );
-      } else {
-        const batchSize = 50;
-
-        for (let i = 0; i < applicantEmails.length; i += batchSize) {
-          const batch = applicantEmails.slice(i, i + batchSize);
-
-          try {
-            await this.emailsService.sendEmail({
-              toEmail: senderEmail,
-              bccEmails: batch,
-              ...matchCanceledEmail(),
-            });
-          } catch (error) {
-            this.logger.error(
-              `Failed to send match cancellation email batch ${
-                Math.floor(i / batchSize) + 1
-              }.`,
-              error,
-            );
-          }
-        }
       }
     }
 

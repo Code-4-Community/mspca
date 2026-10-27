@@ -830,7 +830,6 @@ describe('VolunteersService', () => {
   });
 
   describe('changeHomebase', () => {
-    const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
     const oldCoordinators = [
       {
         coordinatorId: 1,
@@ -868,20 +867,11 @@ describe('VolunteersService', () => {
       } as FosterVolunteer);
 
     beforeEach(() => {
-      process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
       mockCoordinatorsService.findActiveByHomebase.mockResolvedValue(
         newCoordinators,
       );
       mockRepo.save.mockImplementation(async (volunteer) => volunteer);
       emailsService.sendEmail.mockResolvedValue(undefined);
-    });
-
-    afterEach(() => {
-      if (originalSenderEmail === undefined) {
-        delete process.env.AWS_SES_SENDER_EMAIL;
-      } else {
-        process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
-      }
     });
 
     it('saves the new homebase and replaces the coordinator list', async () => {
@@ -930,6 +920,21 @@ describe('VolunteersService', () => {
           toEmail: 'sender@example.com',
           ccEmails: ['new3@example.com'],
           subject: 'New volunteer assigned to you',
+        }),
+      );
+    });
+
+    it('names the old and new homebase in the email to the new coordinators', async () => {
+      mockRepo.findOne.mockResolvedValue(makeVolunteer());
+
+      await service.changeHomebase(9, Homebase.SALEM);
+
+      expect(emailsService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'New volunteer assigned to you',
+          bodyHtml: expect.stringContaining(
+            'has moved from the Boston homebase to the Salem homebase',
+          ),
         }),
       );
     });
