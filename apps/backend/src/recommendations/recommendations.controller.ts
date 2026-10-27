@@ -34,7 +34,6 @@ export class RecommendationsController {
     @Body() body: CreateRecommendationDTO,
   ): Promise<Recommendation> {
     validateId(body.volunteerId, 'Volunteer');
-    validateId(body.chameleonAnimalId, 'Chameleon Animal');
 
     await this.volunteersService.findActiveOrFail(body.volunteerId);
     await this.animalsService.findByChameleonIdOrFail(body.chameleonAnimalId);

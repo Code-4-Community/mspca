@@ -21,7 +21,6 @@ import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
-import { AnimalsService } from '../animals/animals.service';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -29,7 +28,6 @@ export class VolunteersController {
   constructor(
     private volunteersService: VolunteersService,
     private matchesService: MatchesService,
-    private animalsService: AnimalsService,
   ) {}
 
   @Public()
@@ -248,14 +246,13 @@ export class VolunteersController {
   async updateAnimalPreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateAnimalPreferencesDto,
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     validateId(volunteerId, 'Volunteer');
     if (!dto.added?.length && !dto.removed?.length) {
       throw new BadRequestException(
         'At least one of added or removed must be provided',
       );
     }
-    await this.animalsService.checkAllExistOrFail(dto.added ?? []);
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 }

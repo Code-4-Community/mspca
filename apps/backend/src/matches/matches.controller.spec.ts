@@ -11,7 +11,6 @@ import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { DenyMatchDto } from './dtos/deny-match.dto';
-import { AnimalsService } from '../animals/animals.service';
 
 describe('MatchesController', () => {
   let controller: MatchesController;
@@ -21,7 +20,6 @@ describe('MatchesController', () => {
     approveMatch: jest.Mock;
     denyMatch: jest.Mock;
   };
-  let animalsService: { findByChameleonIdOrFail: jest.Mock };
 
   const mockMatch = {
     matchId: 1,
@@ -36,14 +34,10 @@ describe('MatchesController', () => {
       approveMatch: jest.fn(),
       denyMatch: jest.fn(),
     };
-    animalsService = { findByChameleonIdOrFail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MatchesController],
-      providers: [
-        { provide: MatchesService, useValue: service },
-        { provide: AnimalsService, useValue: animalsService },
-      ],
+      providers: [{ provide: MatchesService, useValue: service }],
     }).compile();
 
     controller = module.get<MatchesController>(MatchesController);
@@ -59,54 +53,38 @@ describe('MatchesController', () => {
 
   describe('createMatch', () => {
     it('passes the body through to the service', async () => {
-      animalsService.findByChameleonIdOrFail.mockResolvedValue({});
       service.create.mockResolvedValue({ matchId: 10 } as Match);
-      const body = { volunteerId: 1, chameleonAnimalId: 42 };
+      const body = { volunteerId: 1, chameleonAnimalId: 'A42' };
 
       const match = await controller.createMatch(body);
 
-      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(42);
       expect(service.create).toHaveBeenCalledWith(body);
       expect(match.matchId).toEqual(10);
     });
 
-    it('does not create a match when the animal does not exist', async () => {
-      const error = new NotFoundException(
-        'Animal with Chameleon ID 42 not found',
-      );
-      animalsService.findByChameleonIdOrFail.mockRejectedValue(error);
-
-      await expect(
-        controller.createMatch({ volunteerId: 1, chameleonAnimalId: 42 }),
-      ).rejects.toThrow(error);
-      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(42);
-      expect(service.create).not.toHaveBeenCalled();
-    });
-
-    // Apart from the animal check, whatever the service throws has to come
-    // back out untouched.
+    // The handler adds no guards of its own, so whatever the service throws
+    // has to come back out untouched.
     it('surfaces a NotFoundException from the service', async () => {
-      animalsService.findByChameleonIdOrFail.mockResolvedValue({});
       service.create.mockRejectedValue(
         new NotFoundException('Volunteer not found'),
       );
 
       await expect(
-        controller.createMatch({ volunteerId: 999, chameleonAnimalId: 42 }),
+        controller.createMatch({ volunteerId: 999, chameleonAnimalId: 'A42' }),
       ).rejects.toThrow(NotFoundException);
     });
 
     // Invalid bodies never reach the handler - the global ValidationPipe
     // rejects them first, so run the real pipe over the DTO here.
     it.each([
-      { volunteerId: 0, chameleonAnimalId: 42 },
-      { volunteerId: -1, chameleonAnimalId: 42 },
-      { volunteerId: 1.5, chameleonAnimalId: 42 },
-      { volunteerId: 1, chameleonAnimalId: 0 },
-      { volunteerId: 1, chameleonAnimalId: 'abc' },
-      { chameleonAnimalId: 42 },
+      { volunteerId: 0, chameleonAnimalId: 'A42' },
+      { volunteerId: -1, chameleonAnimalId: 'A42' },
+      { volunteerId: 1.5, chameleonAnimalId: 'A42' },
+      { volunteerId: 1, chameleonAnimalId: 42 },
+      { volunteerId: 1, chameleonAnimalId: '   ' },
+      { volunteerId: 1 },
     ])('rejects the invalid body %j', async (body) => {
-      const pipe = new ValidationPipe({ whitelist: true });
+      const pipe = new ValidationPipe({ whitelist: true, transform: true });
 
       await expect(
         pipe.transform(body, { type: 'body', metatype: CreateMatchDto }),

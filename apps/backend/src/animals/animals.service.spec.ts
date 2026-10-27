@@ -4,6 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { In } from 'typeorm';
 import { AnimalsService } from './animals.service';
 import { Animal } from './animals.entity';
+import { Restriction } from './animals.types';
+import { Homebase } from '../types';
 
 describe('AnimalsService', () => {
   let service: AnimalsService;
@@ -11,15 +13,17 @@ describe('AnimalsService', () => {
 
   const mockAnimal = {
     animalId: 1,
-    chameleonAnimalId: 42,
+    chameleonAnimalId: 'A42',
     name: 'Biscuit',
     age: 3,
-    sex: 'Female',
+    months: 2,
+    sex: 'F',
     breed: ['Beagle'],
     weight: 22.5,
-    location: 'Boston',
-    picture: null,
-    fosterBioMemo: null,
+    location: Homebase.BOSTON,
+    pictures: ['https://example.com/biscuit.jpg'],
+    fosterBioMemo: 'Loves walks',
+    restrictions: [Restriction.CAT_FREE_HOME],
   } as Animal;
 
   beforeEach(async () => {
@@ -43,22 +47,22 @@ describe('AnimalsService', () => {
     it('returns the animal when one with the Chameleon ID exists', async () => {
       mockRepo.findOneBy.mockResolvedValue(mockAnimal);
 
-      const result = await service.findByChameleonIdOrFail(42);
+      const result = await service.findByChameleonIdOrFail('A42');
 
       expect(result).toBe(mockAnimal);
       expect(mockRepo.findOneBy).toHaveBeenCalledWith({
-        chameleonAnimalId: 42,
+        chameleonAnimalId: 'A42',
       });
     });
 
     it('throws NotFoundException when no animal with the Chameleon ID exists', async () => {
       mockRepo.findOneBy.mockResolvedValue(null);
 
-      await expect(service.findByChameleonIdOrFail(999)).rejects.toThrow(
-        new NotFoundException('Animal with Chameleon ID 999 not found'),
+      await expect(service.findByChameleonIdOrFail('A999')).rejects.toThrow(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
       );
       expect(mockRepo.findOneBy).toHaveBeenCalledWith({
-        chameleonAnimalId: 999,
+        chameleonAnimalId: 'A999',
       });
     });
   });
@@ -66,28 +70,45 @@ describe('AnimalsService', () => {
   describe('checkAllExistOrFail', () => {
     it('does not throw when every Chameleon ID exists', async () => {
       mockRepo.find.mockResolvedValue([
-        { ...mockAnimal, chameleonAnimalId: 42 },
-        { ...mockAnimal, animalId: 2, chameleonAnimalId: 107 },
+        { ...mockAnimal, chameleonAnimalId: 'A42' },
+        { ...mockAnimal, animalId: 2, chameleonAnimalId: 'A107' },
       ]);
 
       await expect(
-        service.checkAllExistOrFail([42, 107]),
+        service.checkAllExistOrFail(['A42', 'A107']),
       ).resolves.toBeUndefined();
       expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { chameleonAnimalId: In([42, 107]) },
+        where: { chameleonAnimalId: In(['A42', 'A107']) },
       });
     });
 
     it('throws NotFoundException listing every missing Chameleon ID', async () => {
       mockRepo.find.mockResolvedValue([
-        { ...mockAnimal, chameleonAnimalId: 42 },
+        { ...mockAnimal, chameleonAnimalId: 'A42' },
       ]);
 
-      await expect(service.checkAllExistOrFail([42, 998, 999])).rejects.toThrow(
-        new NotFoundException('Animals with Chameleon IDs not found: 998, 999'),
+      await expect(
+        service.checkAllExistOrFail(['A42', 'A998', 'A999']),
+      ).rejects.toThrow(
+        new NotFoundException(
+          'Animals with Chameleon IDs not found: A998, A999',
+        ),
       );
       expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { chameleonAnimalId: In([42, 998, 999]) },
+        where: { chameleonAnimalId: In(['A42', 'A998', 'A999']) },
+      });
+    });
+
+    it('lists a missing Chameleon ID once even if it is given more than once', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.checkAllExistOrFail(['A998', 'A998']),
+      ).rejects.toThrow(
+        new NotFoundException('Animals with Chameleon IDs not found: A998'),
+      );
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        where: { chameleonAnimalId: In(['A998']) },
       });
     });
 

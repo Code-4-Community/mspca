@@ -16,7 +16,6 @@ import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
-import { AnimalsService } from '../animals/animals.service';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -40,7 +39,6 @@ describe('VolunteersController', () => {
     updateAnimalPreferences: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
-  let mockAnimalsService: { checkAllExistOrFail: jest.Mock };
 
   const mockVolunteers = [
     { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
@@ -60,14 +58,12 @@ describe('VolunteersController', () => {
       updateAnimalPreferences: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
-    mockAnimalsService = { checkAllExistOrFail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VolunteersController],
       providers: [
         { provide: VolunteersService, useValue: mockVolunteersService },
         { provide: MatchesService, useValue: mockMatchesService },
-        { provide: AnimalsService, useValue: mockAnimalsService },
       ],
     }).compile();
 
@@ -152,7 +148,7 @@ describe('VolunteersController', () => {
         {
           matchId: 1,
           volunteerId: 7,
-          chameleonAnimalId: 42,
+          chameleonAnimalId: 'A42',
           status: MatchStatus.DENIED,
           deniedReason: 'Schedule conflict',
         },
@@ -359,33 +355,18 @@ describe('VolunteersController', () => {
 
   describe('updateAnimalPreferences', () => {
     it('returns the updated list from the service', async () => {
-      const dto = { added: [55], removed: [107] };
-      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([42, 55]);
+      const dto = { added: ['A55'], removed: ['A107'] };
+      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([
+        'A42',
+        'A55',
+      ]);
 
       const result = await controller.updateAnimalPreferences(1, dto);
 
-      expect(result).toEqual([42, 55]);
-      expect(mockAnimalsService.checkAllExistOrFail).toHaveBeenCalledWith([55]);
+      expect(result).toEqual(['A42', 'A55']);
       expect(
         mockVolunteersService.updateAnimalPreferences,
       ).toHaveBeenCalledWith(1, dto);
-    });
-
-    it('does not update preferences when an added animal does not exist', async () => {
-      const error = new NotFoundException(
-        'Animals with Chameleon IDs not found: 998, 999',
-      );
-      mockAnimalsService.checkAllExistOrFail.mockRejectedValue(error);
-
-      await expect(
-        controller.updateAnimalPreferences(1, { added: [55, 998, 999] }),
-      ).rejects.toThrow(error);
-      expect(mockAnimalsService.checkAllExistOrFail).toHaveBeenCalledWith([
-        55, 998, 999,
-      ]);
-      expect(
-        mockVolunteersService.updateAnimalPreferences,
-      ).not.toHaveBeenCalled();
     });
 
     it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(
@@ -413,7 +394,7 @@ describe('VolunteersController', () => {
       );
 
       await expect(
-        controller.updateAnimalPreferences(999, { added: [42] }),
+        controller.updateAnimalPreferences(999, { added: ['A42'] }),
       ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );

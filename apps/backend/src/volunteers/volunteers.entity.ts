@@ -79,11 +79,11 @@ export class FosterVolunteer {
 
   @Column({
     name: 'animal_preferences',
-    type: 'int',
+    type: 'text',
     array: true,
     default: () => "'{}'",
   })
-  animalPreferences!: number[];
+  animalPreferences!: string[];
 
   @ManyToOne(
     () => FosterCoordinator,

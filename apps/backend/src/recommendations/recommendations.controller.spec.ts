@@ -15,7 +15,7 @@ describe('RecommendationsController', () => {
 
   const body = {
     volunteerId: 7,
-    chameleonAnimalId: 42,
+    chameleonAnimalId: 'A42',
   } as CreateRecommendationDTO;
 
   beforeEach(async () => {
@@ -61,7 +61,9 @@ describe('RecommendationsController', () => {
 
       expect(result).toBe(recommendation);
       expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(7);
-      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(42);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
       expect(recommendationsService.create).toHaveBeenCalledWith(body);
     });
 
@@ -77,7 +79,7 @@ describe('RecommendationsController', () => {
 
     it('does not create a recommendation when the animal does not exist', async () => {
       const error = new NotFoundException(
-        'Animal with Chameleon ID 42 not found',
+        'Animal with Chameleon ID A42 not found',
       );
       volunteersService.findActiveOrFail.mockResolvedValue({});
       animalsService.findByChameleonIdOrFail.mockRejectedValue(error);
@@ -85,7 +87,9 @@ describe('RecommendationsController', () => {
       await expect(controller.createRecommendation(body)).rejects.toThrow(
         error,
       );
-      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(42);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
       expect(recommendationsService.create).not.toHaveBeenCalled();
     });
   });

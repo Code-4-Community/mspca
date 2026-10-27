@@ -17,7 +17,7 @@ export class AnimalsService {
    * @returns The Animal.
    * @throws {NotFoundException} If no Animal with the Chameleon ID exists.
    */
-  async findByChameleonIdOrFail(chameleonAnimalId: number): Promise<Animal> {
+  async findByChameleonIdOrFail(chameleonAnimalId: string): Promise<Animal> {
     const animal = await this.repo.findOneBy({ chameleonAnimalId });
 
     if (!animal) {
@@ -32,21 +32,24 @@ export class AnimalsService {
   /**
    * Ensures every given Chameleon animal ID belongs to an existing Animal.
    *
-   * Looks all of the IDs up in a single query and reports every missing ID together.
+   * Looks all of the IDs up in a single query and reports every missing ID together,
+   * listing each missing ID once even if it was given more than once.
    *
    * @param chameleonAnimalIds - The Chameleon IDs to check.
    * @throws {NotFoundException} If any of the IDs don't match an Animal.
    */
-  async checkAllExistOrFail(chameleonAnimalIds: number[]): Promise<void> {
-    if (chameleonAnimalIds.length === 0) {
+  async checkAllExistOrFail(chameleonAnimalIds: string[]): Promise<void> {
+    const uniqueIds = [...new Set(chameleonAnimalIds)];
+
+    if (uniqueIds.length === 0) {
       return;
     }
 
     const animals = await this.repo.find({
-      where: { chameleonAnimalId: In(chameleonAnimalIds) },
+      where: { chameleonAnimalId: In(uniqueIds) },
     });
     const foundIds = new Set(animals.map((animal) => animal.chameleonAnimalId));
-    const missing = chameleonAnimalIds.filter((id) => !foundIds.has(id));
+    const missing = uniqueIds.filter((id) => !foundIds.has(id));
 
     if (missing.length > 0) {
       throw new NotFoundException(

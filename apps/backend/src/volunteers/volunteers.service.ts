@@ -18,6 +18,7 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
 import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { AnimalsService } from '../animals/animals.service';
 
 @Injectable()
 export class VolunteersService {
@@ -28,6 +29,7 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
     private emailsService: EmailsService,
+    private animalsService: AnimalsService,
   ) {}
 
   /**
@@ -306,7 +308,7 @@ export class VolunteersService {
    * @param id - The Volunteer's ID.
    * @param dto - The animal IDs to add and/or remove.
    * @returns The Volunteer's updated list of animal IDs.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If no Volunteer with the ID exists, or an added animal does not exist.
    * @throws {BadRequestException} If the Volunteer is not active, animals are removed from
    * an empty list, an ID is in both the added and removed lists, or a removed ID is not in
    * the Volunteer's preferences.
@@ -314,9 +316,13 @@ export class VolunteersService {
   async updateAnimalPreferences(
     id: number,
     dto: UpdateAnimalPreferencesDto,
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     const volunteer = await this.findActiveOrFail(id);
     const { added = [], removed = [] } = dto;
+
+    if (added.length > 0) {
+      await this.animalsService.checkAllExistOrFail(added);
+    }
     const removedSet = new Set(removed);
     const preferences = new Set(volunteer.animalPreferences);
 

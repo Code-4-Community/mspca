@@ -1,11 +1,12 @@
-import { IsInt, IsPositive } from 'class-validator';
+import { IsInt, IsPositive, MaxLength } from 'class-validator';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 export class CreateMatchDto {
   @IsInt()
   @IsPositive()
   volunteerId!: number;
 
-  @IsInt()
-  @IsPositive()
-  chameleonAnimalId!: number;
+  @IsNonEmptyString()
+  @MaxLength(255)
+  chameleonAnimalId!: string;
 }

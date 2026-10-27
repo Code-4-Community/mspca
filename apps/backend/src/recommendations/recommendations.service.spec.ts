@@ -9,7 +9,7 @@ describe('RecommendationsService', () => {
 
   const saved = {
     volunteerId: 7,
-    chameleonAnimalId: 42,
+    chameleonAnimalId: 'A42',
     isActive: true,
   } as Recommendation;
 
@@ -38,10 +38,10 @@ describe('RecommendationsService', () => {
 
   describe('create', () => {
     it('upserts the recommendation as active on the composite key', async () => {
-      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
+      await service.create({ volunteerId: 7, chameleonAnimalId: 'A42' });
 
       expect(repo.upsert).toHaveBeenCalledWith(
-        { volunteerId: 7, chameleonAnimalId: 42, isActive: true },
+        { volunteerId: 7, chameleonAnimalId: 'A42', isActive: true },
         ['volunteerId', 'chameleonAnimalId'],
       );
     });
@@ -49,7 +49,7 @@ describe('RecommendationsService', () => {
     it('reactivates an inactive recommendation for the same pair', async () => {
       const result = await service.create({
         volunteerId: 7,
-        chameleonAnimalId: 42,
+        chameleonAnimalId: 'A42',
       });
 
       expect(repo.upsert).toHaveBeenCalledWith(
@@ -62,13 +62,13 @@ describe('RecommendationsService', () => {
     it('returns the persisted recommendation', async () => {
       const result = await service.create({
         volunteerId: 7,
-        chameleonAnimalId: 42,
+        chameleonAnimalId: 'A42',
       });
 
       expect(result).toBe(saved);
       expect(repo.findOneByOrFail).toHaveBeenCalledWith({
         volunteerId: 7,
-        chameleonAnimalId: 42,
+        chameleonAnimalId: 'A42',
       });
     });
 
@@ -82,7 +82,7 @@ describe('RecommendationsService', () => {
         return saved;
       });
 
-      await service.create({ volunteerId: 7, chameleonAnimalId: 42 });
+      await service.create({ volunteerId: 7, chameleonAnimalId: 'A42' });
 
       expect(order).toEqual(['upsert', 'read']);
     });

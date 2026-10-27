@@ -1,23 +1,26 @@
 import {
   ArrayUnique,
   IsArray,
-  IsInt,
+  IsNotEmpty,
   IsOptional,
-  IsPositive,
+  IsString,
+  MaxLength,
 } from 'class-validator';
 
 export class UpdateAnimalPreferencesDto {
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsInt({ each: true })
-  @IsPositive({ each: true })
-  added?: number[];
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @MaxLength(255, { each: true })
+  added?: string[];
 
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsInt({ each: true })
-  @IsPositive({ each: true })
-  removed?: number[];
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @MaxLength(255, { each: true })
+  removed?: string[];
 }
