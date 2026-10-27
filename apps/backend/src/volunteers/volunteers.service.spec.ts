@@ -14,6 +14,7 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
 import { EmailsService } from '../aws/ses/email.service';
 
@@ -574,6 +575,101 @@ describe('VolunteersService', () => {
 
       await expect(service.reactivate(1)).rejects.toThrow(
         new BadRequestException('Volunteer with ID 1 is not inactive'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('coordinatorFindByIdOrFail', () => {
+    it('returns the full volunteer, including coordinatorNotes', async () => {
+      const volunteer = { ...mockVolunteer, coordinatorNotes: 'flagged' };
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      const result = await service.coordinatorFindByIdOrFail(1);
+
+      expect(result).toBe(volunteer);
+      expect(result.coordinatorNotes).toBe('flagged');
+    });
+
+    it('does not restrict the selected columns', async () => {
+      mockRepo.findOne.mockResolvedValue(mockVolunteer);
+
+      await service.coordinatorFindByIdOrFail(1);
+
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinator'],
+      });
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.coordinatorFindByIdOrFail(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+  });
+
+  describe('coordinatorUpdateVolunteerById', () => {
+    it('updates coordinatorNotes and returns the volunteer with notes', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: '',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        coordinatorNotes: 'missed two pickups',
+      });
+
+      expect(result.coordinatorNotes).toBe('missed two pickups');
+      expect(result.firstName).toBe('Jane');
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ coordinatorNotes: 'missed two pickups' }),
+      );
+    });
+
+    it('updates volunteer-editable fields alongside the notes', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: '',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const dto: CoordinatorUpdateVolunteerDto = {
+        city: 'Boston',
+        notes: 'updated notes',
+        coordinatorNotes: 'flag',
+      };
+      const result = await service.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result.city).toBe('Boston');
+      expect(result.notes).toBe('updated notes');
+      expect(result.coordinatorNotes).toBe('flag');
+    });
+
+    it('allows clearing the notes with an empty string', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: 'old',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        coordinatorNotes: '',
+      });
+
+      expect(result.coordinatorNotes).toBe('');
+    });
+
+    it('throws NotFoundException and saves nothing when the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.coordinatorUpdateVolunteerById(999, { coordinatorNotes: 'x' }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
