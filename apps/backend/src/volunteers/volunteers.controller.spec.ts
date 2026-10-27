@@ -15,6 +15,7 @@ import { FosterType, VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
@@ -39,6 +40,7 @@ describe('VolunteersController', () => {
     deny: jest.Mock;
     getAllVolunteers: jest.Mock;
     updateAnimalPreferences: jest.Mock;
+    coordinatorUpdateVolunteerById: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -59,6 +61,7 @@ describe('VolunteersController', () => {
       deny: jest.fn(),
       getAllVolunteers: jest.fn(),
       updateAnimalPreferences: jest.fn(),
+      coordinatorUpdateVolunteerById: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -77,6 +80,78 @@ describe('VolunteersController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('coordinatorUpdateVolunteerById', () => {
+    it('passes the id and dto to the service and returns the volunteer with notes', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = {
+        coordinatorNotes: 'missed two pickups',
+      };
+      const updated = {
+        ...mockVolunteer,
+        coordinatorNotes: 'missed two pickups',
+      };
+      mockVolunteersService.coordinatorUpdateVolunteerById.mockResolvedValue(
+        updated,
+      );
+
+      const result = await controller.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result).toBe(updated);
+      expect(result.coordinatorNotes).toBe('missed two pickups');
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('accepts volunteer-editable fields alongside the notes', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = {
+        city: 'Boston',
+        coordinatorNotes: 'flag',
+      };
+      mockVolunteersService.coordinatorUpdateVolunteerById.mockResolvedValue({
+        ...mockVolunteer,
+        ...dto,
+      });
+
+      await controller.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('throws BadRequestException when no fields are provided', async () => {
+      await expect(
+        controller.coordinatorUpdateVolunteerById(1, {}),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid volunteer id without calling the service', async () => {
+      await expect(
+        controller.coordinatorUpdateVolunteerById(-1, {
+          coordinatorNotes: 'x',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('propagates NotFoundException from the service', async () => {
+      const error = new NotFoundException('Volunteer with ID 999 not found');
+      mockVolunteersService.coordinatorUpdateVolunteerById.mockRejectedValue(
+        error,
+      );
+
+      await expect(
+        controller.coordinatorUpdateVolunteerById(999, {
+          coordinatorNotes: 'x',
+        }),
+      ).rejects.toBe(error);
+    });
+  });
   describe('create', () => {
     const dto = {
       firstName: 'Jane',

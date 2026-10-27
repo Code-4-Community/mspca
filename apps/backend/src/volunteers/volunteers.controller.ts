@@ -17,11 +17,13 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
+import { VolunteerWithoutNotes } from './volunteers.types';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -55,7 +57,9 @@ export class VolunteersController {
       'The Cognito user could not be created; or the volunteer could not be saved and the Cognito user was deleted; ' +
       'or the save and the Cognito cleanup both failed (the orphaned Cognito user is logged)',
   })
-  async create(@Body() dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+  async create(
+    @Body() dto: CreateVolunteerDto,
+  ): Promise<VolunteerWithoutNotes> {
     return this.volunteersService.create(dto);
   }
 
@@ -123,7 +127,7 @@ export class VolunteersController {
   @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.deactivate(id);
   }
@@ -138,7 +142,7 @@ export class VolunteersController {
   @Patch('/:id/reactivate')
   async reactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.reactivate(id);
   }
@@ -157,9 +161,47 @@ export class VolunteersController {
   })
   async getVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(volunteerId, 'Volunteer');
     return this.volunteersService.findByIdOrFail(volunteerId);
+  }
+
+  @Patch('/:volunteerId/coordinator-update-profile')
+  @ApiOperation({
+    summary: "Update a volunteer's profile as a coordinator",
+    description:
+      'Accepts every field a volunteer can edit, plus coordinator-only fields such as coordinatorNotes. Returns the full volunteer, including notes.',
+  })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The volunteer was updated',
+    type: FosterVolunteer,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid ID, invalid field, or no fields provided',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async coordinatorUpdateVolunteerById(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: CoordinatorUpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    validateId(volunteerId, 'Volunteer');
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException('At least one field must be provided');
+    }
+    return this.volunteersService.coordinatorUpdateVolunteerById(
+      volunteerId,
+      dto,
+    );
   }
 
   @Patch('/:volunteerId')
@@ -177,7 +219,7 @@ export class VolunteersController {
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateVolunteerDto,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(volunteerId, 'Volunteer');
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
@@ -207,7 +249,7 @@ export class VolunteersController {
   @Patch('/:id/approve')
   async approve(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutNotes> {
     validateId(id, 'Volunteer');
     return this.volunteersService.approve(id);
   }
@@ -253,7 +295,7 @@ export class VolunteersController {
     description: 'All volunteers, regardless of match status',
     type: [FosterVolunteer],
   })
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
+  async getAllVolunteers(): Promise<VolunteerWithoutNotes[]> {
     return this.volunteersService.getAllVolunteers();
   }
 

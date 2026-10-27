@@ -11,10 +11,10 @@ import { Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
-import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCanceledEmail } from '../emails/matchCanceled';
+import { VolunteerWithoutNotes } from '../volunteers/volunteers.types';
 
 @Injectable()
 export class MatchesService {
@@ -102,7 +102,7 @@ export class MatchesService {
    */
   private async notifyCoordinator(
     match: Match,
-    volunteer: FosterVolunteer,
+    volunteer: VolunteerWithoutNotes,
   ): Promise<void> {
     const coordinator = volunteer.assignedCoordinator;
 
