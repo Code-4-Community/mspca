@@ -30,11 +30,11 @@ export class CreateVolunteerDto {
   @MaxLength(255)
   phone!: string;
 
-  @ValidateIf((_, value) => value !== undefined)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @IsPhoneNumber('US')
   @MaxLength(20)
-  secondaryPhone?: string;
+  secondaryPhone?: string | null;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
@@ -70,14 +70,12 @@ export class CreateVolunteerDto {
   @IsEnum(Homebase)
   homebase!: Homebase;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   residentAnimals!: string;
 
-  @ValidateIf((_, value) => value !== undefined)
-  @IsString()
-  @IsNotEmpty()
-  notes?: string;
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNonEmptyString()
+  notes?: string | null;
 
   @IsArray()
   @ArrayNotEmpty()

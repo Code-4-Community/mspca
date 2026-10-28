@@ -27,7 +27,7 @@ export class CreateCoordinatorDto {
   @MaxLength(20)
   phone!: string;
 
-  @ValidateIf((_, value) => value !== undefined)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @MaxLength(20)
   @IsPhoneNumber('US')

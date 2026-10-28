@@ -30,10 +30,10 @@ export class UpdateVolunteerDto {
   @IsPhoneNumber('US')
   phone?: string;
 
-  @ValidateIf((_, value) => value !== undefined)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @IsPhoneNumber('US')
-  secondaryPhone?: string;
+  secondaryPhone?: string | null;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsNotEmpty()
@@ -64,9 +64,9 @@ export class UpdateVolunteerDto {
   @IsNonEmptyString()
   residentAnimals?: string;
 
-  @ValidateIf((_, value) => value !== undefined)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
-  notes?: string;
+  notes?: string | null;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
