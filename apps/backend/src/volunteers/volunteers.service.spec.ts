@@ -12,8 +12,8 @@ import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
-import { CreateVolunteerDto } from './dto/create-volunteer.dto';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
+import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
+import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
 import { Homebase } from '../types';
 
@@ -319,6 +319,8 @@ describe('VolunteersService', () => {
         '123456',
         CognitoRole.FosterVolunteer,
       );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException without calling Cognito when no volunteer has the email', async () => {
@@ -344,6 +346,29 @@ describe('VolunteersService', () => {
         service.confirm({ email: 'jane@example.com', code: '000000' }),
       ).rejects.toBe(error);
       expect(mockCognitoService.confirmUser).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('propagates group assignment failures from Cognito without attempting duplicate cleanup', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+      } as FosterVolunteer);
+
+      const error = new InternalServerErrorException('Failed to confirm user');
+      mockCognitoService.confirmUser.mockRejectedValue(error);
+
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '123456' }),
+      ).rejects.toBe(error);
+
+      expect(mockCognitoService.confirmUser).toHaveBeenCalledWith(
+        'jane@example.com',
+        '123456',
+        CognitoRole.FosterVolunteer,
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -626,23 +651,246 @@ describe('VolunteersService', () => {
     });
   });
 
-  describe('getAllVolunteers', () => {
-    it('should return all volunteers', async () => {
-      mockRepo.find.mockResolvedValue(mockVolunteers);
+  describe('deny', () => {
+    const pendingVolunteer = () =>
+      ({
+        volunteerId: 1,
+        firstName: 'Jane',
+        email: 'jane@example.com',
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer);
 
-      const result = await service.getAllVolunteers();
+    it('deletes the volunteer from Cognito, then from the database', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      mockCognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
+      const findSpy = jest.spyOn(service, 'findByIdOrFail');
 
-      expect(result).toEqual(mockVolunteers);
-      expect(mockRepo.find).toHaveBeenCalled();
+      await service.deny(1);
+
+      expect(findSpy).toHaveBeenCalledWith(1);
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledTimes(1);
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(mockRepo.delete).toHaveBeenCalledTimes(1);
+      expect(mockRepo.delete).toHaveBeenCalledWith({ volunteerId: 1 });
+      expect(
+        mockCognitoService.deleteUser.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockRepo.delete.mock.invocationCallOrder[0]);
     });
 
-    it('should return an empty array when there are no volunteers', async () => {
-      mockRepo.find.mockResolvedValue([]);
+    it('throws NotFoundException and deletes nothing if the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
 
-      const result = await service.getAllVolunteers();
+      await expect(service.deny(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
 
-      expect(result).toEqual([]);
-      expect(mockRepo.find).toHaveBeenCalled();
+    it('throws ConflictException and deletes nothing if the volunteer is not pending', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.ACTIVE,
+      });
+
+      await expect(service.deny(1)).rejects.toThrow(
+        new ConflictException('Only pending Volunteers can be denied'),
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('propagates the error and does not touch the database if Cognito fails', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      const cognitoError = new InternalServerErrorException(
+        'Failed to delete user: boom',
+      );
+      mockCognitoService.deleteUser.mockRejectedValue(cognitoError);
+
+      await expect(service.deny(1)).rejects.toBe(cognitoError);
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws a PARTIAL DELETION error if the database delete fails after Cognito succeeds', async () => {
+      mockRepo.findOne.mockResolvedValue(pendingVolunteer());
+      mockCognitoService.deleteUser.mockResolvedValue(undefined);
+      mockRepo.delete.mockRejectedValue(new Error('connection lost'));
+      const loggerSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => undefined);
+
+      const promise = service.deny(1);
+      await expect(promise).rejects.toThrow(InternalServerErrorException);
+      await expect(promise).rejects.toThrow(
+        new InternalServerErrorException(
+          'Volunteer: { volunteerId: 1, email: jane@example.com } was deleted from Cognito but not from database',
+        ),
+      );
+      expect(mockCognitoService.deleteUser).toHaveBeenCalledWith(
+        'jane@example.com',
+      );
+      expect(loggerSpy).toHaveBeenCalledTimes(1);
+    });
+
+    describe('getAllVolunteers', () => {
+      it('should return all volunteers', async () => {
+        mockRepo.find.mockResolvedValue(mockVolunteers);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual(mockVolunteers);
+        expect(mockRepo.find).toHaveBeenCalled();
+      });
+
+      it('should return an empty array when there are no volunteers', async () => {
+        mockRepo.find.mockResolvedValue([]);
+
+        const result = await service.getAllVolunteers();
+
+        expect(result).toEqual([]);
+        expect(mockRepo.find).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('updateAnimalPreferences', () => {
+    const volunteerWithPreferences = (animalPreferences: number[]) =>
+      ({
+        ...mockVolunteer,
+        status: VolunteerStatus.ACTIVE,
+        animalPreferences,
+      } as FosterVolunteer);
+
+    beforeEach(() => {
+      mockRepo.save.mockImplementation(async (v) => v);
+    });
+
+    it('adds the given animal IDs to the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+      const findSpy = jest.spyOn(service, 'findActiveOrFail');
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [107, 230],
+      });
+
+      expect(findSpy).toHaveBeenCalledWith(1);
+      expect(result).toEqual([42, 107, 230]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [42, 107, 230] }),
+      );
+    });
+
+    it('removes the given animal IDs from the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        removed: [42],
+      });
+
+      expect(result).toEqual([107]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [107] }),
+      );
+    });
+
+    it('applies removals and additions in the same request', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [55],
+        removed: [107],
+      });
+
+      expect(result).toEqual([42, 55]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ animalPreferences: [42, 55] }),
+      );
+    });
+
+    // Can't happen through the endpoint, since the DTO's @ArrayUnique rejects
+    // duplicate IDs; this checks the service on its own.
+    it('does not create duplicates when adding an ID already in the list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42]));
+
+      const result = await service.updateAnimalPreferences(1, {
+        added: [42, 55, 55],
+      });
+
+      expect(result).toEqual([42, 55]);
+    });
+
+    it('throws BadRequestException listing every removed ID that is not in the list', async () => {
+      const volunteer = volunteerWithPreferences([42]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      await expect(
+        service.updateAnimalPreferences(1, { removed: [42, 998, 999] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "Animal IDs not in the volunteer's preferences: 998, 999",
+        ),
+      );
+      expect(volunteer.animalPreferences).toEqual([42]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException listing every ID that is in both added and removed', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([42, 107]));
+
+      await expect(
+        service.updateAnimalPreferences(1, {
+          added: [42, 107, 55],
+          removed: [42, 107],
+        }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Animal IDs cannot be both added and removed: 42, 107',
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when the volunteer is not active', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...volunteerWithPreferences([42]),
+        status: VolunteerStatus.PENDING,
+      });
+
+      await expect(
+        service.updateAnimalPreferences(1, { added: [55] }),
+      ).rejects.toThrow(
+        new BadRequestException('Volunteer with ID 1 is not active'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when removing from an empty list', async () => {
+      mockRepo.findOne.mockResolvedValue(volunteerWithPreferences([]));
+
+      await expect(
+        service.updateAnimalPreferences(1, { removed: [42] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Volunteer with ID 1 has no animal preferences to remove',
+        ),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+      const findSpy = jest.spyOn(service, 'findActiveOrFail');
+
+      await expect(
+        service.updateAnimalPreferences(999, { added: [42] }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+      expect(findSpy).toHaveBeenCalledWith(999);
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
   });
 });

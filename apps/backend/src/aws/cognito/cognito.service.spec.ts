@@ -435,6 +435,7 @@ describe('CognitoService', () => {
         expect(sub).toBe('test-sub-123');
         expect(addUserToGroup).not.toHaveBeenCalled();
         expect(sendSpy).toHaveBeenCalledTimes(1);
+
         const cmd = sendSpy.mock.calls[0][0];
         expect(cmd).toBeInstanceOf(SignUpCommand);
         expect(cmd.input).toEqual({
@@ -575,6 +576,7 @@ describe('CognitoService', () => {
           Username: 'jane@example.com',
           ConfirmationCode: '123456',
         });
+
         expect(addUserToGroup).toHaveBeenCalledTimes(1);
         expect(addUserToGroup).toHaveBeenCalledWith(
           'jane@example.com',
@@ -659,6 +661,7 @@ describe('CognitoService', () => {
         ).rejects.toThrow(
           new InternalServerErrorException('Failed to confirm user'),
         );
+
         expect(sendSpy).toHaveBeenCalledTimes(1);
         expect(addUserToGroup).not.toHaveBeenCalled();
         expect(logError).toHaveBeenCalledTimes(1);
@@ -844,6 +847,14 @@ describe('CognitoService', () => {
           'Failed to delete user jane@example.com',
           error,
         );
+      });
+      it('throws when auth is disabled and does not call Cognito', async () => {
+        process.env.AUTH_DISABLED = 'true';
+
+        await expect(service.deleteUser('jane@example.com')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+        expect(sendSpy).not.toHaveBeenCalled();
       });
     });
 

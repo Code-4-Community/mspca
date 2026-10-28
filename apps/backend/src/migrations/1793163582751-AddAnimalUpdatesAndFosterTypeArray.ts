@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAnimalUpdatesAndFosterTypeArray1791429623582
+export class AddAnimalUpdatesAndFosterTypeArray1793163582751
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {

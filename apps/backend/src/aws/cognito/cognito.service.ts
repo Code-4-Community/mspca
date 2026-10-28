@@ -83,6 +83,7 @@ export class CognitoService {
       );
       return null;
     }
+
     // The CognitoJWTGuard attaches the verified JWT payload to request.user,
     // but Express's Request type doesn't know about it, so we widen the type.
     const authenticatedRequest = request as Request & {
@@ -249,19 +250,19 @@ export class CognitoService {
   }
 
   /**
-   * Confirms a self-service user's email with the code Cognito sent them, then
-   * assigns them to a group (role).
+   * Confirms a self-service user's email with the code Cognito sent them,
+   * then assigns them to the specified Cognito group.
    *
-   * If the user is confirmed but can't be added to the group, they are deleted,
-   * since a confirmed user with no role can't use the app.
+   * If confirmation succeeds but group assignment fails, an attempt is made
+   * to delete the user to avoid leaving a confirmed user without a role.
    *
    * @param email - The user's email (their Cognito username).
    * @param code - The verification code from the sign-up email.
-   * @param role - The role (group) to assign once confirmed.
+   * @param role - The Cognito group to assign after successful confirmation.
    * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed (e.g. they already are).
    * @throws {NotFoundException} If no user with the email exists.
    * @throws {HttpException} 429 if there have been too many attempts.
-   * @throws {InternalServerErrorException} If confirmation fails, or adding to the group fails (the user is then deleted).
+   * @throws {InternalServerErrorException} If confirmation or group assignment fails.
    */
   async confirmUser(
     email: string,
@@ -316,6 +317,8 @@ export class CognitoService {
       throw new InternalServerErrorException('Failed to confirm user');
     }
 
+    // Add the verified user to their Cognito group.
+    // If group assignment fails, attempt to roll back the confirmed user.
     try {
       await this.addUserToGroup(email, role);
     } catch {

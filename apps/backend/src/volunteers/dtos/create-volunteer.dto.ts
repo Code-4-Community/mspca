@@ -8,58 +8,62 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
+  IsStrongPassword,
   MaxLength,
-  MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 
 export class CreateVolunteerDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   firstName!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   lastName!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
-  @MaxLength(20)
+  @MaxLength(255)
   phone!: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @IsPhoneNumber('US')
   @MaxLength(20)
   secondaryPhone?: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(255)
   email!: string;
 
-  // Cognito enforces the pool's full password policy; these are its outer bounds.
   @IsString()
-  @MinLength(8)
+  @IsNotEmpty()
+  @IsStrongPassword({
+    minLength: 8,
+    minLowercase: 1,
+    minUppercase: 1,
+    minNumbers: 1,
+    minSymbols: 1,
+  })
   @MaxLength(256)
   password!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   address!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(255)
   city!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsNonEmptyString()
   @MaxLength(10)
   zipcode!: string;
 
