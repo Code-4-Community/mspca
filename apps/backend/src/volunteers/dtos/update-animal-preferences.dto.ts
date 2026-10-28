@@ -2,13 +2,13 @@ import {
   ArrayUnique,
   IsArray,
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateAnimalPreferencesDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })
@@ -16,7 +16,7 @@ export class UpdateAnimalPreferencesDto {
   @MaxLength(255, { each: true })
   added?: string[];
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })
