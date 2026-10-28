@@ -4,6 +4,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
@@ -11,7 +12,11 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
@@ -21,6 +26,11 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
+
+  const validationPipe = new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  });
 
   const mockVolunteer = {
     volunteerId: 1,
@@ -151,6 +161,30 @@ describe('VolunteersController', () => {
         }),
       ).rejects.toBe(error);
     });
+
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        await expect(
+          validationPipe.transform(
+            { completedTrainings },
+            { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([[[]], [[FosterTraining.CAT]]])(
+      'accepts completedTrainings %j',
+      async (completedTrainings) => {
+        const result = await validationPipe.transform(
+          { completedTrainings },
+          { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+        );
+
+        expect(result.completedTrainings).toEqual(completedTrainings);
+      },
+    );
   });
   describe('create', () => {
     const dto = {
@@ -189,6 +223,39 @@ describe('VolunteersController', () => {
       await expect(controller.create(dto)).rejects.toThrow(error);
       expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+    });
+
+    it.each([[[]], [['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        await expect(
+          validationPipe.transform(
+            { ...dto, completedTrainings },
+            { type: 'body', metatype: CreateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([
+      [[FosterTraining.DOG]],
+      [[FosterTraining.DOG, FosterTraining.CAT]],
+    ])('accepts completedTrainings %j', async (completedTrainings) => {
+      const result = await validationPipe.transform(
+        { ...dto, completedTrainings },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.completedTrainings).toEqual(completedTrainings);
+    });
+
+    it('accepts a body without completedTrainings', async () => {
+      const result = await validationPipe.transform(dto, {
+        type: 'body',
+        metatype: CreateVolunteerDto,
+      });
+
+      expect(result).not.toHaveProperty('completedTrainings');
     });
   });
 

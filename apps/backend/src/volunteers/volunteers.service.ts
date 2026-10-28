@@ -268,8 +268,10 @@ export class VolunteersService {
 
   /**
    * Updates a Volunteer's profile as a coordinator. Accepts every field a
-   * Volunteer can edit themselves, plus coordinator-only fields.
-   * Only the fields included in the DTO are changed.
+   * Volunteer can edit themselves, plus coordinator-only fields
+   * (coordinator notes and completed trainings).
+   * Only the fields included in the DTO are changed; completed trainings
+   * are replaced as a whole list.
    *
    * @param id - The Volunteer's ID.
    * @param dto - The fields to update.
