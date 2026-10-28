@@ -27,7 +27,6 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 describe('VolunteersController', () => {
   let controller: VolunteersController;
 
-  // Mirrors the global ValidationPipe in main.ts.
   const validationPipe = new ValidationPipe({
     whitelist: true,
     transform: true,
@@ -226,8 +225,6 @@ describe('VolunteersController', () => {
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
     });
 
-    // Invalid bodies never reach the handler - the global ValidationPipe
-    // rejects them first, so run the real pipe over the DTO here.
     it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
