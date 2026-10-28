@@ -157,7 +157,7 @@ describe('VolunteersController', () => {
       ).rejects.toBe(error);
     });
 
-    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog']])(
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
         const pipe = new ValidationPipe({ whitelist: true, transform: true });
@@ -229,7 +229,7 @@ describe('VolunteersController', () => {
 
     // Invalid bodies never reach the handler - the global ValidationPipe
     // rejects them first, so run the real pipe over the DTO here.
-    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]]])(
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
         const pipe = new ValidationPipe({ whitelist: true, transform: true });

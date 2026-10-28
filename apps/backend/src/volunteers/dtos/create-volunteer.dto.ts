@@ -9,6 +9,7 @@ import {
   IsString,
   IsStrongPassword,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
@@ -79,7 +80,8 @@ export class CreateVolunteerDto {
   @IsEnum(FosterType)
   fosterType!: FosterType;
 
-  @IsOptional()
+  // Unlike @IsOptional, still validates null so it 400s instead of hitting NOT NULL.
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @ArrayUnique()
   @IsEnum(FosterTraining, { each: true })
