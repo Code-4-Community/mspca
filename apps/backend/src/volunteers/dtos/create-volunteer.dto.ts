@@ -5,11 +5,11 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsPhoneNumber,
   IsString,
   IsStrongPassword,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
@@ -30,7 +30,7 @@ export class CreateVolunteerDto {
   @MaxLength(255)
   phone!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsNonEmptyString()
   @IsPhoneNumber('US')
   @MaxLength(20)
@@ -74,7 +74,7 @@ export class CreateVolunteerDto {
   @IsNotEmpty()
   residentAnimals!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @IsNotEmpty()
   notes?: string;

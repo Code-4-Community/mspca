@@ -2,19 +2,19 @@ import {
   ArrayUnique,
   IsArray,
   IsInt,
-  IsOptional,
+  ValidateIf,
   IsPositive,
 } from 'class-validator';
 
 export class UpdateAnimalPreferencesDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @ArrayUnique()
   @IsInt({ each: true })
   @IsPositive({ each: true })
   added?: number[];
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @ArrayUnique()
   @IsInt({ each: true })
