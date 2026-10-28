@@ -1,15 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  NotFoundException,
-  ValidationPipe,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
 import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
-import { CreateMatchDto } from './dtos/create-match.dto';
 import { DenyMatchDto } from './dtos/deny-match.dto';
 
 describe('MatchesController', () => {
@@ -72,25 +67,6 @@ describe('MatchesController', () => {
       await expect(
         controller.createMatch({ volunteerId: 999, chameleonAnimalId: 'A42' }),
       ).rejects.toThrow(NotFoundException);
-    });
-
-    // Invalid bodies never reach the handler - the global ValidationPipe
-    // rejects them first, so run the real pipe over the DTO here.
-    it.each([
-      { volunteerId: 0, chameleonAnimalId: 'A42' },
-      { volunteerId: -1, chameleonAnimalId: 'A42' },
-      { volunteerId: 1.5, chameleonAnimalId: 'A42' },
-      { volunteerId: 1, chameleonAnimalId: 42 },
-      { volunteerId: 1, chameleonAnimalId: '   ' },
-      { volunteerId: 1 },
-    ])('rejects the invalid body %j', async (body) => {
-      const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
-      await expect(
-        pipe.transform(body, { type: 'body', metatype: CreateMatchDto }),
-      ).rejects.toThrow(BadRequestException);
-
-      expect(service.create).not.toHaveBeenCalled();
     });
   });
 

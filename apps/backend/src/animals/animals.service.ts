@@ -32,13 +32,14 @@ export class AnimalsService {
   /**
    * Ensures every given Chameleon animal ID belongs to an existing Animal.
    *
-   * Looks all of the IDs up in a single query and reports every missing ID together,
-   * listing each missing ID once even if it was given more than once.
+   * Looks all of the IDs up in a single query and reports every missing ID together.
    *
    * @param chameleonAnimalIds - The Chameleon IDs to check.
    * @throws {NotFoundException} If any of the IDs don't match an Animal.
    */
   async checkAllExistOrFail(chameleonAnimalIds: string[]): Promise<void> {
+    // Chameleon IDs are already unique in the database (UNIQUE constraint); we
+    // dedupe the input only so the lookup query is smaller and faster.
     const uniqueIds = [...new Set(chameleonAnimalIds)];
 
     if (uniqueIds.length === 0) {

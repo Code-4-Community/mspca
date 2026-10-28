@@ -1,11 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
+import { VolunteersService } from '../volunteers/volunteers.service';
+import { AnimalsService } from '../animals/animals.service';
 
 describe('RecommendationsService', () => {
   let service: RecommendationsService;
   let repo: { upsert: jest.Mock; findOneByOrFail: jest.Mock };
+  let volunteersService: { findActiveOrFail: jest.Mock };
+  let animalsService: { findByChameleonIdOrFail: jest.Mock };
 
   const saved = {
     volunteerId: 7,
@@ -18,6 +23,10 @@ describe('RecommendationsService', () => {
       upsert: jest.fn().mockResolvedValue({ identifiers: [] }),
       findOneByOrFail: jest.fn().mockResolvedValue(saved),
     };
+    volunteersService = { findActiveOrFail: jest.fn().mockResolvedValue({}) };
+    animalsService = {
+      findByChameleonIdOrFail: jest.fn().mockResolvedValue({}),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +35,8 @@ describe('RecommendationsService', () => {
           provide: getRepositoryToken(Recommendation),
           useValue: repo,
         },
+        { provide: VolunteersService, useValue: volunteersService },
+        { provide: AnimalsService, useValue: animalsService },
       ],
     }).compile();
 
@@ -85,6 +96,62 @@ describe('RecommendationsService', () => {
       await service.create({ volunteerId: 7, chameleonAnimalId: 'A42' });
 
       expect(order).toEqual(['upsert', 'read']);
+    });
+
+    it('checks the volunteer is active, then that the animal exists, before saving', async () => {
+      const order: string[] = [];
+      volunteersService.findActiveOrFail.mockImplementation(async () => {
+        order.push('volunteer');
+      });
+      animalsService.findByChameleonIdOrFail.mockImplementation(async () => {
+        order.push('animal');
+      });
+      repo.upsert.mockImplementation(async () => {
+        order.push('upsert');
+      });
+
+      await service.create({ volunteerId: 7, chameleonAnimalId: 'A42' });
+
+      expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(7);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
+      expect(order).toEqual(['volunteer', 'animal', 'upsert']);
+    });
+
+    it('throws without checking the animal or saving when the volunteer does not exist', async () => {
+      const error = new NotFoundException('Volunteer with ID 7 not found');
+      volunteersService.findActiveOrFail.mockRejectedValue(error);
+
+      await expect(
+        service.create({ volunteerId: 7, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(error);
+      expect(animalsService.findByChameleonIdOrFail).not.toHaveBeenCalled();
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('throws without saving when the volunteer is not active', async () => {
+      const error = new BadRequestException(
+        'Volunteer with ID 7 is not active',
+      );
+      volunteersService.findActiveOrFail.mockRejectedValue(error);
+
+      await expect(
+        service.create({ volunteerId: 7, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(error);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('throws without saving when the animal does not exist', async () => {
+      const error = new NotFoundException(
+        'Animal with Chameleon ID A42 not found',
+      );
+      animalsService.findByChameleonIdOrFail.mockRejectedValue(error);
+
+      await expect(
+        service.create({ volunteerId: 7, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(error);
+      expect(repo.upsert).not.toHaveBeenCalled();
     });
   });
 });

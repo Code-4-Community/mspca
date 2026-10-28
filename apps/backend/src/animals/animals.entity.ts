@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 import { Homebase } from '../types';
+import { FosterType } from '../volunteers/volunteers.types';
 import { Restriction } from './animals.types';
 
 @Entity('animals')
@@ -19,15 +20,18 @@ export class Animal {
   name!: string;
 
   // Whole years of age, e.g. 4 for "4Y5M"
-  @Column({ type: 'int' })
-  age!: number;
+  @Column({ name: 'age_year', type: 'int', default: 0 })
+  ageYear!: number;
 
   // Remaining months of age, e.g. 5 for "4Y5M"
-  @Column({ type: 'int', default: 0 })
-  months!: number;
+  @Column({ name: 'age_month', type: 'int', default: 0 })
+  ageMonth!: number;
 
   @Column({ type: 'varchar', length: 10 })
   sex!: string;
+
+  @Column({ type: 'enum', enum: FosterType, enumName: 'foster_type_enum' })
+  species!: FosterType;
 
   // TODO: change to an enum once the breed values are known
   @Column({ type: 'text', array: true, default: () => "'{}'" })

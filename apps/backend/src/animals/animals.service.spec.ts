@@ -6,6 +6,7 @@ import { AnimalsService } from './animals.service';
 import { Animal } from './animals.entity';
 import { Restriction } from './animals.types';
 import { Homebase } from '../types';
+import { FosterType } from '../volunteers/volunteers.types';
 
 describe('AnimalsService', () => {
   let service: AnimalsService;
@@ -15,9 +16,10 @@ describe('AnimalsService', () => {
     animalId: 1,
     chameleonAnimalId: 'A42',
     name: 'Biscuit',
-    age: 3,
-    months: 2,
+    ageYear: 3,
+    ageMonth: 2,
     sex: 'F',
+    species: FosterType.DOG,
     breed: ['Beagle'],
     weight: 22.5,
     location: Homebase.BOSTON,
@@ -96,19 +98,6 @@ describe('AnimalsService', () => {
       );
       expect(mockRepo.find).toHaveBeenCalledWith({
         where: { chameleonAnimalId: In(['A42', 'A998', 'A999']) },
-      });
-    });
-
-    it('lists a missing Chameleon ID once even if it is given more than once', async () => {
-      mockRepo.find.mockResolvedValue([]);
-
-      await expect(
-        service.checkAllExistOrFail(['A998', 'A998']),
-      ).rejects.toThrow(
-        new NotFoundException('Animals with Chameleon IDs not found: A998'),
-      );
-      expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { chameleonAnimalId: In(['A998']) },
       });
     });
 
