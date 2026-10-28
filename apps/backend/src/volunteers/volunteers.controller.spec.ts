@@ -156,6 +156,37 @@ describe('VolunteersController', () => {
         }),
       ).rejects.toBe(error);
     });
+
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog']])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        const pipe = new ValidationPipe({ whitelist: true, transform: true });
+
+        await expect(
+          pipe.transform(
+            { completedTrainings },
+            { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+        expect(
+          mockVolunteersService.coordinatorUpdateVolunteerById,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([[[]], [[FosterTraining.CAT]]])(
+      'accepts completedTrainings %j',
+      async (completedTrainings) => {
+        const pipe = new ValidationPipe({ whitelist: true, transform: true });
+
+        const result = await pipe.transform(
+          { completedTrainings },
+          { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+        );
+
+        expect(result.completedTrainings).toEqual(completedTrainings);
+      },
+    );
   });
   describe('create', () => {
     const dto = {

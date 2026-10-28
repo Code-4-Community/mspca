@@ -685,6 +685,44 @@ describe('VolunteersService', () => {
       expect(result.coordinatorNotes).toBe('');
     });
 
+    it('replaces the completed trainings', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        completedTrainings: [FosterTraining.DOG],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+        }),
+      );
+      expect(result.completedTrainings).toEqual([
+        FosterTraining.DOG,
+        FosterTraining.CAT,
+      ]);
+    });
+
+    it('allows clearing the completed trainings with an empty list', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        completedTrainings: [FosterTraining.DOG],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        completedTrainings: [],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(result.completedTrainings).toEqual([]);
+    });
+
     it('throws NotFoundException and saves nothing when the volunteer does not exist', async () => {
       mockRepo.findOne.mockResolvedValue(null);
 
