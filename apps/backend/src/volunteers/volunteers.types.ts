@@ -8,8 +8,8 @@ export enum FosterType {
 }
 
 export enum FosterTraining {
-  DOG = FosterType.DOG,
-  CAT = FosterType.CAT,
+  DOG = 'Dog',
+  CAT = 'Cat',
 }
 
 export enum VolunteerStatus {

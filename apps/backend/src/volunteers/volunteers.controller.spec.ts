@@ -27,6 +27,12 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 describe('VolunteersController', () => {
   let controller: VolunteersController;
 
+  // Mirrors the global ValidationPipe in main.ts.
+  const validationPipe = new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  });
+
   const mockVolunteer = {
     volunteerId: 1,
     firstName: 'Jane',
@@ -157,29 +163,22 @@ describe('VolunteersController', () => {
       ).rejects.toBe(error);
     });
 
-    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [null]])(
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
-        const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
         await expect(
-          pipe.transform(
+          validationPipe.transform(
             { completedTrainings },
             { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
           ),
         ).rejects.toThrow(BadRequestException);
-        expect(
-          mockVolunteersService.coordinatorUpdateVolunteerById,
-        ).not.toHaveBeenCalled();
       },
     );
 
     it.each([[[]], [[FosterTraining.CAT]]])(
       'accepts completedTrainings %j',
       async (completedTrainings) => {
-        const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
-        const result = await pipe.transform(
+        const result = await validationPipe.transform(
           { completedTrainings },
           { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
         );
@@ -232,15 +231,12 @@ describe('VolunteersController', () => {
     it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
-        const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
         await expect(
-          pipe.transform(
+          validationPipe.transform(
             { ...dto, completedTrainings },
             { type: 'body', metatype: CreateVolunteerDto },
           ),
         ).rejects.toThrow(BadRequestException);
-        expect(mockVolunteersService.create).not.toHaveBeenCalled();
       },
     );
 
@@ -249,9 +245,7 @@ describe('VolunteersController', () => {
       [[FosterTraining.DOG]],
       [[FosterTraining.DOG, FosterTraining.CAT]],
     ])('accepts completedTrainings %j', async (completedTrainings) => {
-      const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
-      const result = await pipe.transform(
+      const result = await validationPipe.transform(
         { ...dto, completedTrainings },
         { type: 'body', metatype: CreateVolunteerDto },
       );
@@ -260,9 +254,7 @@ describe('VolunteersController', () => {
     });
 
     it('accepts a body without completedTrainings', async () => {
-      const pipe = new ValidationPipe({ whitelist: true, transform: true });
-
-      const result = await pipe.transform(dto, {
+      const result = await validationPipe.transform(dto, {
         type: 'body',
         metatype: CreateVolunteerDto,
       });

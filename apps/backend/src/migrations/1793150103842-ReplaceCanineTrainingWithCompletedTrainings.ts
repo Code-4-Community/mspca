@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ReplaceCanineTrainingWithCompletedTrainings1793100000000
+export class ReplaceCanineTrainingWithCompletedTrainings1793150103842
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {

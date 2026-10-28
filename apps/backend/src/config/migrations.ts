@@ -5,7 +5,7 @@ import { ReplaceVolunteerActiveWithStatus1790998545137 } from '../migrations/179
 import { AddVolunteerCognitoSub1791000000000 } from '../migrations/1791000000000-AddVolunteerCognitoSub';
 import { AddVolunteerAnimalPreferences1791778598934 } from '../migrations/1791778598934-AddVolunteerAnimalPreferences';
 import { AddVolunteerCoordinatorNotes1793055981679 } from '../migrations/1793055981679-AddVolunteerCoordinatorNotes';
-import { ReplaceCanineTrainingWithCompletedTrainings1793100000000 } from '../migrations/1793100000000-ReplaceCanineTrainingWithCompletedTrainings';
+import { ReplaceCanineTrainingWithCompletedTrainings1793150103842 } from '../migrations/1793150103842-ReplaceCanineTrainingWithCompletedTrainings';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -15,7 +15,7 @@ const schemaMigrations = [
   AddCognitoSubToCoordinators1791234567890,
   AddVolunteerAnimalPreferences1791778598934,
   AddVolunteerCoordinatorNotes1793055981679,
-  ReplaceCanineTrainingWithCompletedTrainings1793100000000,
+  ReplaceCanineTrainingWithCompletedTrainings1793150103842,
 ];
 
 export default schemaMigrations;
