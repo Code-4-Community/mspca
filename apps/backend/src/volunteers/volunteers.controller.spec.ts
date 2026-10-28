@@ -4,6 +4,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
@@ -11,7 +12,11 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
@@ -189,6 +194,49 @@ describe('VolunteersController', () => {
       await expect(controller.create(dto)).rejects.toThrow(error);
       expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+    });
+
+    // Invalid bodies never reach the handler - the global ValidationPipe
+    // rejects them first, so run the real pipe over the DTO here.
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]]])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        const pipe = new ValidationPipe({ whitelist: true, transform: true });
+
+        await expect(
+          pipe.transform(
+            { ...dto, completedTrainings },
+            { type: 'body', metatype: CreateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockVolunteersService.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      [[]],
+      [[FosterTraining.DOG]],
+      [[FosterTraining.DOG, FosterTraining.CAT]],
+    ])('accepts completedTrainings %j', async (completedTrainings) => {
+      const pipe = new ValidationPipe({ whitelist: true, transform: true });
+
+      const result = await pipe.transform(
+        { ...dto, completedTrainings },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.completedTrainings).toEqual(completedTrainings);
+    });
+
+    it('accepts a body without completedTrainings', async () => {
+      const pipe = new ValidationPipe({ whitelist: true, transform: true });
+
+      const result = await pipe.transform(dto, {
+        type: 'body',
+        metatype: CreateVolunteerDto,
+      });
+
+      expect(result).not.toHaveProperty('completedTrainings');
     });
   });
 

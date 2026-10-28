@@ -9,7 +9,11 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
@@ -235,6 +239,24 @@ describe('VolunteersService', () => {
         cognitoSub: 'cognito-sub-123',
       });
       expect(result).not.toHaveProperty('password');
+    });
+
+    it('saves the completed trainings given at sign-up', async () => {
+      const result = await service.create({
+        ...dto,
+        completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+        }),
+      );
+      expect(result.completedTrainings).toEqual([
+        FosterTraining.DOG,
+        FosterTraining.CAT,
+      ]);
     });
 
     it('throws ConflictException without calling Cognito when the email is already in Postgres', async () => {
