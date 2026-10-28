@@ -23,18 +23,3 @@ export function isNonEmptyEnv(value: string | undefined): value is string {
 export function getMissingEnvVars(names: readonly string[]): string[] {
   return names.filter((name) => !isNonEmptyEnv(process.env[name]));
 }
-
-/**
- * Reads an environment variable that must be set.
- *
- * @param name The environment variable name.
- * @returns The variable's value.
- * @throws {Error} If the variable is unset, empty, or whitespace-only.
- */
-export function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!isNonEmptyEnv(value)) {
-    throw new Error(`${name} is not set`);
-  }
-  return value;
-}

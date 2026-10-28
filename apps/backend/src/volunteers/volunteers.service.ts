@@ -24,7 +24,6 @@ import { coordinatorLostVolunteerEmail } from '../coordinators/emails/coordinato
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
-import { requireEnv } from '../utils/env';
 
 @Injectable()
 export class VolunteersService {
@@ -276,7 +275,9 @@ export class VolunteersService {
 
     try {
       await this.emailsService.sendEmail({
-        toEmail: requireEnv('AWS_SES_SENDER_EMAIL'),
+        // AWSSESModule throws at startup when SES is enabled and this is unset,
+        // so the fallback is only here to satisfy TypeScript.
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
         ccEmails: coordinators.map((c) => c.email),
         ...email,
       });

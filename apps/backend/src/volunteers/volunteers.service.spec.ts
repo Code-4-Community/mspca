@@ -830,6 +830,7 @@ describe('VolunteersService', () => {
   });
 
   describe('changeHomebase', () => {
+    const originalSenderEmail = process.env.AWS_SES_SENDER_EMAIL;
     const oldCoordinators = [
       {
         coordinatorId: 1,
@@ -867,11 +868,20 @@ describe('VolunteersService', () => {
       } as FosterVolunteer);
 
     beforeEach(() => {
+      process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
       mockCoordinatorsService.findActiveByHomebase.mockResolvedValue(
         newCoordinators,
       );
       mockRepo.save.mockImplementation(async (volunteer) => volunteer);
       emailsService.sendEmail.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      if (originalSenderEmail === undefined) {
+        delete process.env.AWS_SES_SENDER_EMAIL;
+      } else {
+        process.env.AWS_SES_SENDER_EMAIL = originalSenderEmail;
+      }
     });
 
     it('saves the new homebase and replaces the coordinator list', async () => {

@@ -8,7 +8,6 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import Mail from 'nodemailer/lib/mailer';
 import { AMAZON_SES_CLIENT } from './awsSesClient.factory';
 import { SendEmailDTO } from './sendEmail.dto';
-import { requireEnv } from '../../utils/env';
 
 @Injectable()
 export class AmazonSESWrapper {
@@ -31,7 +30,10 @@ export class AmazonSESWrapper {
    * or if SES rejects the send (bad recipient, throttling, unverified sender, quota exceeded).
    */
   async sendEmail(dto: SendEmailDTO): Promise<SendEmailCommandOutput> {
-    const senderEmail = requireEnv('AWS_SES_SENDER_EMAIL');
+    // Can't actually be empty: AWSSESModule throws at startup when SES is enabled
+    // and this is unset, and sendEmail only runs when SES is enabled. The
+    // fallback is only here to satisfy TypeScript.
+    const senderEmail = process.env.AWS_SES_SENDER_EMAIL ?? '';
 
     const mailOptions: Mail.Options = {
       from: senderEmail,
