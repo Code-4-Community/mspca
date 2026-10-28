@@ -151,7 +151,7 @@ describe('VolunteersController', () => {
         {
           matchId: 1,
           volunteerId: 7,
-          chameleonAnimalId: 42,
+          chameleonAnimalId: 'A42',
           status: MatchStatus.DENIED,
           deniedReason: 'Schedule conflict',
         },
@@ -398,12 +398,15 @@ describe('VolunteersController', () => {
 
   describe('updateAnimalPreferences', () => {
     it('returns the updated list from the service', async () => {
-      const dto = { added: [55], removed: [107] };
-      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([42, 55]);
+      const dto = { added: ['A55'], removed: ['A107'] };
+      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([
+        'A42',
+        'A55',
+      ]);
 
       const result = await controller.updateAnimalPreferences(1, dto);
 
-      expect(result).toEqual([42, 55]);
+      expect(result).toEqual(['A42', 'A55']);
       expect(
         mockVolunteersService.updateAnimalPreferences,
       ).toHaveBeenCalledWith(1, dto);
@@ -434,7 +437,7 @@ describe('VolunteersController', () => {
       );
 
       await expect(
-        controller.updateAnimalPreferences(999, { added: [42] }),
+        controller.updateAnimalPreferences(999, { added: ['A42'] }),
       ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );

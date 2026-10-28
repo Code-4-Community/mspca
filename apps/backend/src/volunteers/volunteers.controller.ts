@@ -276,12 +276,12 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'The volunteer does not exist',
+    description: 'The volunteer or an added animal does not exist',
   })
   async updateAnimalPreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateAnimalPreferencesDto,
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     validateId(volunteerId, 'Volunteer');
     if (!dto.added?.length && !dto.removed?.length) {
       throw new BadRequestException(
