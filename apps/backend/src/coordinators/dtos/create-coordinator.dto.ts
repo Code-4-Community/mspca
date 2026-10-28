@@ -2,12 +2,12 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsPhoneNumber,
   IsStrongPassword,
   IsString,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Homebase } from '../../types';
@@ -27,7 +27,7 @@ export class CreateCoordinatorDto {
   @MaxLength(20)
   phone!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @MaxLength(20)
   @IsPhoneNumber('US')

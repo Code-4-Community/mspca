@@ -4,6 +4,7 @@ import { AddCognitoSubToCoordinators1791234567890 } from '../migrations/17912345
 import { ReplaceVolunteerActiveWithStatus1790998545137 } from '../migrations/1790998545137-ReplaceVolunteerActiveWithStatus';
 import { AddVolunteerCognitoSub1791000000000 } from '../migrations/1791000000000-AddVolunteerCognitoSub';
 import { AddVolunteerAnimalPreferences1791778598934 } from '../migrations/1791778598934-AddVolunteerAnimalPreferences';
+import { AddAnimalUpdatesAndFosterTypeArray1793163582751 } from '../migrations/1793163582751-AddAnimalUpdatesAndFosterTypeArray';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -12,6 +13,7 @@ const schemaMigrations = [
   AddVolunteerCognitoSub1791000000000,
   AddCognitoSubToCoordinators1791234567890,
   AddVolunteerAnimalPreferences1791778598934,
+  AddAnimalUpdatesAndFosterTypeArray1793163582751,
 ];
 
 export default schemaMigrations;
