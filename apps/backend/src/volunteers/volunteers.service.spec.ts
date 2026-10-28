@@ -720,6 +720,9 @@ describe('VolunteersService', () => {
       });
 
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ completedTrainings: [] }),
+      );
       expect(result.completedTrainings).toEqual([]);
     });
 

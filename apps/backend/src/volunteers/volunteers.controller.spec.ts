@@ -225,7 +225,7 @@ describe('VolunteersController', () => {
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
     });
 
-    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
+    it.each([[[]], [['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
       'rejects completedTrainings %j',
       async (completedTrainings) => {
         await expect(
@@ -238,7 +238,6 @@ describe('VolunteersController', () => {
     );
 
     it.each([
-      [[]],
       [[FosterTraining.DOG]],
       [[FosterTraining.DOG, FosterTraining.CAT]],
     ])('accepts completedTrainings %j', async (completedTrainings) => {

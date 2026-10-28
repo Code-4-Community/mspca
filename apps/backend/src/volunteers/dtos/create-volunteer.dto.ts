@@ -1,4 +1,5 @@
 import {
+  ArrayNotEmpty,
   ArrayUnique,
   IsArray,
   IsEmail,
@@ -83,6 +84,7 @@ export class CreateVolunteerDto {
   // Unlike @IsOptional, still validates null so it 400s instead of hitting NOT NULL.
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
+  @ArrayNotEmpty()
   @ArrayUnique()
   @IsEnum(FosterTraining, { each: true })
   completedTrainings?: FosterTraining[];
