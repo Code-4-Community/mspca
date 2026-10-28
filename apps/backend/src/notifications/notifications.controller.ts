@@ -22,7 +22,6 @@ import { NotificationsDispatchGuard } from './notifications.dispatch.guard';
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
-  // TODO: role/cognito auth: possible considerations of how roles are modelled (cognito groups vs db role)
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({

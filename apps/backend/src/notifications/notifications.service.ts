@@ -114,7 +114,8 @@ export class NotificationsService {
    * rest of the send.
    *
    * @param content - The subject, HTML body, and foster type filters.
-   * @throws {InternalServerErrorException} If AWS_SES_SENDER_EMAIL is not configured.
+   * @throws {InternalServerErrorException} If AWS_SES_SENDER_EMAIL is not configured,
+   *   or if every batch fails to send.
    */
   async sendNow(content: CreateBulkNotificationDto): Promise<void> {
     const sender = process.env.AWS_SES_SENDER_EMAIL;
@@ -168,6 +169,12 @@ export class NotificationsService {
           err instanceof Error ? err.stack : String(err),
         );
       }
+    }
+
+    if (failed === recipients.length) {
+      throw new InternalServerErrorException(
+        `Bulk notification failed: none of ${recipients.length} recipient(s) were emailed`,
+      );
     }
 
     // TODO: implement retry mechanism for failed email sends

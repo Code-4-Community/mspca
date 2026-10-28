@@ -24,11 +24,22 @@ describe('NotificationsService', () => {
 
   const dto = { subject: 'Fosters needed', body: '<p>Please help.</p>' };
 
+  const ENV_VARS = [
+    'AWS_SES_SENDER_EMAIL',
+    'AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN',
+    'AWS_SCHEDULER_ROLE_ARN',
+  ] as const;
+  const originalEnv: Record<string, string | undefined> = {};
+
   /** The bccEmails array of each sendEmail call, in order. */
   const sentBatches = (): string[][] =>
     emailsService.sendEmail.mock.calls.map((c) => c[0].bccEmails);
 
   beforeEach(async () => {
+    for (const name of ENV_VARS) {
+      originalEnv[name] = process.env[name];
+    }
+
     process.env.AWS_SES_SENDER_EMAIL = SENDER;
 
     process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN = 'arn:aws:lambda:::fn';
@@ -50,6 +61,16 @@ describe('NotificationsService', () => {
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
+  });
+
+  afterEach(() => {
+    for (const name of ENV_VARS) {
+      if (originalEnv[name] === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = originalEnv[name];
+      }
+    }
   });
 
   it('should be defined', () => {
@@ -181,6 +202,21 @@ describe('NotificationsService', () => {
         .mockResolvedValueOnce(undefined);
 
       await expect(service.sendNow(dto)).resolves.toBeUndefined();
+
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails when every batch fails to send', async () => {
+      volunteersService.findActiveByFosterTypes.mockResolvedValue(
+        volunteers(98),
+      );
+      emailsService.sendEmail.mockRejectedValue(
+        new Error('SES rejected the send'),
+      );
+
+      await expect(service.sendNow(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
 
       expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
     });

@@ -30,7 +30,6 @@ export class NotificationsDispatchGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const expected = process.env.NOTIFICATIONS_DISPATCH_SECRET;
 
-    // Fail closed: an unset secret must never mean "let everyone through".
     if (!expected) {
       this.logger.error(
         'NOTIFICATIONS_DISPATCH_SECRET is not configured. Rejecting all dispatch requests.',

@@ -377,8 +377,6 @@ export class VolunteersService {
   async findActiveByFosterTypes(
     fosterTypes: FosterType[],
   ): Promise<FosterVolunteer[]> {
-    // shortcut: fosterType is a single enum today, so In() is an exact match.
-    // Once PR #11 makes the column an array this needs the && overlap operator.
     return this.repo.find({
       where: {
         status: VolunteerStatus.ACTIVE,

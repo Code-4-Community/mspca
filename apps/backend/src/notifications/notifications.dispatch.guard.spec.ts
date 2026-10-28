@@ -13,10 +13,20 @@ const contextWith = (headers: Record<string, unknown>) =>
 
 describe('NotificationsDispatchGuard', () => {
   let guard: NotificationsDispatchGuard;
+  let originalSecret: string | undefined;
 
   beforeEach(() => {
+    originalSecret = process.env.NOTIFICATIONS_DISPATCH_SECRET;
     process.env.NOTIFICATIONS_DISPATCH_SECRET = SECRET;
     guard = new NotificationsDispatchGuard();
+  });
+
+  afterEach(() => {
+    if (originalSecret === undefined) {
+      delete process.env.NOTIFICATIONS_DISPATCH_SECRET;
+    } else {
+      process.env.NOTIFICATIONS_DISPATCH_SECRET = originalSecret;
+    }
   });
 
   it('allows a request presenting the configured secret', () => {
@@ -39,7 +49,6 @@ describe('NotificationsDispatchGuard', () => {
     );
   });
 
-  // An unset secret must never mean "let everyone through".
   it('fails closed when no secret is configured', () => {
     delete process.env.NOTIFICATIONS_DISPATCH_SECRET;
 

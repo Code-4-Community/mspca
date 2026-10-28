@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 import { FosterType, VolunteerStatus } from './volunteers.types';
@@ -887,6 +888,36 @@ describe('VolunteersService', () => {
       );
       expect(findSpy).toHaveBeenCalledWith(999);
       expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findActiveByFosterTypes', () => {
+    it('should return active volunteers matching any of the foster types', async () => {
+      mockRepo.find.mockResolvedValue(mockVolunteers);
+
+      const result = await service.findActiveByFosterTypes([
+        FosterType.DOG,
+        FosterType.CAT,
+      ]);
+
+      expect(result).toEqual(mockVolunteers);
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        where: {
+          status: VolunteerStatus.ACTIVE,
+          fosterType: In([FosterType.DOG, FosterType.CAT]),
+        },
+      });
+    });
+
+    it('should return every active volunteer when no foster types are given', async () => {
+      mockRepo.find.mockResolvedValue(mockVolunteers);
+
+      const result = await service.findActiveByFosterTypes([]);
+
+      expect(result).toEqual(mockVolunteers);
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        where: { status: VolunteerStatus.ACTIVE },
+      });
     });
   });
 });
