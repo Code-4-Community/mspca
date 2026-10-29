@@ -5,7 +5,6 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsPhoneNumber,
   IsString,
   IsStrongPassword,
@@ -31,11 +30,11 @@ export class CreateVolunteerDto {
   @MaxLength(255)
   phone!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @IsPhoneNumber('US')
   @MaxLength(20)
-  secondaryPhone?: string;
+  secondaryPhone?: string | null;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
@@ -74,12 +73,15 @@ export class CreateVolunteerDto {
   @IsNonEmptyString()
   residentAnimals!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
-  notes?: string;
+  notes?: string | null;
 
-  @IsEnum(FosterType)
-  fosterType!: FosterType;
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterType, { each: true })
+  fosterType!: FosterType[];
 
   // Unlike @IsOptional, still validates null so it 400s instead of hitting NOT NULL.
   @ValidateIf((_, value) => value !== undefined)
