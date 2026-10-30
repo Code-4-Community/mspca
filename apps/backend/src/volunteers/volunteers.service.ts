@@ -7,9 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
-import { VolunteerStatus } from './volunteers.types';
+import { FosterType, VolunteerStatus } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
@@ -474,5 +474,25 @@ export class VolunteersService {
     volunteer.animalPreferences = [...preferences];
     const saved = await this.repo.save(volunteer);
     return saved.animalPreferences;
+  }
+
+  /**
+   * Gets every active Volunteer whose foster type is one of `fosterTypes`.
+   *
+   * An empty `fosterTypes` matches every active Volunteer. Pending and inactive
+   * Volunteers are never returned.
+   *
+   * @param fosterTypes - The foster types to match, or an empty array for all.
+   * @returns The matching active Volunteers, or an empty array if there are none.
+   */
+  async findActiveByFosterTypes(
+    fosterTypes: FosterType[],
+  ): Promise<FosterVolunteer[]> {
+    return this.repo.find({
+      where: {
+        status: VolunteerStatus.ACTIVE,
+        ...(fosterTypes.length > 0 && { fosterType: In(fosterTypes) }),
+      },
+    });
   }
 }
