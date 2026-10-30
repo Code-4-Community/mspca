@@ -14,6 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
+import { matchCreatedEmail } from './emails/matchCreated';
 import { matchCanceledEmail } from '../emails/matchCanceled';
 
 @Injectable()
@@ -30,11 +31,11 @@ export class MatchesService {
 
   /**
    * Creates a PENDING match between a volunteer and a Chameleon animal, then
-   * notifies the volunteer's assigned foster coordinator by email.
+   * notifies the volunteer's assigned foster coordinators by email.
    *
    * The email is best-effort: the match is already committed when it is sent,
    * so a send failure is logged rather than surfaced to the caller. Volunteers
-   * with no assigned coordinator still get a match; no email goes out.
+   * with no assigned coordinators still get a match; no email goes out.
    *
    * @param dto the volunteer and Chameleon animal to match
    * @returns the created match
@@ -55,7 +56,7 @@ export class MatchesService {
       }),
     );
 
-    await this.notifyCoordinator(match, volunteer);
+    await this.notifyCoordinators(match, volunteer);
 
     return match;
   }
@@ -91,39 +92,43 @@ export class MatchesService {
   }
 
   /**
-   * Emails the volunteer's assigned foster coordinator about a new match.
+   * Emails the sender address about a new match, with the volunteer's active
+   * assigned foster coordinators cc'd.
    *
    * Never throws: the match is already committed by the time this runs, so a
-   * missing coordinator is logged as a warning and a failed send as an error
-   * rather than failing the request.
+   * volunteer with no active coordinators is logged as a warning and a failed send
+   * as an error rather than failing the request.
    *
    * @param match the match that was just created
-   * @param volunteer the matched volunteer, with assignedCoordinator loaded
+   * @param volunteer the matched volunteer, with assignedCoordinators loaded
    */
-  private async notifyCoordinator(
+  private async notifyCoordinators(
     match: Match,
     volunteer: FosterVolunteer,
   ): Promise<void> {
-    const coordinator = volunteer.assignedCoordinator;
-
-    if (!coordinator) {
-      this.logger.warn(
-        `Volunteer ${volunteer.volunteerId} has no assigned coordinator; no match email sent for match ${match.matchId}.`,
-      );
-      return;
-    }
-
-    // Placeholder copy - TODO: put real template here later.
     try {
+      const coordinators = volunteer.assignedCoordinators.filter(
+        (c) => c.active,
+      );
+
+      if (coordinators.length === 0) {
+        this.logger.warn(
+          `Volunteer ${volunteer.volunteerId} has no active assigned coordinators; no match email sent for match ${match.matchId}.`,
+        );
+        return;
+      }
+
       await this.emailsService.sendEmail({
-        toEmail: coordinator.email,
-        subject: 'New foster match created',
-        bodyHtml: `<p>A match has been created for ${volunteer.firstName} ${volunteer.lastName} (volunteer ${volunteer.volunteerId}) and Chameleon animal ${match.chameleonAnimalId}.</p>`,
+        // AWSSESModule throws at startup when SES is enabled and this is unset,
+        // so the fallback is only here to satisfy TypeScript.
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        ...matchCreatedEmail(match, volunteer),
       });
     } catch (error) {
       this.logger.error(
         `Failed to send match creation email for match ${match.matchId}.`,
-        error instanceof Error ? error.stack : String(error),
+        error,
       );
     }
   }

@@ -2,8 +2,8 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
-  JoinColumn,
+  ManyToMany,
+  JoinTable,
   Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
@@ -88,11 +88,18 @@ export class FosterVolunteer {
   })
   animalPreferences!: number[];
 
-  @ManyToOne(
+  @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
-    { nullable: true },
+    { onDelete: 'CASCADE' },
   )
-  @JoinColumn({ name: 'assigned_coordinator_id' })
-  assignedCoordinator!: FosterCoordinator | null;
+  @JoinTable({
+    name: 'volunteer_coordinator_assignments',
+    joinColumn: { name: 'volunteer_id', referencedColumnName: 'volunteerId' },
+    inverseJoinColumn: {
+      name: 'coordinator_id',
+      referencedColumnName: 'coordinatorId',
+    },
+  })
+  assignedCoordinators!: FosterCoordinator[];
 }

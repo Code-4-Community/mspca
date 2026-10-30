@@ -17,7 +17,13 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
-import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { volunteerApprovedEmail } from './emails/volunteerApproved';
+import { EmailContent } from '../utils/emails.utils';
+import { coordinatorGainedVolunteerEmail } from '../coordinators/emails/coordinatorGainedVolunteer';
+import { coordinatorLostVolunteerEmail } from '../coordinators/emails/coordinatorLostVolunteer';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Homebase } from '../types';
 
 @Injectable()
 export class VolunteersService {
@@ -28,10 +34,11 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
     private emailsService: EmailsService,
+    private coordinatorsService: CoordinatorsService,
   ) {}
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinators.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -42,7 +49,7 @@ export class VolunteersService {
   async findByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinator'],
+      relations: ['assignedCoordinators'],
     });
 
     if (!volunteer) {
@@ -60,6 +67,7 @@ export class VolunteersService {
    * If the save fails, the Cognito user is deleted so the email can be reused.
    * Cognito emails the Volunteer a verification code, which they pass to
    * {@link confirm}. New Volunteers are pending until a coordinator approves them.
+   * Assigns every active coordinator at the Volunteer's homebase.
    *
    * @param dto - The Volunteer's profile fields and chosen password.
    * @returns The saved Volunteer.
@@ -85,13 +93,18 @@ export class VolunteersService {
       password,
     });
 
+    // Inside the try so a failed lookup also deletes the Cognito user.
     try {
+      const assignedCoordinators =
+        await this.coordinatorsService.findActiveByHomebase(profile.homebase);
+
       return await this.repo.save({
         ...profile,
         email,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
+        assignedCoordinators,
       });
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
@@ -181,6 +194,102 @@ export class VolunteersService {
   }
 
   /**
+   * Moves a Volunteer to a different homebase and reassigns their coordinators.
+   *
+   * Saves the new homebase and coordinators first, then emails the old
+   * coordinators and the new ones. Emails are best-effort: a failed send is
+   * logged rather than failing the request, since the reassignment is already
+   * committed.
+   *
+   * @param id - The Volunteer's ID.
+   * @param homebase - The new homebase.
+   * @returns The updated Volunteer, with their new homebase and assigned coordinators.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is inactive, or is already
+   * at the homebase.
+   */
+  async changeHomebase(
+    id: number,
+    homebase: Homebase,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    // Pending Volunteers can still fix the homebase they picked at sign-up.
+    if (volunteer.status === VolunteerStatus.INACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is inactive`);
+    }
+
+    if (volunteer.homebase === homebase) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} is already assigned to the ${homebase} homebase`,
+      );
+    }
+
+    const previousHomebase = volunteer.homebase;
+    const previous = volunteer.assignedCoordinators.filter((c) => c.active);
+    const next = await this.coordinatorsService.findActiveByHomebase(homebase);
+
+    volunteer.homebase = homebase;
+    volunteer.assignedCoordinators = next;
+    const saved = await this.repo.save(volunteer);
+
+    // A coordinator has one homebase, so the old and new lists never overlap.
+    await Promise.all([
+      this.notifyCoordinators(
+        previous,
+        coordinatorLostVolunteerEmail(saved, homebase),
+        saved,
+      ),
+      this.notifyCoordinators(
+        next,
+        coordinatorGainedVolunteerEmail(saved, previousHomebase),
+        saved,
+      ),
+    ]);
+
+    return saved;
+  }
+
+  /**
+   * Sends one email to the sender address with the coordinators cc'd.
+   * Logs a warning and sends nothing when there are no coordinators, and logs
+   * a failed send instead of throwing.
+   *
+   * @param coordinators - The coordinators to cc.
+   * @param email - The email's subject and body.
+   * @param volunteer - The Volunteer the email is about, for log messages.
+   */
+  private async notifyCoordinators(
+    coordinators: FosterCoordinator[],
+    email: EmailContent,
+    volunteer: FosterVolunteer,
+  ): Promise<void> {
+    const volunteerLabel = `volunteer ${volunteer.volunteerId} (${volunteer.firstName} ${volunteer.lastName})`;
+
+    if (coordinators.length === 0) {
+      this.logger.warn(
+        `No coordinators to send "${email.subject}" email to for ${volunteerLabel}.`,
+      );
+      return;
+    }
+
+    try {
+      await this.emailsService.sendEmail({
+        // AWSSESModule throws at startup when SES is enabled and this is unset,
+        // so the fallback is only here to satisfy TypeScript.
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        ...email,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send "${email.subject}" email for ${volunteerLabel}.`,
+        error,
+      );
+    }
+  }
+
+  /**
    * Fetches a Volunteer by ID, requiring that they are active.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
@@ -215,6 +324,8 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * The homebase is changed through changeHomebase instead, since changing it
+   * also reassigns coordinators and emails them.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer
@@ -308,7 +419,7 @@ export class VolunteersService {
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo.find();
+    return this.repo.find({ relations: ['assignedCoordinators'] });
   }
 
   /**

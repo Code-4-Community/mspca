@@ -11,8 +11,8 @@ import { AWSSESModule } from '../aws/ses/email.module';
   imports: [
     TypeOrmModule.forFeature([FosterVolunteer]),
     CoordinatorsModule,
-    forwardRef(() => MatchesModule),
     AWSSESModule,
+    forwardRef(() => MatchesModule),
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],

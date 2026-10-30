@@ -1,4 +1,3 @@
-import { Homebase } from '../../types';
 import { FosterType } from '../volunteers.types';
 import {
   ArrayNotEmpty,
@@ -55,10 +54,6 @@ export class UpdateVolunteerDto {
   @IsNonEmptyString()
   @MaxLength(10)
   zipcode?: string;
-
-  @ValidateIf((_, value) => value !== undefined)
-  @IsEnum(Homebase)
-  homebase?: Homebase;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsNonEmptyString()

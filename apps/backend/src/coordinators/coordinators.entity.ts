@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 
@@ -41,9 +41,10 @@ export class FosterCoordinator {
   })
   cognitoSub!: string;
 
-  @OneToMany(
+  @ManyToMany(
     () => FosterVolunteer,
-    (volunteer) => volunteer.assignedCoordinator,
+    (volunteer) => volunteer.assignedCoordinators,
+    { onDelete: 'RESTRICT' },
   )
   assignedVolunteers!: FosterVolunteer[];
 }
