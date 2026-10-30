@@ -306,14 +306,20 @@ describe('CoordinatorsService', () => {
   describe('findActiveByHomebase', () => {
     it('returns the active coordinators at the homebase ordered by id', async () => {
       const coordinators = [
-        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
         { coordinatorId: 5, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
       ] as FosterCoordinator[];
-      repo.find.mockResolvedValue(coordinators);
+      repo.find.mockImplementation(async (options) => {
+        const order = options?.order as { coordinatorId: 'ASC' | 'DESC' };
+        const sign = order.coordinatorId === 'ASC' ? 1 : -1;
+        return [...coordinators].sort(
+          (a, b) => sign * (a.coordinatorId - b.coordinatorId),
+        );
+      });
 
       const result = await service.findActiveByHomebase(Homebase.SALEM);
 
-      expect(result).toBe(coordinators);
+      expect(result).toEqual([coordinators[1], coordinators[0]]);
       expect(repo.find).toHaveBeenCalledTimes(1);
       expect(repo.find).toHaveBeenCalledWith({
         where: { homebase: Homebase.SALEM, active: true },
@@ -342,7 +348,16 @@ describe('CoordinatorsService', () => {
     });
 
     it('returns an empty array when the homebase has no active coordinators', async () => {
-      repo.find.mockResolvedValue([]);
+      const coordinators = [
+        { coordinatorId: 1, homebase: Homebase.CAPE_COD, active: false },
+        { coordinatorId: 2, homebase: Homebase.CAPE_COD, active: false },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(async (options) => {
+        const where = options?.where as Partial<FosterCoordinator>;
+        return coordinators.filter(
+          (c) => c.homebase === where.homebase && c.active === where.active,
+        );
+      });
 
       const result = await service.findActiveByHomebase(Homebase.CAPE_COD);
 

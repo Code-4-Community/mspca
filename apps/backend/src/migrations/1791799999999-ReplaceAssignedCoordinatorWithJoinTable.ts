@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ReplaceAssignedCoordinatorWithJoinTable1791800000000
+export class ReplaceAssignedCoordinatorWithJoinTable1791799999999
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
