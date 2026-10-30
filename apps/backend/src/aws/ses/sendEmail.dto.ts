@@ -5,10 +5,10 @@ import {
   IsArray,
   IsEmail,
   IsInstance,
-  IsOptional,
   Length,
   Matches,
   MaxLength,
+  ValidateIf,
   ValidateNested,
   registerDecorator,
 } from 'class-validator';
@@ -64,14 +64,14 @@ export class SendEmailDTO {
   toEmail!: string;
 
   @IsArray()
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @ArrayUnique()
   @IsEmail({}, { each: true })
   @Length(1, 255, { each: true })
   ccEmails?: string[];
 
   @IsArray()
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @ArrayUnique()
   @IsEmail({}, { each: true })
   @Length(1, 255, { each: true })
@@ -91,7 +91,7 @@ export class SendEmailDTO {
   bodyHtml!: string;
 
   @IsArray()
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @ArrayMaxSize(10)
   @ValidateNested({ each: true })
   @Type(() => EmailAttachmentDto)
