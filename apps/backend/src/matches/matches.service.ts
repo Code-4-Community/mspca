@@ -14,7 +14,7 @@ import { CreateMatchDto } from './dtos/create-match.dto';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCanceledEmail } from '../emails/matchCanceled';
-import { VolunteerWithoutNotes } from '../volunteers/volunteers.types';
+import { VolunteerWithoutPrivateFields } from '../volunteers/volunteers.types';
 
 @Injectable()
 export class MatchesService {
@@ -102,7 +102,7 @@ export class MatchesService {
    */
   private async notifyCoordinator(
     match: Match,
-    volunteer: VolunteerWithoutNotes,
+    volunteer: VolunteerWithoutPrivateFields,
   ): Promise<void> {
     const coordinator = volunteer.assignedCoordinator;
 

@@ -1,17 +1,11 @@
-import {
-  ArrayUnique,
-  IsArray,
-  IsEnum,
-  IsOptional,
-  IsString,
-  ValidateIf,
-} from 'class-validator';
+import { ArrayUnique, IsArray, IsEnum, ValidateIf } from 'class-validator';
 import { UpdateVolunteerDto } from './update-volunteer.dto';
 import { FosterTraining } from '../volunteers.types';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 export class CoordinatorUpdateVolunteerDto extends UpdateVolunteerDto {
-  @IsOptional()
-  @IsString()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNonEmptyString()
   coordinatorNotes?: string;
 
   // Unlike @IsOptional, still validates null so it 400s instead of hitting NOT NULL.

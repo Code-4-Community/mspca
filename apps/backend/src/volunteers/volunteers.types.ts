@@ -18,4 +18,7 @@ export enum VolunteerStatus {
   PENDING = 'Pending',
 }
 
-export type VolunteerWithoutNotes = Omit<FosterVolunteer, 'coordinatorNotes'>;
+export type VolunteerWithoutPrivateFields = Omit<
+  FosterVolunteer,
+  'coordinatorNotes'
+>;

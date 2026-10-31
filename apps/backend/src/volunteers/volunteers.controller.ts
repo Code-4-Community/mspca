@@ -23,7 +23,7 @@ import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
-import { VolunteerWithoutNotes } from './volunteers.types';
+import { VolunteerWithoutPrivateFields } from './volunteers.types';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -59,7 +59,7 @@ export class VolunteersController {
   })
   async create(
     @Body() dto: CreateVolunteerDto,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     return this.volunteersService.create(dto);
   }
 
@@ -127,7 +127,7 @@ export class VolunteersController {
   @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     validateId(id, 'Volunteer');
     return this.volunteersService.deactivate(id);
   }
@@ -142,7 +142,7 @@ export class VolunteersController {
   @Patch('/:id/reactivate')
   async reactivate(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     validateId(id, 'Volunteer');
     return this.volunteersService.reactivate(id);
   }
@@ -161,16 +161,17 @@ export class VolunteersController {
   })
   async getVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     validateId(volunteerId, 'Volunteer');
     return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
+  // TODO: restrict to coordinators once role guarding is added
   @Patch('/:volunteerId/coordinator-update-profile')
   @ApiOperation({
     summary: "Update a volunteer's profile as a coordinator",
     description:
-      'Accepts every field a volunteer can edit, plus coordinator-only fields such as coordinatorNotes. Returns the full volunteer, including notes.',
+      'Accepts every field a volunteer can edit, plus coordinator-only fields. Returns the full volunteer, including all fields hidden to them.',
   })
   @ApiParam({
     name: 'volunteerId',
@@ -219,7 +220,7 @@ export class VolunteersController {
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateVolunteerDto,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     validateId(volunteerId, 'Volunteer');
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
@@ -249,7 +250,7 @@ export class VolunteersController {
   @Patch('/:id/approve')
   async approve(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<VolunteerWithoutNotes> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     validateId(id, 'Volunteer');
     return this.volunteersService.approve(id);
   }
@@ -295,7 +296,7 @@ export class VolunteersController {
     description: 'All volunteers, regardless of match status',
     type: [FosterVolunteer],
   })
-  async getAllVolunteers(): Promise<VolunteerWithoutNotes[]> {
+  async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
     return this.volunteersService.getAllVolunteers();
   }
 

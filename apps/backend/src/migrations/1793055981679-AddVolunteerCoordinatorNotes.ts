@@ -5,7 +5,7 @@ export class AddVolunteerCoordinatorNotes1793055981679
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      ALTER TABLE "foster_volunteers" ADD COLUMN "coordinator_notes" text NOT NULL DEFAULT '';
+      ALTER TABLE "foster_volunteers" ADD COLUMN "coordinator_notes" text;
     `);
   }
 

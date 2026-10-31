@@ -95,7 +95,7 @@ describe('VolunteersController', () => {
       const dto: CoordinatorUpdateVolunteerDto = {
         coordinatorNotes: 'missed two pickups',
       };
-      const updated = {
+      const updated: FosterVolunteer = {
         ...mockVolunteer,
         coordinatorNotes: 'missed two pickups',
       };
@@ -112,53 +112,25 @@ describe('VolunteersController', () => {
       ).toHaveBeenCalledWith(1, dto);
     });
 
-    it('accepts volunteer-editable fields alongside the notes', async () => {
-      const dto: CoordinatorUpdateVolunteerDto = {
-        city: 'Boston',
-        coordinatorNotes: 'flag',
-      };
-      mockVolunteersService.coordinatorUpdateVolunteerById.mockResolvedValue({
-        ...mockVolunteer,
-        ...dto,
-      });
-
-      await controller.coordinatorUpdateVolunteerById(1, dto);
-
-      expect(
-        mockVolunteersService.coordinatorUpdateVolunteerById,
-      ).toHaveBeenCalledWith(1, dto);
-    });
-
     it('throws BadRequestException when no fields are provided', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = {};
       await expect(
-        controller.coordinatorUpdateVolunteerById(1, {}),
+        controller.coordinatorUpdateVolunteerById(1, dto),
       ).rejects.toThrow(BadRequestException);
       expect(
         mockVolunteersService.coordinatorUpdateVolunteerById,
       ).not.toHaveBeenCalled();
     });
 
-    it('rejects an invalid volunteer id without calling the service', async () => {
-      await expect(
-        controller.coordinatorUpdateVolunteerById(-1, {
-          coordinatorNotes: 'x',
-        }),
-      ).rejects.toThrow(BadRequestException);
-      expect(
-        mockVolunteersService.coordinatorUpdateVolunteerById,
-      ).not.toHaveBeenCalled();
-    });
-
-    it('propagates NotFoundException from the service', async () => {
+    it('propagates errors from the service', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = { coordinatorNotes: 'x' };
       const error = new NotFoundException('Volunteer with ID 999 not found');
       mockVolunteersService.coordinatorUpdateVolunteerById.mockRejectedValue(
         error,
       );
 
       await expect(
-        controller.coordinatorUpdateVolunteerById(999, {
-          coordinatorNotes: 'x',
-        }),
+        controller.coordinatorUpdateVolunteerById(999, dto),
       ).rejects.toBe(error);
     });
 

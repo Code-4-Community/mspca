@@ -58,8 +58,8 @@ export class FosterVolunteer {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ name: 'coordinator_notes', type: 'text', default: '' })
-  coordinatorNotes!: string;
+  @Column({ name: 'coordinator_notes', type: 'text', nullable: true })
+  coordinatorNotes?: string | null;
 
   @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
   fosterType!: FosterType[];
