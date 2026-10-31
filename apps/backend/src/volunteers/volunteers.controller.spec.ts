@@ -92,13 +92,13 @@ describe('VolunteersController', () => {
 
   describe('coordinatorUpdateVolunteerById', () => {
     it('passes the id and dto to the service and returns the volunteer with notes', async () => {
-      const dto: CoordinatorUpdateVolunteerDto = {
+      const dto = {
         coordinatorNotes: 'missed two pickups',
-      };
-      const updated: FosterVolunteer = {
+      } as CoordinatorUpdateVolunteerDto;
+      const updated = {
         ...mockVolunteer,
         coordinatorNotes: 'missed two pickups',
-      };
+      } as FosterVolunteer;
       mockVolunteersService.coordinatorUpdateVolunteerById.mockResolvedValue(
         updated,
       );

@@ -641,7 +641,7 @@ describe('VolunteersService', () => {
         city: 'Boston',
         notes: 'updated notes',
         coordinatorNotes: 'flag',
-      };
+      } as CoordinatorUpdateVolunteerDto;
       const result = await service.coordinatorUpdateVolunteerById(1, dto);
 
       expect(result.city).toBe('Boston');
