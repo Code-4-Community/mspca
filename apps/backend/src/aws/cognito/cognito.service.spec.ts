@@ -749,7 +749,7 @@ describe('CognitoService', () => {
 
     describe('addUserToGroup', () => {
       it('sends AdminAddUserToGroupCommand', async () => {
-        await service.addUserToGroup('jane@example.com', CognitoRole.Admin);
+        await service.addUserToGroup('jane@example.com', CognitoRole.Owner);
 
         expect(sendSpy).toHaveBeenCalledTimes(1);
         const cmd = sendSpy.mock.calls[0][0];
@@ -757,7 +757,7 @@ describe('CognitoService', () => {
         expect(cmd.input).toEqual({
           UserPoolId: 'us-east-2_TestPool',
           Username: 'jane@example.com',
-          GroupName: CognitoRole.Admin,
+          GroupName: CognitoRole.Owner,
         });
       });
 
@@ -765,7 +765,7 @@ describe('CognitoService', () => {
         sendSpy.mockRejectedValueOnce(new Error('fail'));
 
         await expect(
-          service.addUserToGroup('jane@example.com', CognitoRole.Admin),
+          service.addUserToGroup('jane@example.com', CognitoRole.Owner),
         ).rejects.toThrow(InternalServerErrorException);
       });
     });
@@ -774,7 +774,7 @@ describe('CognitoService', () => {
       it('sends AdminRemoveUserFromGroupCommand', async () => {
         await service.removeUserFromGroup(
           'jane@example.com',
-          CognitoRole.Admin,
+          CognitoRole.Owner,
         );
 
         expect(sendSpy).toHaveBeenCalledTimes(1);
@@ -783,7 +783,7 @@ describe('CognitoService', () => {
         expect(cmd.input).toEqual({
           UserPoolId: 'us-east-2_TestPool',
           Username: 'jane@example.com',
-          GroupName: CognitoRole.Admin,
+          GroupName: CognitoRole.Owner,
         });
       });
 
@@ -791,7 +791,7 @@ describe('CognitoService', () => {
         sendSpy.mockRejectedValueOnce(new Error('fail'));
 
         await expect(
-          service.removeUserFromGroup('jane@example.com', CognitoRole.Admin),
+          service.removeUserFromGroup('jane@example.com', CognitoRole.Owner),
         ).rejects.toThrow(InternalServerErrorException);
       });
     });
