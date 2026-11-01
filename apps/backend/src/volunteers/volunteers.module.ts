@@ -12,8 +12,8 @@ import { AnimalsModule } from '../animals/animals.module';
   imports: [
     TypeOrmModule.forFeature([FosterVolunteer]),
     CoordinatorsModule,
-    forwardRef(() => MatchesModule),
     AWSSESModule,
+    forwardRef(() => MatchesModule),
     AnimalsModule,
   ],
   controllers: [VolunteersController],
