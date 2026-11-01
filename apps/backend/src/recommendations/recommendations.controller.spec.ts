@@ -4,21 +4,18 @@ import { RecommendationsController } from './recommendations.controller';
 import { RecommendationsService } from './recommendations.service';
 import { Recommendation } from './recommendations.entity';
 import { CreateRecommendationDTO } from './dto/create-recommendation.dto';
-import { VolunteersService } from '../volunteers/volunteers.service';
 
 describe('RecommendationsController', () => {
   let controller: RecommendationsController;
   let recommendationsService: { create: jest.Mock };
-  let volunteersService: { findActiveOrFail: jest.Mock };
 
   const body = {
     volunteerId: 7,
-    chameleonAnimalId: 42,
+    chameleonAnimalId: 'A42',
   } as CreateRecommendationDTO;
 
   beforeEach(async () => {
     recommendationsService = { create: jest.fn() };
-    volunteersService = { findActiveOrFail: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RecommendationsController],
@@ -26,10 +23,6 @@ describe('RecommendationsController', () => {
         {
           provide: RecommendationsService,
           useValue: recommendationsService,
-        },
-        {
-          provide: VolunteersService,
-          useValue: volunteersService,
         },
       ],
     }).compile();
@@ -44,26 +37,25 @@ describe('RecommendationsController', () => {
   });
 
   describe('createRecommendation', () => {
-    it('returns the created recommendation when the volunteer is active', async () => {
+    it('returns the recommendation created by the service', async () => {
       const recommendation = { ...body, isActive: true } as Recommendation;
-      volunteersService.findActiveOrFail.mockResolvedValue({});
       recommendationsService.create.mockResolvedValue(recommendation);
 
       const result = await controller.createRecommendation(body);
 
       expect(result).toBe(recommendation);
-      expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(7);
       expect(recommendationsService.create).toHaveBeenCalledWith(body);
     });
 
-    it('does not create a recommendation when the volunteer does not exist or is not active', async () => {
-      const error = new NotFoundException();
-      volunteersService.findActiveOrFail.mockRejectedValue(error);
+    it('surfaces errors from the service', async () => {
+      const error = new NotFoundException(
+        'Animal with Chameleon ID A42 not found',
+      );
+      recommendationsService.create.mockRejectedValue(error);
 
       await expect(controller.createRecommendation(body)).rejects.toThrow(
         error,
       );
-      expect(recommendationsService.create).not.toHaveBeenCalled();
     });
   });
 });
