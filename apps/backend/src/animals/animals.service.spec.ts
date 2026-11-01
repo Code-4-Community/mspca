@@ -84,7 +84,7 @@ describe('AnimalsService', () => {
       });
     });
 
-    it('throws NotFoundException listing every missing Chameleon ID', async () => {
+    it('throws NotFoundException listing the missing IDs even when some of them exist', async () => {
       mockRepo.find.mockResolvedValue([
         { ...mockAnimal, chameleonAnimalId: 'A42' },
       ]);

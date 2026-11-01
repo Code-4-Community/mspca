@@ -33,22 +33,30 @@ export class CreateAnimals1792897315518 implements MigrationInterface {
     `);
 
     // Chameleon animal IDs are now strings, so the columns that store them change type,
-    // and matches/recommendations now reference the animal they're for.
-    await queryRunner.query(`
-      ALTER TABLE "matches"
-        ALTER COLUMN "chameleon_animal_id" TYPE varchar(255) USING "chameleon_animal_id"::varchar,
-        ADD CONSTRAINT "fk_matches_animal"
-          FOREIGN KEY ("chameleon_animal_id")
-          REFERENCES "animals" ("chameleon_animal_id")
-    `);
+    // and matches/recommendations now reference the animal they're for. Existing rows
+    // point at old test IDs that aren't in the (new, empty) animals table, so they're
+    // deleted first; otherwise adding the foreign keys would fail.
+    for (const table of ['matches', 'recommendations']) {
+      await queryRunner.query(`
+        ALTER TABLE "${table}"
+          ALTER COLUMN "chameleon_animal_id" TYPE varchar(255) USING "chameleon_animal_id"::varchar
+      `);
 
-    await queryRunner.query(`
-      ALTER TABLE "recommendations"
-        ALTER COLUMN "chameleon_animal_id" TYPE varchar(255) USING "chameleon_animal_id"::varchar,
-        ADD CONSTRAINT "fk_recommendations_animal"
-          FOREIGN KEY ("chameleon_animal_id")
-          REFERENCES "animals" ("chameleon_animal_id")
-    `);
+      await queryRunner.query(`
+        DELETE FROM "${table}" t
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "animals" a
+          WHERE a."chameleon_animal_id" = t."chameleon_animal_id"
+        )
+      `);
+
+      await queryRunner.query(`
+        ALTER TABLE "${table}"
+          ADD CONSTRAINT "fk_${table}_animal"
+            FOREIGN KEY ("chameleon_animal_id")
+            REFERENCES "animals" ("chameleon_animal_id")
+      `);
+    }
 
     await queryRunner.query(`
       ALTER TABLE "foster_volunteers"
@@ -59,6 +67,18 @@ export class CreateAnimals1792897315518 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Only numeric IDs fit back into the old int columns, so anything else
+    // (i.e. real Chameleon IDs like 'A476750') is dropped before casting.
+    // Postgres doesn't allow subqueries in ALTER ... USING, hence the separate
+    // UPDATE/DELETE statements.
+    await queryRunner.query(`
+      UPDATE "foster_volunteers"
+        SET "animal_preferences" = ARRAY(
+          SELECT id FROM unnest("animal_preferences") AS id
+          WHERE id ~ '^[0-9]{1,9}$'
+        )
+    `);
+
     await queryRunner.query(`
       ALTER TABLE "foster_volunteers"
         ALTER COLUMN "animal_preferences" DROP DEFAULT,
@@ -66,17 +86,21 @@ export class CreateAnimals1792897315518 implements MigrationInterface {
         ALTER COLUMN "animal_preferences" SET DEFAULT '{}'
     `);
 
-    await queryRunner.query(`
-      ALTER TABLE "recommendations"
-        DROP CONSTRAINT "fk_recommendations_animal",
-        ALTER COLUMN "chameleon_animal_id" TYPE int USING "chameleon_animal_id"::int
-    `);
+    for (const table of ['recommendations', 'matches']) {
+      await queryRunner.query(`
+        ALTER TABLE "${table}" DROP CONSTRAINT "fk_${table}_animal"
+      `);
 
-    await queryRunner.query(`
-      ALTER TABLE "matches"
-        DROP CONSTRAINT "fk_matches_animal",
-        ALTER COLUMN "chameleon_animal_id" TYPE int USING "chameleon_animal_id"::int
-    `);
+      await queryRunner.query(`
+        DELETE FROM "${table}"
+        WHERE "chameleon_animal_id" !~ '^[0-9]{1,9}$'
+      `);
+
+      await queryRunner.query(`
+        ALTER TABLE "${table}"
+          ALTER COLUMN "chameleon_animal_id" TYPE int USING "chameleon_animal_id"::int
+      `);
+    }
 
     await queryRunner.query(`DROP TABLE "animals"`);
     await queryRunner.query(`DROP TYPE "animal_restriction_enum"`);
