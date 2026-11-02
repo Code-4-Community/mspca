@@ -1,5 +1,3 @@
-import { FosterVolunteer } from './volunteers.entity';
-
 export enum FosterType {
   DOG = 'Dog',
   CAT = 'Cat',
@@ -17,8 +15,3 @@ export enum VolunteerStatus {
   INACTIVE = 'Inactive',
   PENDING = 'Pending',
 }
-
-export type VolunteerWithoutPrivateFields = Omit<
-  FosterVolunteer,
-  'coordinatorNotes'
->;

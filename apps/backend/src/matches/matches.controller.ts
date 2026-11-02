@@ -37,7 +37,7 @@ export class MatchesController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'No volunteer exists with the given ID.',
+    description: 'No volunteer or animal exists with the given ID.',
   })
   async createMatch(@Body() body: CreateMatchDto): Promise<Match> {
     return this.matchesService.create(body);

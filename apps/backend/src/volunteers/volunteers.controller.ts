@@ -22,8 +22,9 @@ import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto
 import { FosterVolunteer } from './volunteers.entity';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
+import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
-import { VolunteerWithoutPrivateFields } from './volunteers.types';
+import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -33,14 +34,14 @@ export class VolunteersController {
     private matchesService: MatchesService,
   ) {}
 
-  @Public()
   @Post()
+  @Public()
   @ApiOperation({ summary: 'Create a foster volunteer account' })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description:
       'The volunteer was created and is pending approval; a verification code was emailed to them',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -63,8 +64,8 @@ export class VolunteersController {
     return this.volunteersService.create(dto);
   }
 
-  @Public()
   @Post('/confirm')
+  @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: "Confirm a foster volunteer's email with their verification code",
@@ -117,14 +118,14 @@ export class VolunteersController {
     return this.matchesService.findByVolunteerId(volunteerId);
   }
 
+  @Patch('/:id/deactivate')
   @ApiOperation({ summary: 'Deactivate an active foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was deactivated',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
-  @Patch('/:id/deactivate')
   async deactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<VolunteerWithoutPrivateFields> {
@@ -132,14 +133,14 @@ export class VolunteersController {
     return this.volunteersService.deactivate(id);
   }
 
+  @Patch('/:id/reactivate')
   @ApiOperation({ summary: 'Reactivate an inactive foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was reactivated',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
-  @Patch('/:id/reactivate')
   async reactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<VolunteerWithoutPrivateFields> {
@@ -157,7 +158,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was found',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
   async getVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
@@ -181,7 +182,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was updated',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -215,7 +216,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was updated',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
@@ -228,12 +229,13 @@ export class VolunteersController {
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
   }
 
+  @Patch('/:id/approve')
   @ApiOperation({ summary: 'Approve a pending foster volunteer' })
   @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The volunteer was approved and emailed',
-    type: FosterVolunteer,
+    type: VolunteerWithoutPrivateFields,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -247,7 +249,6 @@ export class VolunteersController {
     status: HttpStatus.CONFLICT,
     description: 'The volunteer is not pending',
   })
-  @Patch('/:id/approve')
   async approve(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<VolunteerWithoutPrivateFields> {
@@ -255,6 +256,8 @@ export class VolunteersController {
     return this.volunteersService.approve(id);
   }
 
+  @Delete('/:id/deny')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Deny a pending foster volunteer',
     description:
@@ -282,8 +285,6 @@ export class VolunteersController {
     description:
       'Cognito deletion failed, or a partial deletion occurred (Cognito deleted, database not)',
   })
-  @Delete('/:id/deny')
-  @HttpCode(HttpStatus.NO_CONTENT)
   async deny(@Param('id', ParseIntPipe) id: number): Promise<void> {
     validateId(id, 'Volunteer');
     return this.volunteersService.deny(id);
@@ -294,7 +295,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'All volunteers, regardless of match status',
-    type: [FosterVolunteer],
+    type: [VolunteerWithoutPrivateFields],
   })
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
     return this.volunteersService.getAllVolunteers();
@@ -319,12 +320,12 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'The volunteer does not exist',
+    description: 'The volunteer or an added animal does not exist',
   })
   async updateAnimalPreferences(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateAnimalPreferencesDto,
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     validateId(volunteerId, 'Volunteer');
     if (!dto.added?.length && !dto.removed?.length) {
       throw new BadRequestException(
@@ -332,5 +333,34 @@ export class VolunteersController {
       );
     }
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
+  }
+
+  @Patch('/:id/homebase')
+  @ApiOperation({
+    summary:
+      "Change a foster volunteer's homebase and reassign their coordinators",
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Volunteer ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'The homebase was changed and the volunteer was reassigned to its coordinators',
+    type: VolunteerWithoutPrivateFields,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The volunteer ID is invalid, the volunteer is inactive, or the homebase is missing, invalid, or the same as the current homebase',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No volunteer exists with the ID',
+  })
+  async updateHomebase(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateHomebaseDto,
+  ): Promise<FosterVolunteer> {
+    validateId(id, 'Volunteer');
+    return this.volunteersService.changeHomebase(id, dto.homebase);
   }
 }

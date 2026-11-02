@@ -56,7 +56,7 @@ describe('AWSSESModule', () => {
   });
 
   describe('onModuleInit', () => {
-    it('logs and does not warn when all required env vars are set and enabled', () => {
+    it('logs when all required env vars are set and enabled', () => {
       module.onModuleInit();
 
       expect(warnSpy).not.toHaveBeenCalled();
@@ -92,33 +92,27 @@ describe('AWSSESModule', () => {
     });
 
     it.each(REQUIRED_WHEN_ENABLED)(
-      'warns when enabled and %s is missing',
+      'throws when enabled and %s is missing',
       (name) => {
         delete process.env[name];
 
-        expect(() => module.onModuleInit()).not.toThrow();
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(name));
+        expect(() => module.onModuleInit()).toThrow(name);
+        expect(logSpy).not.toHaveBeenCalledWith('SES enabled');
       },
     );
 
-    it('warns when enabled and a required var is empty/whitespace-only', () => {
+    it('throws when enabled and a required var is empty/whitespace-only', () => {
       process.env.AWS_SES_SENDER_EMAIL = '   ';
 
-      expect(() => module.onModuleInit()).not.toThrow();
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('AWS_SES_SENDER_EMAIL'),
-      );
+      expect(() => module.onModuleInit()).toThrow('AWS_SES_SENDER_EMAIL');
     });
 
-    it('lists every missing env var in a single warning', () => {
+    it('lists every missing env var in the error', () => {
       delete process.env.AWS_REGION;
       delete process.env.AWS_SES_SENDER_EMAIL;
 
-      module.onModuleInit();
-
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('AWS_REGION, AWS_SES_SENDER_EMAIL'),
+      expect(() => module.onModuleInit()).toThrow(
+        'AWS_REGION, AWS_SES_SENDER_EMAIL',
       );
     });
   });
