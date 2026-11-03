@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { OwnersService } from './owners.service';
 import { Owner } from './owners.entity';
+import { CognitoService } from '../aws/cognito/cognito.service';
 
 describe('OwnersService', () => {
   let service: OwnersService;
@@ -14,6 +15,7 @@ describe('OwnersService', () => {
           provide: getRepositoryToken(Owner),
           useValue: {},
         },
+        { provide: CognitoService, useValue: {} },
       ],
     }).compile();
 
