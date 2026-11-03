@@ -5,6 +5,11 @@ export enum FosterType {
   BABY_BOTTLE_ANIMALS = 'Baby Bottle Animals',
 }
 
+export enum FosterTraining {
+  DOG = 'Dog',
+  CAT = 'Cat',
+}
+
 export enum VolunteerStatus {
   ACTIVE = 'Active',
   INACTIVE = 'Inactive',

@@ -9,11 +9,16 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
 import { AnimalsService } from '../animals/animals.service';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
@@ -28,7 +33,7 @@ describe('VolunteersService', () => {
     firstName: 'Jane',
     lastName: 'Doe',
     notes: 'likes cats',
-    assignedCoordinators: [],
+    assignedCoordinators: [] as FosterCoordinator[],
   } as FosterVolunteer;
 
   let mockRepo: {
@@ -116,6 +121,17 @@ describe('VolunteersService', () => {
         where: { volunteerId: 7 },
         relations: ['assignedCoordinators'],
       });
+    });
+
+    it('removes coordinatorNotes from the returned volunteer', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: 'secret',
+      });
+
+      const result = await service.findByIdOrFail(1);
+
+      expect(result).not.toHaveProperty('coordinatorNotes');
     });
   });
 
@@ -240,6 +256,23 @@ describe('VolunteersService', () => {
       expect(result).not.toHaveProperty('password');
     });
 
+    it('saves the completed trainings given at sign-up', async () => {
+      const result = await service.create({
+        ...dto,
+        completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+        }),
+      );
+      expect(result.completedTrainings).toEqual([
+        FosterTraining.DOG,
+        FosterTraining.CAT,
+      ]);
+    });
     it("looks up the active coordinators at the volunteer's homebase", async () => {
       await service.create(dto);
 
@@ -377,6 +410,28 @@ describe('VolunteersService', () => {
       expect(logError).toHaveBeenCalledWith(
         'Created Cognito user cognito-sub-123 for jane@example.com but failed to save the Volunteer or delete the Cognito user',
       );
+    });
+
+    it('does not return coordinatorNotes in the saved volunteer', async () => {
+      mockRepo.save.mockResolvedValue({
+        volunteerId: 1,
+        ...profile,
+        coordinatorNotes: null,
+      });
+
+      const result = await service.create(dto);
+
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...profile,
+          status: VolunteerStatus.PENDING,
+          cognitoSub: 'cognito-sub-123',
+        }),
+      );
+      expect(mockRepo.save.mock.calls[0][0]).not.toHaveProperty(
+        'coordinatorNotes',
+      );
+      expect(result).not.toHaveProperty('coordinatorNotes');
     });
   });
 
@@ -529,6 +584,20 @@ describe('VolunteersService', () => {
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
+
+    it('never writes coordinatorNotes when saving', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        status: VolunteerStatus.ACTIVE,
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      await service.deactivate(1);
+
+      expect(mockRepo.save.mock.calls[0][0]).not.toHaveProperty(
+        'coordinatorNotes',
+      );
+    });
   });
 
   describe('reactivate', () => {
@@ -587,6 +656,158 @@ describe('VolunteersService', () => {
 
       await expect(service.reactivate(1)).rejects.toThrow(
         new BadRequestException('Volunteer with ID 1 is not inactive'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('coordinatorFindByIdOrFail', () => {
+    it('returns the full volunteer, including coordinatorNotes', async () => {
+      const volunteer = { ...mockVolunteer, coordinatorNotes: 'flagged' };
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      const result = await service.coordinatorFindByIdOrFail(1);
+
+      expect(result).toBe(volunteer);
+      expect(result.coordinatorNotes).toBe('flagged');
+    });
+
+    it('does not restrict the selected columns', async () => {
+      mockRepo.findOne.mockResolvedValue(mockVolunteer);
+
+      await service.coordinatorFindByIdOrFail(1);
+
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinators'],
+      });
+    });
+
+    it('throws NotFoundException when no volunteer with the id exists', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.coordinatorFindByIdOrFail(999)).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+    });
+  });
+
+  describe('coordinatorUpdateVolunteerById', () => {
+    it('updates coordinatorNotes and returns the volunteer with notes', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: '',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        coordinatorNotes: 'missed two pickups',
+      });
+
+      expect(result.coordinatorNotes).toBe('missed two pickups');
+      expect(result.firstName).toBe('Jane');
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ coordinatorNotes: 'missed two pickups' }),
+      );
+    });
+
+    it('updates volunteer-editable fields alongside the notes', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: '',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const dto: CoordinatorUpdateVolunteerDto = {
+        city: 'Boston',
+        notes: 'updated notes',
+        coordinatorNotes: 'flag',
+      } as CoordinatorUpdateVolunteerDto;
+      const result = await service.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result.city).toBe('Boston');
+      expect(result.notes).toBe('updated notes');
+      expect(result.coordinatorNotes).toBe('flag');
+    });
+
+    it('allows clearing the notes with null', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: 'old',
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+      const dto = { coordinatorNotes: null } as CoordinatorUpdateVolunteerDto;
+
+      const result = await service.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result.coordinatorNotes).toBeNull();
+    });
+
+    it('leaves coordinatorNotes unchanged when only completedTrainings is provided', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        coordinatorNotes: 'keep me',
+        completedTrainings: [FosterTraining.DOG],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+      const dto = {
+        completedTrainings: [FosterTraining.CAT],
+      } as CoordinatorUpdateVolunteerDto;
+
+      const result = await service.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result.coordinatorNotes).toBe('keep me');
+      expect(result.completedTrainings).toEqual([FosterTraining.CAT]);
+    });
+
+    it('replaces the completed trainings', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        completedTrainings: [FosterTraining.DOG],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completedTrainings: [FosterTraining.DOG, FosterTraining.CAT],
+        }),
+      );
+      expect(result.completedTrainings).toEqual([
+        FosterTraining.DOG,
+        FosterTraining.CAT,
+      ]);
+    });
+
+    it('allows clearing the completed trainings with an empty list', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        completedTrainings: [FosterTraining.DOG],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        completedTrainings: [],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ completedTrainings: [] }),
+      );
+      expect(result.completedTrainings).toEqual([]);
+    });
+
+    it('throws NotFoundException and saves nothing when the volunteer does not exist', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.coordinatorUpdateVolunteerById(999, { coordinatorNotes: 'x' }),
+      ).rejects.toThrow(
+        new NotFoundException('Volunteer with ID 999 not found'),
       );
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
@@ -814,27 +1035,40 @@ describe('VolunteersService', () => {
       );
       expect(loggerSpy).toHaveBeenCalledTimes(1);
     });
+  });
 
-    describe('getAllVolunteers', () => {
-      it('should return all volunteers', async () => {
-        mockRepo.find.mockResolvedValue(mockVolunteers);
+  describe('getAllVolunteers', () => {
+    it('should return all volunteers', async () => {
+      mockRepo.find.mockResolvedValue(mockVolunteers);
 
-        const result = await service.getAllVolunteers();
+      const result = await service.getAllVolunteers();
 
-        expect(result).toEqual(mockVolunteers);
-        expect(mockRepo.find).toHaveBeenCalledWith({
-          relations: ['assignedCoordinators'],
-        });
+      expect(result).toEqual(mockVolunteers);
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        relations: ['assignedCoordinators'],
       });
+    });
 
-      it('should return an empty array when there are no volunteers', async () => {
-        mockRepo.find.mockResolvedValue([]);
+    it('should return an empty array when there are no volunteers', async () => {
+      mockRepo.find.mockResolvedValue([]);
 
-        const result = await service.getAllVolunteers();
+      const result = await service.getAllVolunteers();
 
-        expect(result).toEqual([]);
-        expect(mockRepo.find).toHaveBeenCalled();
-      });
+      expect(result).toEqual([]);
+      expect(mockRepo.find).toHaveBeenCalled();
+    });
+
+    it('removes coordinatorNotes from every returned volunteer', async () => {
+      mockRepo.find.mockResolvedValue([
+        { ...mockVolunteer, coordinatorNotes: 'a' },
+        { ...mockVolunteer, volunteerId: 2, coordinatorNotes: 'b' },
+      ]);
+
+      const result = await service.getAllVolunteers();
+
+      result.forEach((volunteer) =>
+        expect(volunteer).not.toHaveProperty('coordinatorNotes'),
+      );
     });
   });
 
