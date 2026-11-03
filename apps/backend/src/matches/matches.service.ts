@@ -11,11 +11,12 @@ import { Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
-import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCreatedEmail } from './emails/matchCreated';
 import { matchCanceledEmail } from '../emails/matchCanceled';
+import { VolunteerWithoutPrivateFields } from '../volunteers/dtos/volunteer-without-private-fields.dto';
 
 @Injectable()
 export class MatchesService {
@@ -26,6 +27,7 @@ export class MatchesService {
     private repo: Repository<Match>,
     @Inject(forwardRef(() => VolunteersService))
     private volunteersService: VolunteersService,
+    private animalsService: AnimalsService,
     private emailsService: EmailsService,
   ) {}
 
@@ -39,13 +41,14 @@ export class MatchesService {
    *
    * @param dto the volunteer and Chameleon animal to match
    * @returns the created match
-   * @throws NotFoundException if the volunteer does not exist
+   * @throws NotFoundException if the volunteer or animal does not exist
    * @throws BadRequestException if the volunteer is not active
    */
   async create(dto: CreateMatchDto): Promise<Match> {
     const volunteer = await this.volunteersService.findActiveOrFail(
       dto.volunteerId,
     );
+    await this.animalsService.findByChameleonIdOrFail(dto.chameleonAnimalId);
 
     const match = await this.repo.save(
       this.repo.create({
@@ -104,7 +107,7 @@ export class MatchesService {
    */
   private async notifyCoordinators(
     match: Match,
-    volunteer: FosterVolunteer,
+    volunteer: VolunteerWithoutPrivateFields,
   ): Promise<void> {
     try {
       const coordinators = volunteer.assignedCoordinators.filter(
