@@ -1,0 +1,33 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class AddAnimalUpdatesAndFosterTypeArray1793163582751
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers" ADD "animal_updates" boolean NOT NULL DEFAULT true`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers"
+       ALTER COLUMN "foster_type" TYPE "foster_type_enum"[]
+       USING ARRAY["foster_type"]`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers" ADD "foster_type_preferences" "foster_type_enum"[] NOT NULL DEFAULT '{}'`,
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers" DROP COLUMN "foster_type_preferences"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers"
+       ALTER COLUMN "foster_type" TYPE "foster_type_enum"
+       USING "foster_type"[1]`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "foster_volunteers" DROP COLUMN "animal_updates"`,
+    );
+  }
+}

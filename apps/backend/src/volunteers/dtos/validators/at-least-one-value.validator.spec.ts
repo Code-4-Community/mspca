@@ -1,15 +1,13 @@
 import { validate } from 'class-validator';
-import { AtLeastOneFosterTypePreference } from './at-least-one-foster-type-preference.validator';
+import { AtLeastOneValue } from './at-least-one-value.validator';
 
+@AtLeastOneValue<TestDto>(['added', 'removed'])
 class TestDto {
   added?: string[];
   removed?: string[];
-
-  @AtLeastOneFosterTypePreference()
-  private readonly atLeastOnePreference?: boolean;
 }
 
-describe('AtLeastOneFosterTypePreference', () => {
+describe('AtLeastOneValue', () => {
   it('passes when added contains a value', async () => {
     const dto = Object.assign(new TestDto(), {
       added: ['DOG'],
@@ -40,8 +38,7 @@ describe('AtLeastOneFosterTypePreference', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0].constraints).toEqual({
-      atLeastOneFosterTypePreference:
-        'At least one of added or removed must be provided',
+      atLeastOneValue: 'At least one of added, removed must be provided',
     });
   });
 

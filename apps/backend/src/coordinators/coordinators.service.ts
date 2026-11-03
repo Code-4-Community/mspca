@@ -9,6 +9,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterCoordinator } from './coordinators.entity';
+import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { Homebase } from '../types';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
@@ -21,18 +23,21 @@ export class CoordinatorsService {
   constructor(
     @InjectRepository(FosterCoordinator)
     private repo: Repository<FosterCoordinator>,
+    @InjectRepository(FosterVolunteer)
+    private volunteerRepo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
   ) {}
 
   /**
    * Registers a coordinator with Cognito and saves their profile.
    * Coordinators are active immediately and do not require approval.
+   * Assigns every Volunteer at the coordinator's homebase.
    *
    * @param dto - The coordinator's registration information.
    * @returns The newly created coordinator.
    * @throws {ConflictException} If a coordinator with the email already exists in the database.
    * @throws {BadRequestException} If Cognito rejects the registration request.
-   * @throws {InternalServerErrorException} If saving the coordinator to the database fails.
+   * @throws {InternalServerErrorException} If saving the coordinator to the database fails (the Cognito user is deleted).
    */
   async create(dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
     const { password, ...profile } = dto;
@@ -53,11 +58,17 @@ export class CoordinatorsService {
       password,
     });
 
+    // Inside the try so a failed lookup also deletes the Cognito user.
     try {
+      const assignedVolunteers = await this.volunteerRepo.find({
+        where: { homebase: profile.homebase },
+      });
+
       return await this.repo.save({
         ...profile,
         active: true,
         cognitoSub,
+        assignedVolunteers,
       });
     } catch (error) {
       this.logger.error(`Failed to save coordinator ${email}`, error);
@@ -117,6 +128,19 @@ export class CoordinatorsService {
     }
 
     return coordinator;
+  }
+
+  /**
+   * Fetches the active Coordinators at a homebase.
+   *
+   * @param homebase - The homebase to look up.
+   * @returns The active Coordinators, ordered by ID, or an empty array if none.
+   */
+  findActiveByHomebase(homebase: Homebase): Promise<FosterCoordinator[]> {
+    return this.repo.find({
+      where: { homebase, active: true },
+      order: { coordinatorId: 'ASC' },
+    });
   }
 
   /**
