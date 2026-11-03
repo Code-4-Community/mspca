@@ -659,6 +659,157 @@ describe('VolunteersService', () => {
     });
   });
 
+  describe('updateFosterTypePreferences', () => {
+    const volunteerWithPreferences = (
+      fosterTypePreferences: FosterType[],
+      status: VolunteerStatus = VolunteerStatus.ACTIVE,
+    ): FosterVolunteer => ({
+      ...mockVolunteer,
+      status,
+      fosterTypePreferences,
+    });
+
+    beforeEach(() => {
+      mockRepo.save.mockImplementation(async (volunteer) => volunteer);
+    });
+
+    it('adds new foster types to the existing list', async () => {
+      mockRepo.findOne.mockResolvedValue(
+        volunteerWithPreferences([FosterType.DOG]),
+      );
+
+      const result = await service.updateFosterTypePreferences(1, {
+        added: [FosterType.CAT, FosterType.SMALL_ANIMALS],
+      });
+
+      expect(result).toEqual([
+        FosterType.DOG,
+        FosterType.CAT,
+        FosterType.SMALL_ANIMALS,
+      ]);
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 1 },
+        relations: ['assignedCoordinators'],
+      });
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ fosterTypePreferences: result }),
+      );
+    });
+
+    it('removes an existing preference', async () => {
+      mockRepo.findOne.mockResolvedValue(
+        volunteerWithPreferences([
+          FosterType.DOG,
+          FosterType.CAT,
+          FosterType.SMALL_ANIMALS,
+        ]),
+      );
+
+      const result = await service.updateFosterTypePreferences(1, {
+        removed: [FosterType.CAT, FosterType.SMALL_ANIMALS],
+      });
+
+      expect(result).toEqual([FosterType.DOG]);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ fosterTypePreferences: [FosterType.DOG] }),
+      );
+    });
+
+    it('applies valid removals and additions together', async () => {
+      mockRepo.findOne.mockResolvedValue(
+        volunteerWithPreferences([FosterType.DOG, FosterType.CAT]),
+      );
+
+      const result = await service.updateFosterTypePreferences(1, {
+        added: [FosterType.BABY_BOTTLE_ANIMALS],
+        removed: [FosterType.DOG],
+      });
+
+      expect(result).toEqual([FosterType.CAT, FosterType.BABY_BOTTLE_ANIMALS]);
+    });
+
+    it('skips adding an existing preference', async () => {
+      mockRepo.findOne.mockResolvedValue(
+        volunteerWithPreferences([FosterType.DOG]),
+      );
+
+      const result = await service.updateFosterTypePreferences(1, {
+        added: [FosterType.DOG],
+      });
+
+      expect(result).toEqual([FosterType.DOG]);
+    });
+
+    it('rejects removing a nonexistent preference without saving or mutating', async () => {
+      const volunteer = volunteerWithPreferences([FosterType.DOG]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      await expect(
+        service.updateFosterTypePreferences(1, {
+          removed: [FosterType.CAT],
+        }),
+      ).rejects.toThrow(
+        `Foster types not in the volunteer's preferences: ${FosterType.CAT}`,
+      );
+      expect(volunteer.fosterTypePreferences).toEqual([FosterType.DOG]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects removing from an empty preference list', async () => {
+      const volunteer = volunteerWithPreferences([]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      await expect(
+        service.updateFosterTypePreferences(1, {
+          removed: [FosterType.DOG],
+        }),
+      ).rejects.toThrow(
+        'Volunteer with ID 1 has no foster type preferences to remove',
+      );
+      expect(volunteer.fosterTypePreferences).toEqual([]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('reports multiple invalid removals together', async () => {
+      const volunteer = volunteerWithPreferences([FosterType.DOG]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      await expect(
+        service.updateFosterTypePreferences(1, {
+          removed: [FosterType.CAT, FosterType.SMALL_ANIMALS],
+        }),
+      ).rejects.toThrow(
+        `Foster types not in the volunteer's preferences: ${FosterType.CAT}, ${FosterType.SMALL_ANIMALS}`,
+      );
+      expect(volunteer.fosterTypePreferences).toEqual([FosterType.DOG]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid removal even if other removals are valid', async () => {
+      const volunteer = volunteerWithPreferences([FosterType.DOG]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      await expect(
+        service.updateFosterTypePreferences(1, {
+          removed: [FosterType.DOG, FosterType.CAT],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(volunteer.fosterTypePreferences).toEqual([FosterType.DOG]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('checks for overlapping additions and removals first', async () => {
+      const volunteer = volunteerWithPreferences([FosterType.DOG]);
+      mockRepo.findOne.mockResolvedValue(volunteer);
+      await expect(
+        service.updateFosterTypePreferences(1, {
+          added: [FosterType.CAT],
+          removed: [FosterType.CAT],
+        }),
+      ).rejects.toThrow(
+        `Foster types cannot be both added and removed: ${FosterType.CAT}`,
+      );
+      expect(volunteer.fosterTypePreferences).toEqual([FosterType.DOG]);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('approve', () => {
     const pendingVolunteer = () =>
       ({
