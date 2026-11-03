@@ -44,6 +44,9 @@ export const colors = {
   brown: {
     brown: '#5e3638',
   },
+  purple: {
+    avatar: '#b57bf8',
+  },
   neutrals: {
     black: '#231f20',
     black85: '#4d4d4f',
@@ -105,6 +108,12 @@ const config = defineConfig({
   theme: {
     tokens: {
       colors: toColorTokens(colors),
+      shadows: {
+        card: {
+          value:
+            '0px 4px 8px 0px rgba(24, 24, 27, 0.10), 0px 0px 1px 0px rgba(24, 24, 27, 0.30)',
+        },
+      },
       fonts: {
         heading: { value: "'Montserrat', sans-serif" },
         body: { value: "'Montserrat', sans-serif" },

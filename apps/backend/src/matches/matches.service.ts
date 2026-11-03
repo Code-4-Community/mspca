@@ -51,6 +51,7 @@ export class MatchesService {
         volunteerId: dto.volunteerId,
         chameleonAnimalId: dto.chameleonAnimalId,
         status: MatchStatus.PENDING,
+        additionalComments: dto.additionalComments ?? null,
         deniedReason: null,
       }),
     );

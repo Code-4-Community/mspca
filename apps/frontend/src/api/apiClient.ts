@@ -6,6 +6,36 @@ import { isAuthEnabled } from '../auth/auth.config';
 const defaultBaseUrl =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
+export interface Animal {
+  animalId: number;
+  chameleonAnimalId: number;
+  name: string;
+  age: number;
+  sex: string;
+  breed: string[];
+  weight: number;
+  location: string;
+  picture: string | null;
+  fosterBioMemo: string | null;
+  // Restriction tag labels (e.g. 'Dog-Free Home'). Not returned by the API yet;
+  // filtering and tag pills simply treat a missing value as no tags.
+  restrictions?: string[];
+}
+
+export interface CreateMatchBody {
+  volunteerId: number;
+  chameleonAnimalId: number;
+  additionalComments?: string;
+}
+
+export interface Match {
+  matchId: number;
+  volunteerId: number;
+  chameleonAnimalId: number;
+  status: string;
+  additionalComments: string | null;
+}
+
 export class ApiClient {
   private axiosInstance: AxiosInstance;
 
@@ -43,6 +73,14 @@ export class ApiClient {
 
       return config;
     });
+  }
+
+  public async getAnimals(): Promise<Animal[]> {
+    return this.get('/api/animals') as Promise<Animal[]>;
+  }
+
+  public async createMatch(body: CreateMatchBody): Promise<Match> {
+    return this.post('/api/matches', body) as Promise<Match>;
   }
 
   public async getHello(): Promise<string> {

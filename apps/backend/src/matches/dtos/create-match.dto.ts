@@ -1,4 +1,4 @@
-import { IsInt, IsPositive } from 'class-validator';
+import { IsInt, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class CreateMatchDto {
   @IsInt()
@@ -8,4 +8,8 @@ export class CreateMatchDto {
   @IsInt()
   @IsPositive()
   chameleonAnimalId!: number;
+
+  @IsOptional()
+  @IsString()
+  additionalComments?: string;
 }
