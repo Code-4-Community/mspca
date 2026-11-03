@@ -11,12 +11,12 @@ import { Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
-import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCreatedEmail } from './emails/matchCreated';
 import { matchCanceledEmail } from '../emails/matchCanceled';
+import { VolunteerWithoutPrivateFields } from '../volunteers/dtos/volunteer-without-private-fields.dto';
 
 @Injectable()
 export class MatchesService {
@@ -107,7 +107,7 @@ export class MatchesService {
    */
   private async notifyCoordinators(
     match: Match,
-    volunteer: FosterVolunteer,
+    volunteer: VolunteerWithoutPrivateFields,
   ): Promise<void> {
     try {
       const coordinators = volunteer.assignedCoordinators.filter(
