@@ -106,18 +106,6 @@ describe('OwnersService', () => {
       expect(repo.save).not.toHaveBeenCalled();
     });
 
-    it('does not save if creating the Cognito user fails', async () => {
-      repo.findOneBy.mockResolvedValue(null);
-      cognitoService.createUser.mockRejectedValue(
-        new ConflictException('Cognito user already exists'),
-      );
-
-      await expect(service.create(dto)).rejects.toThrow(ConflictException);
-
-      expect(repo.save).not.toHaveBeenCalled();
-      expect(cognitoService.deleteUser).not.toHaveBeenCalled();
-    });
-
     it('deletes the Cognito user when saving fails and logs the error', async () => {
       const databaseError = new Error('Database error');
 

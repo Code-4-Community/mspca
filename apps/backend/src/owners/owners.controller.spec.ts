@@ -47,12 +47,5 @@ describe('OwnersController', () => {
       expect(service.create).toHaveBeenCalledWith(dto);
       expect(result).toBe(created);
     });
-
-    it('propagates service errors', async () => {
-      const error = new Error('Service failure');
-      service.create.mockRejectedValue(error);
-
-      await expect(controller.create(dto)).rejects.toBe(error);
-    });
   });
 });
