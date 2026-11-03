@@ -2,9 +2,9 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   OneToMany,
-  JoinColumn,
+  ManyToMany,
+  JoinTable,
   Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
@@ -56,8 +56,11 @@ export class FosterVolunteer {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ name: 'foster_type', type: 'enum', enum: FosterType })
-  fosterType!: FosterType;
+  @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
+  fosterType!: FosterType[];
+
+  @Column({ name: 'animal_updates', type: 'boolean', default: true })
+  animalUpdates!: boolean;
 
   @Column({
     name: 'completed_canine_training',
@@ -81,20 +84,27 @@ export class FosterVolunteer {
 
   @Column({
     name: 'animal_preferences',
-    type: 'int',
+    type: 'text',
     array: true,
     default: () => "'{}'",
   })
-  animalPreferences!: number[];
+  animalPreferences!: string[];
 
-  @ManyToOne(
+  @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
-    { nullable: true },
+    { onDelete: 'CASCADE' },
   )
+  @JoinTable({
+    name: 'volunteer_coordinator_assignments',
+    joinColumn: { name: 'volunteer_id', referencedColumnName: 'volunteerId' },
+    inverseJoinColumn: {
+      name: 'coordinator_id',
+      referencedColumnName: 'coordinatorId',
+    },
+  })
+  assignedCoordinators!: FosterCoordinator[];
+
   @OneToMany(() => Match, (match) => match.volunteer)
   matches!: Match[];
-
-  @JoinColumn({ name: 'assigned_coordinator_id' })
-  assignedCoordinator!: FosterCoordinator | null;
 }

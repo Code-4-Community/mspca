@@ -6,13 +6,15 @@ import { VolunteersService } from './volunteers.service';
 import { CoordinatorsModule } from '../coordinators/coordinators.module';
 import { MatchesModule } from '../matches/matches.module';
 import { AWSSESModule } from '../aws/ses/email.module';
+import { AnimalsModule } from '../animals/animals.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([FosterVolunteer]),
     CoordinatorsModule,
-    forwardRef(() => MatchesModule),
     AWSSESModule,
+    forwardRef(() => MatchesModule),
+    AnimalsModule,
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],

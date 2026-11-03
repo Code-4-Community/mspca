@@ -10,6 +10,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
+import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
@@ -19,6 +20,7 @@ import { Homebase } from '../types';
 describe('CoordinatorsService', () => {
   let service: CoordinatorsService;
   let repo: jest.Mocked<Repository<FosterCoordinator>>;
+  let volunteerRepo: jest.Mocked<Repository<FosterVolunteer>>;
   let cognitoService: jest.Mocked<CognitoService>;
   let loggerSpy: jest.SpyInstance;
 
@@ -59,8 +61,13 @@ describe('CoordinatorsService', () => {
           useValue: {
             findOneBy: jest.fn(),
             findOne: jest.fn(),
+            find: jest.fn(),
             save: jest.fn(),
           },
+        },
+        {
+          provide: getRepositoryToken(FosterVolunteer),
+          useValue: { find: jest.fn() },
         },
         {
           provide: CognitoService,
@@ -75,6 +82,7 @@ describe('CoordinatorsService', () => {
 
     service = module.get(CoordinatorsService);
     repo = module.get(getRepositoryToken(FosterCoordinator));
+    volunteerRepo = module.get(getRepositoryToken(FosterVolunteer));
     cognitoService = module.get(CognitoService);
 
     loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
@@ -85,6 +93,15 @@ describe('CoordinatorsService', () => {
   });
 
   describe('create', () => {
+    const bostonVolunteers = [
+      { volunteerId: 1, homebase: Homebase.BOSTON },
+      { volunteerId: 2, homebase: Homebase.BOSTON },
+    ] as FosterVolunteer[];
+
+    beforeEach(() => {
+      volunteerRepo.find.mockResolvedValue(bostonVolunteers);
+    });
+
     it('signs up with Cognito before saving', async () => {
       repo.findOneBy.mockResolvedValue(null);
       cognitoService.signUpUser.mockResolvedValue('cognito-sub-123');
@@ -113,6 +130,49 @@ describe('CoordinatorsService', () => {
 
       expect(repo.save.mock.calls[0][0]).not.toHaveProperty('password');
       expect(result).toBe(coordinator);
+    });
+
+    it("assigns every volunteer at the coordinator's homebase", async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('cognito-sub-123');
+      repo.save.mockResolvedValue(coordinator);
+
+      await service.create(dto);
+
+      expect(volunteerRepo.find).toHaveBeenCalledTimes(1);
+      expect(volunteerRepo.find).toHaveBeenCalledWith({
+        where: { homebase: Homebase.BOSTON },
+      });
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedVolunteers: bostonVolunteers }),
+      );
+    });
+
+    it('saves an empty volunteer list when the homebase has no volunteers', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('cognito-sub-123');
+      volunteerRepo.find.mockResolvedValue([]);
+      repo.save.mockResolvedValue(coordinator);
+
+      await service.create(dto);
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedVolunteers: [] }),
+      );
+    });
+
+    it('deletes the Cognito user when the volunteer lookup fails', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      cognitoService.signUpUser.mockResolvedValue('sub-123');
+      volunteerRepo.find.mockRejectedValue(new Error('Database error'));
+      cognitoService.deleteUser.mockResolvedValue(undefined);
+
+      await expect(service.create(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+
+      expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);
+      expect(repo.save).not.toHaveBeenCalled();
     });
 
     it('rejects duplicate coordinators', async () => {
@@ -240,6 +300,69 @@ describe('CoordinatorsService', () => {
       cognitoService.confirmUser.mockRejectedValue(error);
 
       await expect(service.confirm(confirmDto)).rejects.toBe(error);
+    });
+  });
+
+  describe('findActiveByHomebase', () => {
+    it('returns the active coordinators at the homebase ordered by id', async () => {
+      const coordinators = [
+        { coordinatorId: 5, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(async (options) => {
+        const order = options?.order as { coordinatorId: 'ASC' | 'DESC' };
+        const sign = order.coordinatorId === 'ASC' ? 1 : -1;
+        return [...coordinators].sort(
+          (a, b) => sign * (a.coordinatorId - b.coordinatorId),
+        );
+      });
+
+      const result = await service.findActiveByHomebase(Homebase.SALEM);
+
+      expect(result).toEqual([coordinators[1], coordinators[0]]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+      expect(repo.find).toHaveBeenCalledWith({
+        where: { homebase: Homebase.SALEM, active: true },
+        order: { coordinatorId: 'ASC' },
+      });
+    });
+
+    it('does not return coordinators from other homebases', async () => {
+      const coordinators = [
+        { coordinatorId: 1, homebase: Homebase.BOSTON, active: true },
+        { coordinatorId: 2, homebase: Homebase.SALEM, active: true },
+        { coordinatorId: 3, homebase: Homebase.CAPE_COD, active: true },
+        { coordinatorId: 4, homebase: Homebase.CAPE_COD, active: false },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(async (options) => {
+        const where = options?.where as Partial<FosterCoordinator>;
+        return coordinators.filter(
+          (c) => c.homebase === where.homebase && c.active === where.active,
+        );
+      });
+
+      const result = await service.findActiveByHomebase(Homebase.SALEM);
+
+      expect(result).toEqual([coordinators[1]]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns an empty array when the homebase has no active coordinators', async () => {
+      const coordinators = [
+        { coordinatorId: 1, homebase: Homebase.CAPE_COD, active: false },
+        { coordinatorId: 2, homebase: Homebase.CAPE_COD, active: false },
+      ] as FosterCoordinator[];
+      repo.find.mockImplementation(async (options) => {
+        const where = options?.where as Partial<FosterCoordinator>;
+        return coordinators.filter(
+          (c) => c.homebase === where.homebase && c.active === where.active,
+        );
+      });
+
+      const result = await service.findActiveByHomebase(Homebase.CAPE_COD);
+
+      expect(result).toEqual([]);
+      expect(repo.find).toHaveBeenCalledTimes(1);
     });
   });
 
