@@ -9,6 +9,7 @@ import { CreateAnimals1792897315518 } from '../migrations/1792897315518-CreateAn
 import { AddVolunteerCoordinatorNotes1793055981679 } from '../migrations/1793055981679-AddVolunteerCoordinatorNotes';
 import { ReplaceCanineTrainingWithCompletedTrainings1793150103842 } from '../migrations/1793150103842-ReplaceCanineTrainingWithCompletedTrainings';
 import { AddAnimalUpdatesAndFosterTypeArray1793163582751 } from '../migrations/1793163582751-AddAnimalUpdatesAndFosterTypeArray';
+import { AddFarmAnimalsToFosterType1793476100199 } from '../migrations/1793476100199-AddFarmAnimalsToFosterType';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -22,6 +23,7 @@ const schemaMigrations = [
   AddVolunteerCoordinatorNotes1793055981679,
   ReplaceCanineTrainingWithCompletedTrainings1793150103842,
   AddAnimalUpdatesAndFosterTypeArray1793163582751,
+  AddFarmAnimalsToFosterType1793476100199,
 ];
 
 export default schemaMigrations;
