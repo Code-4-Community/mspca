@@ -863,4 +863,62 @@ describe('MatchesService', () => {
       expect(matchRepo.save).not.toHaveBeenCalled();
     });
   });
+  describe('findPendingByChameleonAnimalId', () => {
+    const pendingMatches = [
+      { ...mockMatch, volunteer: volunteerWithCoordinator },
+      {
+        ...mockMatch,
+        matchId: 2,
+        volunteer: { ...volunteerWithCoordinator, volunteerId: 2 },
+      },
+    ] as Match[];
+
+    const expectedQuery = {
+      where: { chameleonAnimalId: 'A42', status: MatchStatus.PENDING },
+      relations: ['volunteer'],
+    };
+
+    it('returns every pending match for the animal with its volunteer', async () => {
+      matchRepo.find.mockResolvedValue(pendingMatches);
+
+      const result = await service.findPendingByChameleonAnimalId('A42');
+
+      expect(result).toBe(pendingMatches);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns a single pending match', async () => {
+      matchRepo.find.mockResolvedValue([pendingMatches[0]]);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([pendingMatches[0]]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns an empty array when the animal has no pending matches', async () => {
+      matchRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('throws when the animal does not exist', async () => {
+      animalsService.findByChameleonIdOrFail.mockRejectedValue(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A999'),
+      ).rejects.toThrow(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+      expect(matchRepo.find).not.toHaveBeenCalled();
+    });
+  });
 });
