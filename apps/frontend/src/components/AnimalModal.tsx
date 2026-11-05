@@ -12,12 +12,9 @@ import {
 
 import apiClient, { type Animal } from '@api/apiClient';
 import { formatAge } from '@utils/animals';
+import { useVolunteerId } from '@utils/useVolunteerId';
 import { CalendarIcon, PLACEHOLDER_IMAGE } from './AnimalCard';
 import RestrictionTag from './RestrictionTag';
-
-// TODO: replace with the logged-in volunteer's ID once the frontend has access
-// to the current user's profile.
-const CURRENT_VOLUNTEER_ID = 1;
 
 interface AnimalModalProps {
   animal: Animal | null;
@@ -31,13 +28,16 @@ const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
   const [submitting, setSubmitting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // TEMPORARY: comes from the URL until sign-in is implemented.
+  const volunteerId = useVolunteerId();
 
   const handleRequest = async () => {
+    if (volunteerId === null) return;
     setSubmitting(true);
     setError(null);
     try {
       await apiClient.createMatch({
-        volunteerId: CURRENT_VOLUNTEER_ID,
+        volunteerId,
         chameleonAnimalId: animal.chameleonAnimalId,
         additionalComments: comments.trim() || undefined,
       });
@@ -262,6 +262,7 @@ const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
                 lineHeight="24px"
                 onClick={handleRequest}
                 loading={submitting}
+                disabled={volunteerId === null}
               >
                 Apply
               </Button>
