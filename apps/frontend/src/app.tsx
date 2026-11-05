@@ -14,15 +14,25 @@ import AnimalAvailability from '@pages/AnimalAvailability';
 import { ROUTES } from './routes';
 
 // Every page is a child of Layout so the navbar renders once, above all pages.
+// Page errors are caught by the inner errorElement so the navbar stays put;
+// the outer one only catches errors from the layout itself.
 export const routes: RouteObject[] = [
   {
     element: <Layout />,
     errorElement: <NotFound />,
     children: [
-      { path: '/', element: <Root /> },
-      { path: '/test', element: <Test /> },
-      { path: ROUTES.ANIMAL_AVAILABILITY, element: <AnimalAvailability /> },
-      { path: '*', element: <NotFound /> },
+      {
+        errorElement: <NotFound />,
+        children: [
+          { path: '/', element: <Root /> },
+          { path: '/test', element: <Test /> },
+          {
+            path: ROUTES.ANIMAL_AVAILABILITY,
+            element: <AnimalAvailability />,
+          },
+          { path: '*', element: <NotFound /> },
+        ],
+      },
     ],
   },
 ];

@@ -75,7 +75,7 @@ const AnimalAvailability: React.FC = () => {
   );
 
   return (
-    <Box bg="bg.subtle" minH="100vh">
+    <Box bg="bg.subtle" flex="1">
       <Flex gap="8" px="8" py="8" align="flex-start">
         <Flex direction="column" gap="4" flex="1" minW="0">
           <AnimalFilters
