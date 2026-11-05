@@ -1,28 +1,33 @@
 import { useEffect } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  type RouteObject,
+} from 'react-router-dom';
 
 import apiClient from '@api/apiClient';
 import Root from '@containers/root';
+import Layout from '@containers/Layout';
 import NotFound from '@containers/404';
 import Test from '@containers/test';
 import AnimalAvailability from '@pages/AnimalAvailability';
 import { ROUTES } from './routes';
 
-const router = createBrowserRouter([
+// Every page is a child of Layout so the navbar renders once, above all pages.
+export const routes: RouteObject[] = [
   {
-    path: '/',
-    element: <Root />,
+    element: <Layout />,
     errorElement: <NotFound />,
+    children: [
+      { path: '/', element: <Root /> },
+      { path: '/test', element: <Test /> },
+      { path: ROUTES.ANIMAL_AVAILABILITY, element: <AnimalAvailability /> },
+      { path: '*', element: <NotFound /> },
+    ],
   },
-  {
-    path: '/test',
-    element: <Test />,
-  },
-  {
-    path: ROUTES.ANIMAL_AVAILABILITY,
-    element: <AnimalAvailability />,
-  },
-]);
+];
+
+const router = createBrowserRouter(routes);
 
 export const App: React.FC = () => {
   useEffect(() => {

@@ -4,7 +4,6 @@ import {
   Button,
   Flex,
   Heading,
-  Image,
   SimpleGrid,
   Spinner,
   Text,
@@ -21,63 +20,6 @@ import {
   type AnimalFilterState,
 } from '@utils/animals';
 import { MOCK_RESTRICTIONS } from '@utils/mockRestrictions';
-import logo from '../assets/mspca-logo.png';
-
-const PageHeader: React.FC = () => (
-  <Flex
-    alignSelf="stretch"
-    px="12"
-    py="7"
-    bg="gray.50"
-    boxShadow="card"
-    justify="space-between"
-    align="center"
-    overflow="hidden"
-  >
-    <Image
-      src={logo}
-      alt="MSPCA - Kindness and Care for Animals"
-      w="48"
-      h="20"
-    />
-    <Flex justify="center" align="center" gap="4">
-      <Box
-        position="relative"
-        boxSize="16"
-        bg="purple.avatar"
-        borderRadius="full"
-        boxShadow="card"
-        outline="3px solid"
-        outlineColor="neutrals.black"
-        outlineOffset="-3px"
-        overflow="hidden"
-      >
-        {/* TODO: use the logged-in volunteer's initials */}
-        <Text
-          position="absolute"
-          left="7px"
-          top="15px"
-          textAlign="center"
-          color="white"
-          fontSize="2xl"
-          fontWeight="semibold"
-          lineHeight="36px"
-        >
-          MW
-        </Text>
-      </Box>
-      <Text
-        textAlign="center"
-        color="neutrals.black"
-        fontSize="2xl"
-        fontWeight="semibold"
-        lineHeight="36px"
-      >
-        My Profile
-      </Text>
-    </Flex>
-  </Flex>
-);
 
 const AnimalAvailability: React.FC = () => {
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -134,7 +76,6 @@ const AnimalAvailability: React.FC = () => {
 
   return (
     <Box bg="bg.subtle" minH="100vh">
-      <PageHeader />
       <Flex gap="8" px="8" py="8" align="flex-start">
         <Flex direction="column" gap="4" flex="1" minW="0">
           <AnimalFilters
