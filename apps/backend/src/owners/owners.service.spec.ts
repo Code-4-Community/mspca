@@ -18,13 +18,13 @@ describe('OwnersService', () => {
   let cognitoService: jest.Mocked<CognitoService>;
   let loggerSpy: jest.SpyInstance;
 
-  const dto: CreateOwnerDto = {
+  const dto = {
     firstName: 'Jane',
     lastName: 'Doe',
     phone: '+16175551234',
     secondaryPhone: null,
     email: 'jane.doe@mspca.org',
-  };
+  } as CreateOwnerDto;
 
   const owner = {
     ownerId: 1,
@@ -135,7 +135,7 @@ describe('OwnersService', () => {
       cognitoService.deleteUser.mockRejectedValue(new Error('Cleanup failed'));
 
       await expect(service.create(dto)).rejects.toThrow(
-        InternalServerErrorException,
+        new InternalServerErrorException('Failed to save the owner'),
       );
 
       expect(cognitoService.deleteUser).toHaveBeenCalledWith(dto.email);

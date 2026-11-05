@@ -28,7 +28,7 @@ export class OwnersService {
    * @param dto - The owner's information.
    * @returns The newly created owner.
    * @throws {ConflictException} If an owner with the email already exists in the database or Cognito.
-   * @throws {InternalServerErrorException} If the Cognito user could not be created, or saving the owner to the database fails (the Cognito user is deleted).
+   * @throws {InternalServerErrorException} If the Cognito user could not be created or added to the group, or saving the owner to the database fails (the Cognito user is deleted).
    */
   async create(dto: CreateOwnerDto): Promise<Owner> {
     const { email } = dto;
