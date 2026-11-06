@@ -22,6 +22,12 @@ export interface Animal {
   restrictions?: string[];
 }
 
+export interface Volunteer {
+  volunteerId: number;
+  firstName: string;
+  lastName: string;
+}
+
 export interface CreateMatchBody {
   volunteerId: number;
   chameleonAnimalId: number;
@@ -77,6 +83,10 @@ export class ApiClient {
 
   public async getAnimals(): Promise<Animal[]> {
     return this.get('/api/animals') as Promise<Animal[]>;
+  }
+
+  public async getVolunteer(volunteerId: number): Promise<Volunteer> {
+    return this.get(`/api/volunteers/${volunteerId}`) as Promise<Volunteer>;
   }
 
   public async createMatch(body: CreateMatchBody): Promise<Match> {
