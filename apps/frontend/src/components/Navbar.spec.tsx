@@ -59,12 +59,15 @@ describe('Navbar', () => {
     expect(getVolunteer).not.toHaveBeenCalled();
   });
 
-  it('shows a fallback avatar when the volunteer request fails', async () => {
+  it('shows a fallback avatar and warns when the volunteer request fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     getVolunteer.mockRejectedValue(new Error('404'));
     const view = renderWithProviders(<Navbar />, { route: '/?volunteerId=9' });
 
-    await waitFor(() => expect(getVolunteer).toHaveBeenCalledTimes(1));
+    // Waiting for the warning means the rejection has been handled.
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
     expect(avatarText(view)).toBe('');
+    warn.mockRestore();
   });
 
   it('ignores a stale response after the volunteerId changes', async () => {

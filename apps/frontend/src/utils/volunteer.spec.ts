@@ -38,10 +38,16 @@ describe('parseVolunteerId', () => {
     expect(parseVolunteerId('12')).toBe(12);
   });
 
-  it.each([null, '', 'abc', '0', '-3', '1.5', '12abc'])(
-    'returns null for %j',
-    (raw) => {
-      expect(parseVolunteerId(raw)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    '',
+    'abc',
+    '0',
+    '-3',
+    '1.5',
+    '12abc',
+    '99999999999999999999999',
+  ])('returns null for %j', (raw) => {
+    expect(parseVolunteerId(raw)).toBeNull();
+  });
 });

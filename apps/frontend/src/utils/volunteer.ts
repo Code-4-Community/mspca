@@ -21,5 +21,5 @@ export const getAvatarColor = (volunteerId: number): string =>
 export const parseVolunteerId = (raw: string | null): number | null => {
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const id = Number(raw);
-  return id > 0 ? id : null;
+  return id > 0 && Number.isSafeInteger(id) ? id : null;
 };

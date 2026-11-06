@@ -24,8 +24,17 @@ vi.mock('@pages/AnimalAvailability', () => ({
 }));
 
 describe('App routes when a page crashes', () => {
+  let consoleError: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
   it('keeps the navbar above the error message', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // React logs the thrown render error; keep the test output clean.
+    consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     const view = render(
       <ChakraProvider value={system}>
         <RouterProvider

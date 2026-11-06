@@ -47,8 +47,9 @@ const Navbar: React.FC = () => {
       .then((result) => {
         if (!cancelled) setLoaded(result);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         // Unknown volunteer or network error: keep the fallback avatar.
+        console.warn(`Could not load volunteer ${volunteerId}`, err);
       });
     return () => {
       cancelled = true;
