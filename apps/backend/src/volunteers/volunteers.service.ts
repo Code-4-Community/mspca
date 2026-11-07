@@ -10,14 +10,23 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
+import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
-import { volunteerApprovedEmail } from '../emails/bodies/volunteerApproved';
+import { volunteerApprovedEmail } from './emails/volunteerApproved';
+import { EmailContent } from '../utils/emails.utils';
+import { coordinatorGainedVolunteerEmail } from '../coordinators/emails/coordinatorGainedVolunteer';
+import { coordinatorLostVolunteerEmail } from '../coordinators/emails/coordinatorLostVolunteer';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Homebase } from '../types';
+import { AnimalsService } from '../animals/animals.service';
 
 @Injectable()
 export class VolunteersService {
@@ -28,21 +37,37 @@ export class VolunteersService {
     private repo: Repository<FosterVolunteer>,
     private cognitoService: CognitoService,
     private emailsService: EmailsService,
+    private coordinatorsService: CoordinatorsService,
+    private animalsService: AnimalsService,
   ) {}
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   * Removes fields only coordinators may see, so the Volunteer is safe to
+   * return from a standard endpoint.
    *
-   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   * @param volunteer - The full Volunteer.
+   * @returns The same Volunteer without coordinator-only fields.
+   */
+  private withoutPrivateFields(
+    volunteer: FosterVolunteer,
+  ): VolunteerWithoutPrivateFields {
+    delete volunteer.coordinatorNotes;
+    return volunteer;
+  }
+
+  /**
+   * Fetches a full Volunteer by ID, including coordinator-only fields such as
+   * coordinatorNotes. Only use this for coordinator-facing operations;
+   * everything else should use {@link findByIdOrFail}.
    *
    * @param id - The Volunteer's ID.
-   * @returns The Volunteer.
+   * @returns The full Volunteer, notes included.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
-  async findByIdOrFail(id: number): Promise<FosterVolunteer> {
+  async coordinatorFindByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinator'],
+      relations: ['assignedCoordinators'],
     });
 
     if (!volunteer) {
@@ -53,6 +78,28 @@ export class VolunteersService {
   }
 
   /**
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async findByIdOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    return this.withoutPrivateFields(volunteer);
+  }
+
+  /**
    * Signs up a Volunteer account.
    *
    * The Cognito user is registered first; the Postgres row is only saved once
@@ -60,6 +107,7 @@ export class VolunteersService {
    * If the save fails, the Cognito user is deleted so the email can be reused.
    * Cognito emails the Volunteer a verification code, which they pass to
    * {@link confirm}. New Volunteers are pending until a coordinator approves them.
+   * Assigns every active coordinator at the Volunteer's homebase.
    *
    * @param dto - The Volunteer's profile fields and chosen password.
    * @returns The saved Volunteer.
@@ -68,7 +116,9 @@ export class VolunteersService {
    * @throws {InternalServerErrorException} If the Cognito user could not be registered.
    * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
    */
-  async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+  async create(
+    dto: CreateVolunteerDto,
+  ): Promise<VolunteerWithoutPrivateFields> {
     // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
     const { password, ...profile } = dto;
     const email = profile.email.toLowerCase();
@@ -85,14 +135,19 @@ export class VolunteersService {
       password,
     });
 
+    // Inside the try so a failed lookup also deletes the Cognito user.
     try {
-      return await this.repo.save({
+      const assignedCoordinators =
+        await this.coordinatorsService.findActiveByHomebase(profile.homebase);
+      const saved = await this.repo.save({
         ...profile,
         email,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
+        assignedCoordinators,
       });
+      return this.withoutPrivateFields(saved);
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
       try {
@@ -113,15 +168,14 @@ export class VolunteersService {
    * so this stops someone who signed up directly with Cognito (skipping
    * {@link create}) from getting the role without a Volunteer profile.
    *
-   * If the role can't be added, both the Cognito user and the Volunteer are
-   * deleted so the Volunteer can sign up again with the same email.
+   * CognitoService handles both email confirmation and role assignment.
+   * If role assignment fails, CognitoService handles Cognito user cleanup.
    *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
    * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
    * @throws {HttpException} 429 if there have been too many attempts.
-   * @throws {InternalServerErrorException} If confirmation fails.
-   * @throws {InternalServerErrorException} If adding the role fails (the Cognito user and Volunteer are deleted).
+   * @throws {InternalServerErrorException} If confirmation or adding the role fails.
    */
   async confirm(dto: ConfirmVolunteerDto): Promise<void> {
     const email = dto.email.toLowerCase();
@@ -131,32 +185,11 @@ export class VolunteersService {
       throw new NotFoundException('No volunteer with this email exists');
     }
 
-    await this.cognitoService.confirmUser(email, dto.code);
-
-    try {
-      await this.cognitoService.addUserToGroup(
-        email,
-        CognitoRole.FosterVolunteer,
-      );
-    } catch {
-      // addUserToGroup already logs the Cognito error.
-      try {
-        await this.cognitoService.deleteUser(email);
-      } catch {
-        this.logger.error(
-          `Failed to delete Cognito user ${email} after adding the role failed`,
-        );
-      }
-      try {
-        await this.repo.delete({ volunteerId: volunteer.volunteerId });
-      } catch (error) {
-        this.logger.error(
-          `Failed to delete Volunteer ${volunteer.volunteerId} after adding the role failed`,
-          error,
-        );
-      }
-      throw new InternalServerErrorException('Failed to confirm the Volunteer');
-    }
+    await this.cognitoService.confirmUser(
+      email,
+      dto.code,
+      CognitoRole.FosterVolunteer,
+    );
   }
 
   /**
@@ -167,7 +200,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Active.
    */
-  async deactivate(id: number): Promise<FosterVolunteer> {
+  async deactivate(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
@@ -176,7 +209,7 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.INACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
 
   /**
@@ -187,10 +220,10 @@ export class VolunteersService {
    *
    * @param id - The Volunteer's ID.
    * @returns The updated Volunteer.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If the Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Inactive.
    */
-  async reactivate(id: number): Promise<FosterVolunteer> {
+  async reactivate(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.INACTIVE) {
@@ -199,7 +232,103 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.ACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
+  }
+
+  /**
+   * Moves a Volunteer to a different homebase and reassigns their coordinators.
+   *
+   * Saves the new homebase and coordinators first, then emails the old
+   * coordinators and the new ones. Emails are best-effort: a failed send is
+   * logged rather than failing the request, since the reassignment is already
+   * committed.
+   *
+   * @param id - The Volunteer's ID.
+   * @param homebase - The new homebase.
+   * @returns The updated Volunteer, with their new homebase and assigned coordinators.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the Volunteer is inactive, or is already
+   * at the homebase.
+   */
+  async changeHomebase(
+    id: number,
+    homebase: Homebase,
+  ): Promise<VolunteerWithoutPrivateFields> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    // Pending Volunteers can still fix the homebase they picked at sign-up.
+    if (volunteer.status === VolunteerStatus.INACTIVE) {
+      throw new BadRequestException(`Volunteer with ID ${id} is inactive`);
+    }
+
+    if (volunteer.homebase === homebase) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} is already assigned to the ${homebase} homebase`,
+      );
+    }
+
+    const previousHomebase = volunteer.homebase;
+    const previous = volunteer.assignedCoordinators.filter((c) => c.active);
+    const next = await this.coordinatorsService.findActiveByHomebase(homebase);
+
+    volunteer.homebase = homebase;
+    volunteer.assignedCoordinators = next;
+    const saved = await this.repo.save(volunteer);
+
+    // A coordinator has one homebase, so the old and new lists never overlap.
+    await Promise.all([
+      this.notifyCoordinators(
+        previous,
+        coordinatorLostVolunteerEmail(saved, homebase),
+        saved,
+      ),
+      this.notifyCoordinators(
+        next,
+        coordinatorGainedVolunteerEmail(saved, previousHomebase),
+        saved,
+      ),
+    ]);
+
+    return this.withoutPrivateFields(saved);
+  }
+
+  /**
+   * Sends one email to the sender address with the coordinators cc'd.
+   * Logs a warning and sends nothing when there are no coordinators, and logs
+   * a failed send instead of throwing.
+   *
+   * @param coordinators - The coordinators to cc.
+   * @param email - The email's subject and body.
+   * @param volunteer - The Volunteer the email is about, for log messages.
+   */
+  private async notifyCoordinators(
+    coordinators: FosterCoordinator[],
+    email: EmailContent,
+    volunteer: FosterVolunteer,
+  ): Promise<void> {
+    const volunteerLabel = `volunteer ${volunteer.volunteerId} (${volunteer.firstName} ${volunteer.lastName})`;
+
+    if (coordinators.length === 0) {
+      this.logger.warn(
+        `No coordinators to send "${email.subject}" email to for ${volunteerLabel}.`,
+      );
+      return;
+    }
+
+    try {
+      await this.emailsService.sendEmail({
+        // AWSSESModule throws at startup when SES is enabled and this is unset,
+        // so the fallback is only here to satisfy TypeScript.
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        ...email,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send "${email.subject}" email for ${volunteerLabel}.`,
+        error,
+      );
+    }
   }
 
   /**
@@ -212,7 +341,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not active.
    */
-  async findActiveOrFail(id: number): Promise<FosterVolunteer> {
+  async findActiveOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     this.checkVolunteerActive(volunteer);
@@ -226,7 +355,7 @@ export class VolunteersService {
    * @param volunteer - The Volunteer to check.
    * @throws {BadRequestException} If the Volunteer's status is not Active.
    */
-  checkVolunteerActive(volunteer: FosterVolunteer): void {
+  checkVolunteerActive(volunteer: VolunteerWithoutPrivateFields): void {
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
       throw new BadRequestException(
         `Volunteer with ID ${volunteer.volunteerId} is not active`,
@@ -237,6 +366,8 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * The homebase is changed through changeHomebase instead, since changing it
+   * also reassigns coordinators and emails them.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer
@@ -245,8 +376,29 @@ export class VolunteersService {
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
+    Object.assign(volunteer, dto);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
+  }
+
+  /**
+   * Updates a Volunteer's profile as a coordinator. Accepts every field a
+   * Volunteer can edit themselves, plus coordinator-only fields
+   * (coordinator notes and completed trainings).
+   * Only the fields included in the DTO are changed; completed trainings
+   * are replaced as a whole list.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The fields to update.
+   * @returns The updated Volunteer, including private fields.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async coordinatorUpdateVolunteerById(
+    id: number,
+    dto: CoordinatorUpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.coordinatorFindByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
   }
@@ -263,7 +415,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {ConflictException} If the Volunteer is not pending.
    */
-  async approve(id: number): Promise<FosterVolunteer> {
+  async approve(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.PENDING) {
@@ -285,7 +437,43 @@ export class VolunteersService {
       );
     }
 
-    return saved;
+    return this.withoutPrivateFields(saved);
+  }
+
+  /**
+   * Denies a pending Volunteer by permanently deleting them from both Cognito
+   * and the database. No email is sent.
+   *
+   * Cognito is deleted first so that a Cognito failure leaves everything
+   * untouched. If Cognito succeeds but the database delete fails, the
+   * Volunteer is left in a partial state (no login, but a database row), so
+   * a loud error with the Volunteer's ID is logged and thrown for manual cleanup.
+   *
+   * @param id - The Volunteer's ID.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {ConflictException} If the Volunteer is not pending.
+   * @throws {InternalServerErrorException} If the Cognito deletion fails, or
+   *   if the database deletion fails after Cognito succeeded (partial deletion).
+   */
+  async deny(id: number): Promise<void> {
+    const volunteer = await this.findByIdOrFail(id);
+
+    if (volunteer.status !== VolunteerStatus.PENDING) {
+      throw new ConflictException(`Only pending Volunteers can be denied`);
+    }
+
+    await this.cognitoService.deleteUser(volunteer.email);
+
+    try {
+      await this.repo.delete({ volunteerId: id });
+    } catch (err) {
+      const message = `Volunteer: { volunteerId: ${id}, email: ${volunteer.email} } was deleted from Cognito but not from database`;
+      this.logger.error(
+        message,
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(message);
+    }
   }
 
   /**
@@ -293,10 +481,12 @@ export class VolunteersService {
    * Returns every volunteer regardless of match status, or an empty array if there are none.
    * @returns A list of all volunteers
    */
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo.find();
+  async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
+    const volunteers = await this.repo.find({
+      relations: ['assignedCoordinators'],
+    });
+    return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
-
   /**
    * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
    *
@@ -306,7 +496,7 @@ export class VolunteersService {
    * @param id - The Volunteer's ID.
    * @param dto - The animal IDs to add and/or remove.
    * @returns The Volunteer's updated list of animal IDs.
-   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {NotFoundException} If no Volunteer with the ID exists, or an added animal does not exist.
    * @throws {BadRequestException} If the Volunteer is not active, animals are removed from
    * an empty list, an ID is in both the added and removed lists, or a removed ID is not in
    * the Volunteer's preferences.
@@ -314,9 +504,13 @@ export class VolunteersService {
   async updateAnimalPreferences(
     id: number,
     dto: UpdateAnimalPreferencesDto,
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     const volunteer = await this.findActiveOrFail(id);
     const { added = [], removed = [] } = dto;
+
+    if (added.length > 0) {
+      await this.animalsService.checkAllExistOrFail(added);
+    }
     const removedSet = new Set(removed);
     const preferences = new Set(volunteer.animalPreferences);
 

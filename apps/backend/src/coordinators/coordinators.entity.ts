@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
 import { Homebase } from '../types';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 
@@ -24,7 +24,7 @@ export class FosterCoordinator {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'enum', enum: Homebase })
@@ -33,9 +33,18 @@ export class FosterCoordinator {
   @Column({ type: 'boolean' })
   active!: boolean;
 
-  @OneToMany(
+  @Column({
+    name: 'cognito_sub',
+    type: 'varchar',
+    length: 255,
+    default: '',
+  })
+  cognitoSub!: string;
+
+  @ManyToMany(
     () => FosterVolunteer,
-    (volunteer) => volunteer.assignedCoordinator,
+    (volunteer) => volunteer.assignedCoordinators,
+    { onDelete: 'RESTRICT' },
   )
   assignedVolunteers!: FosterVolunteer[];
 }

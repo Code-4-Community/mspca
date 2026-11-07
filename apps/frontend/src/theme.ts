@@ -45,7 +45,7 @@ export const colors = {
     brown: '#5e3638',
   },
   purple: {
-    avatar: '#b57bf8',
+    avatar: '#B67CF9',
   },
   neutrals: {
     black: '#231f20',

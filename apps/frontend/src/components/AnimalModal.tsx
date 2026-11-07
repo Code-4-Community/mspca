@@ -10,7 +10,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 
-import apiClient, { type Animal } from '@api/apiClient';
+import apiClient from '@api/apiClient';
+import type { Animal } from '../types';
 import { formatAge } from '@utils/animals';
 import { CalendarIcon, PLACEHOLDER_IMAGE } from './AnimalCard';
 import RestrictionTag from './RestrictionTag';
@@ -145,7 +146,7 @@ const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
                     fontWeight="semibold"
                     lineHeight="24px"
                   >
-                    {formatAge(animal.age)}
+                    {formatAge(animal.ageYear)}
                   </Text>
                 </Flex>
               </Flex>

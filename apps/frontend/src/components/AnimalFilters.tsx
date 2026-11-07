@@ -5,11 +5,11 @@ import {
   Checkbox,
   Flex,
   Icon,
-  Image,
   Popover,
   Portal,
   Text,
 } from '@chakra-ui/react';
+import { ListFilter, X } from 'lucide-react';
 
 import {
   ANIMAL_TYPES,
@@ -18,8 +18,6 @@ import {
   getRestriction,
   type AnimalFilterState,
 } from '@utils/animals';
-import listFilterIcon from '../assets/list-filter.svg';
-import xIcon from '../assets/x.svg';
 
 type CategoryKey = keyof AnimalFilterState;
 
@@ -247,7 +245,12 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
               borderRadius="12px"
               overflow="hidden"
             >
-              <Image src={listFilterIcon} alt="" boxSize="5" />
+              <ListFilter
+                size={20}
+                strokeWidth={1.5}
+                color="white"
+                aria-hidden
+              />
             </Button>
           </Popover.Trigger>
           <Portal>
@@ -398,7 +401,7 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
           onClick={() => removeChip(chip.key, chip.label)}
           aria-label={`Remove ${chip.label} filter`}
         >
-          <Image src={xIcon} alt="" boxSize="3" />
+          <X size={12} strokeWidth={2} color="white" aria-hidden />
           {chip.label}
         </Button>
       ))}

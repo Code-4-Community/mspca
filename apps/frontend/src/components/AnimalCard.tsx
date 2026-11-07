@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Icon, Image, Text } from '@chakra-ui/react';
 
-import type { Animal } from '@api/apiClient';
+import type { Animal } from '../types';
 import { formatAge } from '@utils/animals';
 import RestrictionTag from './RestrictionTag';
 import catImage from '../assets/cat.png';
@@ -101,7 +101,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
               fontWeight="semibold"
               lineHeight="24px"
             >
-              {formatAge(animal.age)}
+              {formatAge(animal.ageYear)}
             </Text>
           </Flex>
           <Text

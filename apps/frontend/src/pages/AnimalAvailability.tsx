@@ -10,7 +10,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 
-import apiClient, { type Animal } from '@api/apiClient';
+import apiClient from '@api/apiClient';
+import type { Animal } from '../types';
 import AnimalCard from '@components/AnimalCard';
 import AnimalFilters from '@components/AnimalFilters';
 import AnimalModal from '@components/AnimalModal';
@@ -20,7 +21,6 @@ import {
   matchesFilters,
   type AnimalFilterState,
 } from '@utils/animals';
-import { MOCK_RESTRICTIONS } from '@utils/mockRestrictions';
 import logo from '../assets/mspca-logo.png';
 
 const PageHeader: React.FC = () => (
@@ -93,16 +93,7 @@ const AnimalAvailability: React.FC = () => {
     apiClient
       .getAnimals()
       .then((result) => {
-        if (!cancelled)
-          // TEMPORARY: attach mock restriction tags until the API returns them.
-          setAnimals(
-            result.map((animal) => ({
-              ...animal,
-              restrictions:
-                animal.restrictions ??
-                MOCK_RESTRICTIONS[animal.chameleonAnimalId],
-            })),
-          );
+        if (!cancelled) setAnimals(result);
       })
       .catch(() => {
         if (!cancelled) setError('Something went wrong while loading animals.');
