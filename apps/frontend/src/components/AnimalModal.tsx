@@ -15,18 +15,18 @@ import { formatAge } from '@utils/animals';
 import { CalendarIcon, PLACEHOLDER_IMAGE } from './AnimalCard';
 import RestrictionTag from './RestrictionTag';
 
-// TODO: replace with the logged-in volunteer's ID once the frontend has access
-// to the current user's profile.
-const CURRENT_VOLUNTEER_ID = 1;
-
 interface AnimalModalProps {
   animal: Animal | null;
+  volunteerId: number;
   onClose: () => void;
 }
 
 // Form state lives in its own component so it resets whenever a different
 // animal is opened.
-const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
+const AnimalModalBody: React.FC<{ animal: Animal; volunteerId: number }> = ({
+  animal,
+  volunteerId,
+}) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [requested, setRequested] = useState(false);
@@ -37,7 +37,7 @@ const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
     setError(null);
     try {
       await apiClient.createMatch({
-        volunteerId: CURRENT_VOLUNTEER_ID,
+        volunteerId,
         chameleonAnimalId: animal.chameleonAnimalId,
         additionalComments: comments.trim() || undefined,
       });
@@ -274,7 +274,11 @@ const AnimalModalBody: React.FC<{ animal: Animal }> = ({ animal }) => {
   );
 };
 
-const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => (
+const AnimalModal: React.FC<AnimalModalProps> = ({
+  animal,
+  volunteerId,
+  onClose,
+}) => (
   <Dialog.Root
     open={animal !== null}
     onOpenChange={(e) => {
@@ -288,7 +292,13 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => (
     <Portal>
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        {animal && <AnimalModalBody key={animal.animalId} animal={animal} />}
+        {animal && (
+          <AnimalModalBody
+            key={animal.animalId}
+            animal={animal}
+            volunteerId={volunteerId}
+          />
+        )}
       </Dialog.Positioner>
     </Portal>
   </Dialog.Root>

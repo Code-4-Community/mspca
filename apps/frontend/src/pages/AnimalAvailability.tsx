@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -80,6 +81,8 @@ const PageHeader: React.FC = () => (
 );
 
 const AnimalAvailability: React.FC = () => {
+  // TODO: use the signed-in volunteer instead once sign-in is implemented.
+  const volunteerId = Number(useParams().volunteerId);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,6 +202,7 @@ const AnimalAvailability: React.FC = () => {
 
       <AnimalModal
         animal={selectedAnimal}
+        volunteerId={volunteerId}
         onClose={() => setSelectedAnimal(null)}
       />
     </Box>
