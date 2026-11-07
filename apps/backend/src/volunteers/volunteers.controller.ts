@@ -24,6 +24,7 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
+import { AnimalsService } from '../animals/animals.service';
 import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
 
 @ApiTags('Volunteers')
@@ -32,6 +33,7 @@ export class VolunteersController {
   constructor(
     private volunteersService: VolunteersService,
     private matchesService: MatchesService,
+    private animalsService: AnimalsService,
   ) {}
 
   @Post()
@@ -332,6 +334,7 @@ export class VolunteersController {
         'At least one of added or removed must be provided',
       );
     }
+    await this.animalsService.checkAllExistOrFail(dto.added ?? []);
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 

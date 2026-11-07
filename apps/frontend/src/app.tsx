@@ -5,6 +5,8 @@ import apiClient from '@api/apiClient';
 import Root from '@containers/root';
 import NotFound from '@containers/404';
 import Test from '@containers/test';
+import AnimalAvailability from '@pages/AnimalAvailability';
+import { ROUTES } from './routes';
 
 const router = createBrowserRouter([
   {
@@ -15,6 +17,10 @@ const router = createBrowserRouter([
   {
     path: '/test',
     element: <Test />,
+  },
+  {
+    path: ROUTES.ANIMAL_AVAILABILITY,
+    element: <AnimalAvailability />,
   },
 ]);
 
