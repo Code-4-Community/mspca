@@ -15,11 +15,11 @@ const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => {
       <Flex
         h="5"
         minH="4"
-        px="1.5"
+        px="2"
         py="2.5"
         gap="1"
         bg={restriction.color}
-        borderRadius="sm"
+        borderRadius="lg"
         justify="center"
         align="center"
       >

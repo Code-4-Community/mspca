@@ -26,8 +26,8 @@ import logo from '../assets/mspca-logo.png';
 const PageHeader: React.FC = () => (
   <Flex
     alignSelf="stretch"
-    px="12"
-    py="7"
+    px="8"
+    py="4"
     bg="gray.50"
     boxShadow="card"
     justify="space-between"
@@ -42,7 +42,10 @@ const PageHeader: React.FC = () => (
     />
     <Flex justify="center" align="center" gap="4">
       <Box
-        position="relative"
+        display="flex"
+        flexDirection="column"
+        justifyContent="center"
+        alignItems="center"
         boxSize="16"
         bg="purple.avatar"
         borderRadius="full"
@@ -54,14 +57,12 @@ const PageHeader: React.FC = () => (
       >
         {/* TODO: use the logged-in volunteer's initials */}
         <Text
-          position="absolute"
-          left="7px"
-          top="15px"
+          alignSelf="stretch"
           textAlign="center"
           color="white"
-          fontSize="2xl"
+          fontSize="20px"
           fontWeight="semibold"
-          lineHeight="36px"
+          lineHeight="32px"
         >
           MW
         </Text>
@@ -124,10 +125,20 @@ const AnimalAvailability: React.FC = () => {
   );
 
   return (
-    <Box bg="bg.subtle" minH="100vh">
+    <Box bg="bg.muted" minH="100vh">
       <PageHeader />
       <Flex gap="8" px="8" py="8" align="flex-start">
-        <Flex direction="column" gap="4" flex="1" minW="0">
+        <Flex
+          direction="column"
+          gap="4"
+          flex="1"
+          minW="0"
+          p="4"
+          bg="bg.subtle"
+          borderRadius="3xl"
+          boxShadow="card"
+          overflow="hidden"
+        >
           <AnimalFilters
             value={activeFilters}
             onChange={setActiveFilters}
