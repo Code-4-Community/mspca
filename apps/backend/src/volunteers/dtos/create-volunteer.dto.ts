@@ -1,17 +1,20 @@
 import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsPhoneNumber,
   IsString,
   IsStrongPassword,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
-import { FosterType } from '../volunteers.types';
+import { FosterTraining, FosterType } from '../volunteers.types';
 
 export class CreateVolunteerDto {
   @IsNonEmptyString()
@@ -27,11 +30,11 @@ export class CreateVolunteerDto {
   @MaxLength(255)
   phone!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   @IsPhoneNumber('US')
   @MaxLength(20)
-  secondaryPhone?: string;
+  secondaryPhone?: string | null;
 
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
@@ -70,10 +73,21 @@ export class CreateVolunteerDto {
   @IsNonEmptyString()
   residentAnimals!: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
-  notes?: string;
+  notes?: string | null;
 
-  @IsEnum(FosterType)
-  fosterType!: FosterType;
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterType, { each: true })
+  fosterType!: FosterType[];
+
+  // Unlike @IsOptional, still validates null so it 400s instead of hitting NOT NULL.
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterTraining, { each: true })
+  completedTrainings?: FosterTraining[];
 }

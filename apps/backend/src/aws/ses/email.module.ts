@@ -34,13 +34,13 @@ export class AWSSESModule implements OnModuleInit {
     const missing = getMissingEnvVars(REQUIRED_ENV_VARS_WHEN_ENABLED);
 
     if (missing.length > 0) {
-      this.logger.warn(
+      throw new Error(
         `SES enabled but not fully configured: missing env vars (${missing.join(
           ', ',
-        )}). Email sends will fail.`,
+        )}).`,
       );
-    } else {
-      this.logger.log('SES enabled');
     }
+
+    this.logger.log('SES enabled');
   }
 }

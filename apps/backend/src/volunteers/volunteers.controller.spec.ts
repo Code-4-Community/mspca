@@ -4,6 +4,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
@@ -11,15 +12,26 @@ import { MatchesService } from '../matches/matches.service';
 import { Match } from '../matches/matches.entity';
 import { MatchStatus } from '../matches/matches.types';
 import { FosterVolunteer } from './volunteers.entity';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
+import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
+
+  const validationPipe = new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  });
 
   const mockVolunteer = {
     volunteerId: 1,
@@ -38,7 +50,9 @@ describe('VolunteersController', () => {
     approve: jest.Mock;
     deny: jest.Mock;
     getAllVolunteers: jest.Mock;
+    changeHomebase: jest.Mock;
     updateAnimalPreferences: jest.Mock;
+    coordinatorUpdateVolunteerById: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
 
@@ -58,7 +72,9 @@ describe('VolunteersController', () => {
       approve: jest.fn(),
       deny: jest.fn(),
       getAllVolunteers: jest.fn(),
+      changeHomebase: jest.fn(),
       updateAnimalPreferences: jest.fn(),
+      coordinatorUpdateVolunteerById: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
 
@@ -77,6 +93,74 @@ describe('VolunteersController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('coordinatorUpdateVolunteerById', () => {
+    it('passes the id and dto to the service and returns the volunteer with notes', async () => {
+      const dto = {
+        coordinatorNotes: 'missed two pickups',
+      } as CoordinatorUpdateVolunteerDto;
+      const updated = {
+        ...mockVolunteer,
+        coordinatorNotes: 'missed two pickups',
+      } as FosterVolunteer;
+      mockVolunteersService.coordinatorUpdateVolunteerById.mockResolvedValue(
+        updated,
+      );
+
+      const result = await controller.coordinatorUpdateVolunteerById(1, dto);
+
+      expect(result).toBe(updated);
+      expect(result.coordinatorNotes).toBe('missed two pickups');
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('throws BadRequestException when no fields are provided', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = {};
+      await expect(
+        controller.coordinatorUpdateVolunteerById(1, dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockVolunteersService.coordinatorUpdateVolunteerById,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('propagates errors from the service', async () => {
+      const dto: CoordinatorUpdateVolunteerDto = { coordinatorNotes: 'x' };
+      const error = new NotFoundException('Volunteer with ID 999 not found');
+      mockVolunteersService.coordinatorUpdateVolunteerById.mockRejectedValue(
+        error,
+      );
+
+      await expect(
+        controller.coordinatorUpdateVolunteerById(999, dto),
+      ).rejects.toBe(error);
+    });
+
+    it.each([[['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        await expect(
+          validationPipe.transform(
+            { completedTrainings },
+            { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([[[]], [[FosterTraining.CAT]]])(
+      'accepts completedTrainings %j',
+      async (completedTrainings) => {
+        const result = await validationPipe.transform(
+          { completedTrainings },
+          { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+        );
+
+        expect(result.completedTrainings).toEqual(completedTrainings);
+      },
+    );
+  });
   describe('create', () => {
     const dto = {
       firstName: 'Jane',
@@ -88,7 +172,7 @@ describe('VolunteersController', () => {
       zipcode: '02130',
       homebase: Homebase.BOSTON,
       residentAnimals: 'One cat',
-      fosterType: FosterType.CAT,
+      fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
 
@@ -114,6 +198,39 @@ describe('VolunteersController', () => {
       await expect(controller.create(dto)).rejects.toThrow(error);
       expect(mockVolunteersService.create).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.create).toHaveBeenCalledWith(dto);
+    });
+
+    it.each([[[]], [['Bird']], [['Dog', 'Dog']], ['Dog'], [[1]], [null]])(
+      'rejects completedTrainings %j',
+      async (completedTrainings) => {
+        await expect(
+          validationPipe.transform(
+            { ...dto, completedTrainings },
+            { type: 'body', metatype: CreateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([
+      [[FosterTraining.DOG]],
+      [[FosterTraining.DOG, FosterTraining.CAT]],
+    ])('accepts completedTrainings %j', async (completedTrainings) => {
+      const result = await validationPipe.transform(
+        { ...dto, completedTrainings },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.completedTrainings).toEqual(completedTrainings);
+    });
+
+    it('accepts a body without completedTrainings', async () => {
+      const result = await validationPipe.transform(dto, {
+        type: 'body',
+        metatype: CreateVolunteerDto,
+      });
+
+      expect(result).not.toHaveProperty('completedTrainings');
     });
   });
 
@@ -151,7 +268,7 @@ describe('VolunteersController', () => {
         {
           matchId: 1,
           volunteerId: 7,
-          chameleonAnimalId: 42,
+          chameleonAnimalId: 'A42',
           status: MatchStatus.DENIED,
           deniedReason: 'Schedule conflict',
         },
@@ -224,6 +341,25 @@ describe('VolunteersController', () => {
       const result = await controller.updateVolunteerById(1, dto);
 
       expect(result).toEqual(updatedVolunteer);
+      expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
+        1,
+        dto,
+      );
+    });
+
+    it('should pass animalUpdates through to the service', async () => {
+      const dto: UpdateVolunteerDto = { animalUpdates: false };
+      const updatedVolunteer = {
+        ...mockVolunteer,
+        animalUpdates: false,
+      } as FosterVolunteer;
+      mockVolunteersService.updateVolunteerById.mockResolvedValue(
+        updatedVolunteer,
+      );
+
+      const result = await controller.updateVolunteerById(1, dto);
+
+      expect(result.animalUpdates).toBe(false);
       expect(mockVolunteersService.updateVolunteerById).toHaveBeenCalledWith(
         1,
         dto,
@@ -377,14 +513,52 @@ describe('VolunteersController', () => {
     });
   });
 
+  describe('updateHomebase', () => {
+    it('changes the homebase through the service and returns the volunteer', async () => {
+      const before = { ...mockVolunteer, homebase: Homebase.BOSTON };
+      const volunteer = {
+        ...before,
+        homebase: Homebase.SALEM,
+        assignedCoordinators: [],
+      } as FosterVolunteer;
+      mockVolunteersService.changeHomebase.mockResolvedValue(volunteer);
+
+      const result = await controller.updateHomebase(1, {
+        homebase: Homebase.SALEM,
+      } as UpdateHomebaseDto);
+
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledWith(
+        1,
+        Homebase.SALEM,
+      );
+      expect(result).toBe(volunteer);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      const error = new NotFoundException('Volunteer with ID 1 not found');
+      mockVolunteersService.changeHomebase.mockRejectedValue(error);
+
+      await expect(
+        controller.updateHomebase(1, {
+          homebase: Homebase.SALEM,
+        } as UpdateHomebaseDto),
+      ).rejects.toBe(error);
+      expect(mockVolunteersService.changeHomebase).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('updateAnimalPreferences', () => {
     it('returns the updated list from the service', async () => {
-      const dto = { added: [55], removed: [107] };
-      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([42, 55]);
+      const dto = { added: ['A55'], removed: ['A107'] };
+      mockVolunteersService.updateAnimalPreferences.mockResolvedValue([
+        'A42',
+        'A55',
+      ]);
 
       const result = await controller.updateAnimalPreferences(1, dto);
 
-      expect(result).toEqual([42, 55]);
+      expect(result).toEqual(['A42', 'A55']);
       expect(
         mockVolunteersService.updateAnimalPreferences,
       ).toHaveBeenCalledWith(1, dto);
@@ -415,7 +589,7 @@ describe('VolunteersController', () => {
       );
 
       await expect(
-        controller.updateAnimalPreferences(999, { added: [42] }),
+        controller.updateAnimalPreferences(999, { added: ['A42'] }),
       ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
