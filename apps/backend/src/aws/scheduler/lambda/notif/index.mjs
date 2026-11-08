@@ -9,7 +9,7 @@
  *   NOTIFICATIONS_DISPATCH_URL     https://<api host>/api/notifications/send-scheduled
  *   NOTIFICATIONS_DISPATCH_SECRET  must match the backend's value
  */
-export const handler = async (event) => {
+export const handler = async (event, context) => {
   const url = process.env.NOTIFICATIONS_DISPATCH_URL;
   const secret = process.env.NOTIFICATIONS_DISPATCH_SECRET;
 
@@ -28,11 +28,13 @@ export const handler = async (event) => {
     body: JSON.stringify(event),
   });
 
-  // Scheduler invokes this Lambda asynchronously, so throwing triggers Lambda's async
-  // retries (up to 2 by default, set in the function's async invocation config).
+  // Scheduler invokes this Lambda asynchronously, so throwing triggers Lambda's async set 2 default
+  // Lambda doesn't pass attempt number, but request ID stays the same across retries so count those
   if (!response.ok) {
     throw new Error(
-      `Dispatch failed: ${response.status} ${await response.text()}`,
+      `Dispatch failed (request ${context.awsRequestId}): ${
+        response.status
+      } ${await response.text()}`,
     );
   }
 };

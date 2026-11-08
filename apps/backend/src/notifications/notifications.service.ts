@@ -17,10 +17,6 @@ import { VolunteersService } from '../volunteers/volunteers.service';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
 import { AMAZON_SCHEDULER_CLIENT } from './awsScheduler.factory';
 
-// SES caps a message at 50 recipients across To, Cc and Bcc combined, and the
-// sender always occupies the To slot, so only 49 are left for Bcc.
-const BCC_BATCH_SIZE = 49;
-
 // Mirrors SendEmailDTO's @Length(1, 255) on each Bcc address.
 const MAX_EMAIL_LENGTH = 255;
 
@@ -125,6 +121,8 @@ export class NotificationsService {
       );
     }
 
+    // TODO: adjust once notification filters are confirmed with the client; they will
+    // likely be more complex than foster type alone
     const volunteers = await this.volunteersService.findActiveByFosterTypes(
       content.filters ?? [],
     );
@@ -152,8 +150,10 @@ export class NotificationsService {
     }
 
     let failed = 0;
-    for (let i = 0; i < recipients.length; i += BCC_BATCH_SIZE) {
-      const batch = recipients.slice(i, i + BCC_BATCH_SIZE);
+    // SES caps a message at 50 recipients across To, Cc and Bcc combined, and the
+    // sender always occupies the To slot, so only 49 are left for Bcc.
+    for (let i = 0; i < recipients.length; i += 49) {
+      const batch = recipients.slice(i, i + 49);
 
       try {
         await this.emailsService.sendEmail({

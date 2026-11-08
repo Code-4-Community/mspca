@@ -5,10 +5,11 @@ import { NotificationsModule } from './notifications.module';
 jest.mock('jwks-rsa', () => ({ __esModule: true, default: jest.fn() }));
 
 describe('NotificationsModule', () => {
-  const REQUIRED_FOR_SCHEDULING = [
+  const REQUIRED = [
     'AWS_REGION',
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
+    'AWS_SES_SENDER_EMAIL',
     'AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN',
     'AWS_SCHEDULER_ROLE_ARN',
     'NOTIFICATIONS_DISPATCH_SECRET',
@@ -19,7 +20,7 @@ describe('NotificationsModule', () => {
   let logSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    for (const name of REQUIRED_FOR_SCHEDULING) {
+    for (const name of REQUIRED) {
       originalEnv[name] = process.env[name];
     }
 
@@ -27,6 +28,7 @@ describe('NotificationsModule', () => {
     process.env.AWS_REGION = 'us-east-2';
     process.env.AWS_ACCESS_KEY_ID = 'test-access-key-id';
     process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-access-key';
+    process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
     process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN = 'arn:aws:lambda:::fn';
     process.env.AWS_SCHEDULER_ROLE_ARN = 'arn:aws:iam:::role/scheduler';
     process.env.NOTIFICATIONS_DISPATCH_SECRET = 'test-secret';
@@ -38,7 +40,7 @@ describe('NotificationsModule', () => {
   });
 
   afterEach(() => {
-    for (const name of REQUIRED_FOR_SCHEDULING) {
+    for (const name of REQUIRED) {
       if (originalEnv[name] === undefined) {
         delete process.env[name];
       } else {
@@ -48,40 +50,22 @@ describe('NotificationsModule', () => {
     jest.restoreAllMocks();
   });
 
-  it('reports scheduling as enabled when every var is set', () => {
+  it('logs that notifications are enabled when every var is set', () => {
     module.onModuleInit();
 
-    expect(logSpy).toHaveBeenCalledWith('Scheduled notifications enabled');
+    expect(logSpy).toHaveBeenCalledWith('Notifications enabled');
   });
 
-  it.each(REQUIRED_FOR_SCHEDULING)('names %s when it is missing', (name) => {
+  it.each(REQUIRED)('throws naming %s when it is missing', (name) => {
     delete process.env[name];
 
-    module.onModuleInit();
-
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining(`missing env vars (${name})`),
-    );
+    expect(() => module.onModuleInit()).toThrow(`missing env vars (${name})`);
   });
 
   // Whitespace is as unusable as unset, and getMissingEnvVars treats it that way.
   it('counts a whitespace-only var as missing', () => {
     process.env.AWS_SCHEDULER_ROLE_ARN = '   ';
 
-    module.onModuleInit();
-
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('AWS_SCHEDULER_ROLE_ARN'),
-    );
-  });
-
-  it('says immediate sends still work when scheduling is unconfigured', () => {
-    delete process.env.AWS_SCHEDULER_ROLE_ARN;
-
-    module.onModuleInit();
-
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Immediate sends still work'),
-    );
+    expect(() => module.onModuleInit()).toThrow('AWS_SCHEDULER_ROLE_ARN');
   });
 });

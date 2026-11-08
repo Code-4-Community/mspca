@@ -9,7 +9,8 @@ scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --
 
 - Recipients are looked up at send time, so volunteers who went inactive in between are left out.
 - The schedule deletes itself after it fires.
-- Code: [notifications/](../../apps/backend/src/notifications) · [index.mjs](./index.mjs)
+- Code: [notifications/](../../../../notifications) · [index.mjs](./index.mjs)
+- `index.mjs` is deployed to Lambda on its own (see "Create from scratch"). It is not imported by the backend and not part of its bundle.
 
 ## Resources (dev, `us-east-2`)
 
@@ -22,7 +23,7 @@ scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --
 
 ## Connect to the existing dev setup
 
-Nothing to create. Immediate sends need only the usual SES vars. Scheduled sends also need these 3 in `.env`. Ask the ticket owner by DM, and never commit them:
+Nothing to create. The backend won't boot without these 3 in `.env`. Ask the ticket owner by DM, and never commit them:
 
 ```
 AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN=
@@ -70,7 +71,7 @@ aws iam attach-role-policy --role-name mspca-notif-lambda-role \
 sleep 10   # let the role propagate
 
 # 2. lambda
-zip -j /tmp/notif-dispatch.zip infra/notification-dispatch-lambda/index.mjs
+zip -j /tmp/notif-dispatch.zip apps/backend/src/aws/scheduler/lambda/notif/index.mjs
 aws lambda create-function --region ${AWS_REGION} --function-name mspca-notif-dispatch \
   --runtime nodejs22.x --handler index.handler --timeout 30 \
   --zip-file fileb:///tmp/notif-dispatch.zip \

@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ArrayOverlap } from 'typeorm';
+import { ArrayOverlap, FindOperator } from 'typeorm';
 import { VolunteersService } from './volunteers.service';
 import { FosterVolunteer } from './volunteers.entity';
 import {
@@ -54,8 +54,20 @@ describe('VolunteersService', () => {
   let mockAnimalsService: { checkAllExistOrFail: jest.Mock };
 
   const mockVolunteers = [
-    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
-    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
+    {
+      volunteerId: 1,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      fosterType: [FosterType.DOG],
+      status: VolunteerStatus.ACTIVE,
+    },
+    {
+      volunteerId: 2,
+      firstName: 'John',
+      lastName: 'Smith',
+      fosterType: [FosterType.CAT],
+      status: VolunteerStatus.ACTIVE,
+    },
   ] as FosterVolunteer[];
 
   beforeEach(async () => {
@@ -1549,9 +1561,33 @@ describe('VolunteersService', () => {
   });
 
   describe('findActiveByFosterTypes', () => {
-    it('should return active volunteers matching any of the foster types', async () => {
-      mockRepo.find.mockResolvedValue(mockVolunteers);
+    const inactiveVolunteer = {
+      volunteerId: 3,
+      firstName: 'Ann',
+      lastName: 'Lee',
+      fosterType: [FosterType.DOG],
+      status: VolunteerStatus.INACTIVE,
+    } as FosterVolunteer;
 
+    beforeEach(() => {
+      mockRepo.find.mockImplementation(
+        ({ where }: { where: Partial<Record<string, unknown>> }) =>
+          Promise.resolve(
+            [...mockVolunteers, inactiveVolunteer].filter(
+              (v) =>
+                v.status === where.status &&
+                (!where.fosterType ||
+                  v.fosterType.some((t) =>
+                    (
+                      where.fosterType as FindOperator<FosterType[]>
+                    ).value.includes(t),
+                  )),
+            ),
+          ),
+      );
+    });
+
+    it('should return active volunteers matching any of the foster types', async () => {
       const result = await service.findActiveByFosterTypes([
         FosterType.DOG,
         FosterType.CAT,
@@ -1566,9 +1602,13 @@ describe('VolunteersService', () => {
       });
     });
 
-    it('should return every active volunteer when no foster types are given', async () => {
-      mockRepo.find.mockResolvedValue(mockVolunteers);
+    it('should return only volunteers with a matching foster type', async () => {
+      const result = await service.findActiveByFosterTypes([FosterType.CAT]);
 
+      expect(result).toEqual([mockVolunteers[1]]);
+    });
+
+    it('should return every active volunteer when no foster types are given', async () => {
       const result = await service.findActiveByFosterTypes([]);
 
       expect(result).toEqual(mockVolunteers);
