@@ -1,28 +1,13 @@
 import { Box, Button, Flex, Icon, Image, Text } from '@chakra-ui/react';
+import { House } from 'lucide-react';
 
-import type { Animal } from '@api/apiClient';
+import type { Animal } from '../types';
 import { formatAge } from '@utils/animals';
 import RestrictionTag from './RestrictionTag';
 import catImage from '../assets/cat.png';
 
 // TODO: swap for animal.picture once animal images are supported.
 export const PLACEHOLDER_IMAGE = catImage;
-
-export const CalendarIcon: React.FC = () => (
-  <Icon asChild boxSize="5" color="neutrals.black">
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M13.333 1.667v3.333M6.667 1.667v3.333M16.25 3.333H3.75c-.69 0-1.25.56-1.25 1.25v12.083c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25V4.583c0-.69-.56-1.25-1.25-1.25zM2.5 8.333h15" />
-    </svg>
-  </Icon>
-);
 
 interface AnimalCardProps {
   animal: Animal;
@@ -77,6 +62,19 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
               {animal.breed.join(', ')}
             </Text>
           </Box>
+          <Flex alignSelf="stretch" align="center" gap="1">
+            <Icon asChild boxSize="5" color="neutrals.black">
+              <House strokeWidth={1} aria-hidden />
+            </Icon>
+            <Text
+              color="neutrals.black"
+              fontSize="16px"
+              fontWeight="semibold"
+              lineHeight="24px"
+            >
+              {formatAge(animal.ageYear)}
+            </Text>
+          </Flex>
           {animal.restrictions && animal.restrictions.length > 0 && (
             <Flex
               alignSelf="stretch"
@@ -92,27 +90,14 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
             </Flex>
           )}
         </Flex>
-        <Box alignSelf="stretch">
-          <Flex alignSelf="stretch" align="center" gap="1">
-            <CalendarIcon />
-            <Text
-              color="neutrals.black"
-              fontSize="16px"
-              fontWeight="semibold"
-              lineHeight="24px"
-            >
-              {formatAge(animal.age)}
-            </Text>
-          </Flex>
-          <Text
-            color="neutrals.black85"
-            fontSize="14px"
-            fontWeight="medium"
-            lineHeight="20px"
-          >
-            {animal.location}
-          </Text>
-        </Box>
+        <Text
+          color="neutrals.black85"
+          fontSize="14px"
+          fontWeight="medium"
+          lineHeight="20px"
+        >
+          {animal.location}
+        </Text>
       </Flex>
       <Button
         alignSelf="stretch"
@@ -121,7 +106,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
         px="5"
         py="0.5"
         gap="3"
-        bg="neutrals.black"
+        bg="blue.blue3"
         color="white"
         borderRadius="12px"
         overflow="hidden"

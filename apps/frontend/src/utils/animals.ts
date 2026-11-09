@@ -1,4 +1,4 @@
-import type { Animal } from '@api/apiClient';
+import type { Animal } from '../types';
 
 export interface Restriction {
   label: string;

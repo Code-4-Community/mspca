@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { chakra, Flex, Image, Text } from '@chakra-ui/react';
 
-import apiClient, { type Volunteer } from '@api/apiClient';
+import apiClient from '@api/apiClient';
+import type { Volunteer } from '../types';
 import { useVolunteerId } from '@utils/useVolunteerId';
 import { getAvatarColor, getInitials } from '@utils/volunteer';
 import logo from '../assets/mspca-logo.png';

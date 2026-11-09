@@ -5,11 +5,11 @@ import {
   Checkbox,
   Flex,
   Icon,
-  Image,
   Popover,
   Portal,
   Text,
 } from '@chakra-ui/react';
+import { ListFilter, X } from 'lucide-react';
 
 import {
   ANIMAL_TYPES,
@@ -18,8 +18,6 @@ import {
   getRestriction,
   type AnimalFilterState,
 } from '@utils/animals';
-import listFilterIcon from '../assets/list-filter.svg';
-import xIcon from '../assets/x.svg';
 
 type CategoryKey = keyof AnimalFilterState;
 
@@ -215,16 +213,19 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
     else onChange(next);
   };
 
-  const chips = (Object.keys(shown) as CategoryKey[]).flatMap((key) =>
-    shown[key].map((label) => ({
-      key,
-      label,
-      color:
-        key === 'restrictions'
-          ? getRestriction(label)?.color ?? 'neutrals.black'
-          : 'neutrals.black',
-    })),
-  );
+  // Animal type selections filter the grid but don't get a chip.
+  const chips = (Object.keys(shown) as CategoryKey[])
+    .filter((key) => key !== 'types')
+    .flatMap((key) =>
+      shown[key].map((label) => ({
+        key,
+        label,
+        color:
+          key === 'restrictions'
+            ? getRestriction(label)?.color ?? 'neutrals.black'
+            : 'neutrals.black',
+      })),
+    );
 
   return (
     <Flex align="center" gap="3" wrap="wrap">
@@ -243,11 +244,16 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
               px="5"
               py="0.5"
               gap="3"
-              bg="neutrals.black"
+              bg="blue.blue3"
               borderRadius="12px"
               overflow="hidden"
             >
-              <Image src={listFilterIcon} alt="" boxSize="5" />
+              <ListFilter
+                size={20}
+                strokeWidth={1.5}
+                color="white"
+                aria-hidden
+              />
             </Button>
           </Popover.Trigger>
           <Portal>
@@ -398,7 +404,7 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
           onClick={() => removeChip(chip.key, chip.label)}
           aria-label={`Remove ${chip.label} filter`}
         >
-          <Image src={xIcon} alt="" boxSize="3" />
+          <X size={12} strokeWidth={2} color="white" aria-hidden />
           {chip.label}
         </Button>
       ))}

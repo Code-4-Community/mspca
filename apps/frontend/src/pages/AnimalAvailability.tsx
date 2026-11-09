@@ -9,7 +9,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 
-import apiClient, { type Animal } from '@api/apiClient';
+import apiClient from '@api/apiClient';
+import type { Animal } from '../types';
 import AnimalCard from '@components/AnimalCard';
 import AnimalFilters from '@components/AnimalFilters';
 import AnimalModal from '@components/AnimalModal';
@@ -19,7 +20,6 @@ import {
   matchesFilters,
   type AnimalFilterState,
 } from '@utils/animals';
-import { MOCK_RESTRICTIONS } from '@utils/mockRestrictions';
 
 const AnimalAvailability: React.FC = () => {
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -35,16 +35,7 @@ const AnimalAvailability: React.FC = () => {
     apiClient
       .getAnimals()
       .then((result) => {
-        if (!cancelled)
-          // TEMPORARY: attach mock restriction tags until the API returns them.
-          setAnimals(
-            result.map((animal) => ({
-              ...animal,
-              restrictions:
-                animal.restrictions ??
-                MOCK_RESTRICTIONS[animal.chameleonAnimalId],
-            })),
-          );
+        if (!cancelled) setAnimals(result);
       })
       .catch(() => {
         if (!cancelled) setError('Something went wrong while loading animals.');
@@ -75,9 +66,19 @@ const AnimalAvailability: React.FC = () => {
   );
 
   return (
-    <Box bg="bg.subtle" flex="1">
+    <Box bg="bg.muted" flex="1">
       <Flex gap="8" px="8" py="8" align="flex-start">
-        <Flex direction="column" gap="4" flex="1" minW="0">
+        <Flex
+          direction="column"
+          gap="4"
+          flex="1"
+          minW="0"
+          p="4"
+          bg="bg.subtle"
+          borderRadius="3xl"
+          boxShadow="card"
+          overflow="hidden"
+        >
           <AnimalFilters
             value={activeFilters}
             onChange={setActiveFilters}
