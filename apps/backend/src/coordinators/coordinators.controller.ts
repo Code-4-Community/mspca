@@ -45,6 +45,10 @@ export class CoordinatorsController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to register or save the coordinator',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many sign-up attempts from this IP; try again later',
+  })
   async create(@Body() dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
     return this.coordinatorsService.create(dto);
   }

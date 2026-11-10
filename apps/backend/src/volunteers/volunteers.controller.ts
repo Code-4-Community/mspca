@@ -59,6 +59,10 @@ export class VolunteersController {
       'The Cognito user could not be created; or the volunteer could not be saved and the Cognito user was deleted; ' +
       'or the save and the Cognito cleanup both failed (the orphaned Cognito user is logged)',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many sign-up attempts from this IP; try again later',
+  })
   async create(
     @Body() dto: CreateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
