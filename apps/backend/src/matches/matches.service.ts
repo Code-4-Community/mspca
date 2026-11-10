@@ -151,7 +151,8 @@ export class MatchesService {
   }
 
   /**
-   * Fetches all PENDING Matches for a Chameleon animal, each with its Volunteer loaded.
+   * Fetches all PENDING Matches for a Chameleon animal, each with its Volunteer
+   * loaded, oldest application first.
    *
    * @param chameleonAnimalId - The animal's Chameleon ID.
    * @returns The animal's pending Matches, or an empty array if it has none.
@@ -165,6 +166,7 @@ export class MatchesService {
     return this.repo.find({
       where: { chameleonAnimalId, status: MatchStatus.PENDING },
       relations: ['volunteer'],
+      order: { matchId: 'ASC' },
     });
   }
 

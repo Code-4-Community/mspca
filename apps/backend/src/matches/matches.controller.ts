@@ -14,7 +14,7 @@ import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
 import { DenyMatchDto } from './dtos/deny-match.dto';
-import { ChameleonAnimalIdParamDto } from './dtos/chameleon-animal-id-param.dto';
+import { ChameleonAnimalIdParamDto } from '../utils/dtos/chameleon-animal-id-param.dto';
 
 @ApiTags('Matches')
 @Controller('matches')
@@ -49,7 +49,7 @@ export class MatchesController {
   @ApiOperation({
     summary: 'Get pending matches for an animal',
     description:
-      'Returns every PENDING match for a Chameleon animal, each with the full volunteer (including notes)',
+      'Returns every PENDING match for a Chameleon animal, each with the full volunteer (including notes), oldest application first.',
   })
   @ApiParam({
     name: 'chameleonAnimalId',

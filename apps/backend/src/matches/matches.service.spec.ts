@@ -873,25 +873,43 @@ describe('MatchesService', () => {
       },
     ] as Match[];
 
+    const otherMatches = [
+      { ...mockMatch, matchId: 3, status: MatchStatus.WITHDRAWN },
+      { ...mockMatch, matchId: 4, status: MatchStatus.DENIED },
+      { ...mockMatch, matchId: 5, status: MatchStatus.ACTIVE },
+      { ...mockMatch, matchId: 6, status: MatchStatus.CANCELED },
+      { ...mockMatch, matchId: 7, chameleonAnimalId: 'A43' },
+    ] as Match[];
+
     const expectedQuery = {
       where: { chameleonAnimalId: 'A42', status: MatchStatus.PENDING },
       relations: ['volunteer'],
+      order: { matchId: 'ASC' },
     };
 
-    it('returns every pending match for the animal with its volunteer', async () => {
-      matchRepo.find.mockResolvedValue(pendingMatches);
+    const mockMatchesTable = (rows: Match[]) =>
+      matchRepo.find.mockImplementation(async ({ where }) =>
+        rows.filter(
+          (row) =>
+            row.chameleonAnimalId === where.chameleonAnimalId &&
+            row.status === where.status,
+        ),
+      );
+
+    it('returns only the pending matches for the animal, each with its volunteer', async () => {
+      mockMatchesTable([...pendingMatches, ...otherMatches]);
 
       const result = await service.findPendingByChameleonAnimalId('A42');
 
-      expect(result).toBe(pendingMatches);
+      expect(result).toEqual(pendingMatches);
       expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
         'A42',
       );
       expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
     });
 
-    it('returns a single pending match', async () => {
-      matchRepo.find.mockResolvedValue([pendingMatches[0]]);
+    it('returns a single pending match among non-pending ones', async () => {
+      mockMatchesTable([pendingMatches[0], ...otherMatches]);
 
       await expect(
         service.findPendingByChameleonAnimalId('A42'),
@@ -900,7 +918,7 @@ describe('MatchesService', () => {
     });
 
     it('returns an empty array when the animal has no pending matches', async () => {
-      matchRepo.find.mockResolvedValue([]);
+      mockMatchesTable(otherMatches);
 
       await expect(
         service.findPendingByChameleonAnimalId('A42'),

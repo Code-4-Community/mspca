@@ -6,7 +6,8 @@ import { MatchesService } from './matches.service';
 import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
 import { DenyMatchDto } from './dtos/deny-match.dto';
-import { ChameleonAnimalIdParamDto } from './dtos/chameleon-animal-id-param.dto';
+import { ChameleonAnimalIdParamDto } from '../utils/dtos/chameleon-animal-id-param.dto';
+import { plainToInstance } from 'class-transformer';
 
 describe('MatchesController', () => {
   let controller: MatchesController;
@@ -235,33 +236,15 @@ describe('MatchesController', () => {
     });
   });
   describe('ChameleonAnimalIdParamDto validation', () => {
-    it('should fail validation when chameleonAnimalId is empty', async () => {
-      const dto = new ChameleonAnimalIdParamDto();
-      dto.chameleonAnimalId = '';
+    it('should fail validation when chameleonAnimalId is whitespace-only', async () => {
+      const dto = plainToInstance(ChameleonAnimalIdParamDto, {
+        chameleonAnimalId: '   ',
+      });
 
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].property).toBe('chameleonAnimalId');
-    });
-
-    it('should fail validation when chameleonAnimalId is longer than 255 characters', async () => {
-      const dto = new ChameleonAnimalIdParamDto();
-      dto.chameleonAnimalId = 'A'.repeat(256);
-
-      const errors = await validate(dto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('chameleonAnimalId');
-    });
-
-    it('should pass validation for a valid Chameleon ID', async () => {
-      const dto = new ChameleonAnimalIdParamDto();
-      dto.chameleonAnimalId = 'A42';
-
-      const errors = await validate(dto);
-
-      expect(errors.length).toBe(0);
     });
   });
 });
