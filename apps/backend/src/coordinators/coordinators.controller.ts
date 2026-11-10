@@ -15,13 +15,14 @@ import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 import { validateId } from '../utils/validation.utils';
+import { minutes } from '@nestjs/throttler';
 
 @ApiTags('Coordinators')
 @Controller('coordinators')
 export class CoordinatorsController {
   constructor(private coordinatorsService: CoordinatorsService) {}
 
-  @Public()
+  @Public({ limit: 3, ttl: minutes(10) })
   @Post()
   @ApiOperation({
     summary: 'Create a foster coordinator account',
@@ -48,7 +49,7 @@ export class CoordinatorsController {
     return this.coordinatorsService.create(dto);
   }
 
-  @Public()
+  @Public({ limit: 5, ttl: minutes(10) })
   @Post('/confirm')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
