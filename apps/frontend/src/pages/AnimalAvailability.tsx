@@ -91,6 +91,7 @@ const AnimalAvailability: React.FC = () => {
   const [activeFilters, setActiveFilters] =
     useState<AnimalFilterState>(EMPTY_FILTERS);
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
+  const [hoveredHomebase, setHoveredHomebase] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +195,9 @@ const AnimalAvailability: React.FC = () => {
                   key={animal.animalId}
                   animal={animal}
                   onSeeMore={setSelectedAnimal}
+                  onHoverChange={(hovering) =>
+                    setHoveredHomebase(hovering ? getAnimalCity(animal) : null)
+                  }
                 />
               ))}
             </SimpleGrid>
@@ -210,8 +214,7 @@ const AnimalAvailability: React.FC = () => {
         >
           <HomebaseMap
             selected={activeFilters.locations}
-            // TODO: highlight the hovered animal's homebase.
-            hovered={null}
+            hovered={hoveredHomebase}
             onToggle={toggleLocation}
           />
         </Box>

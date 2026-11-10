@@ -27,10 +27,17 @@ export const CalendarIcon: React.FC = () => (
 interface AnimalCardProps {
   animal: Animal;
   onSeeMore: (animal: Animal) => void;
+  onHoverChange: (hovering: boolean) => void;
 }
 
-const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
+const AnimalCard: React.FC<AnimalCardProps> = ({
+  animal,
+  onSeeMore,
+  onHoverChange,
+}) => (
   <Flex
+    onMouseEnter={() => onHoverChange(true)}
+    onMouseLeave={() => onHoverChange(false)}
     alignSelf="stretch"
     direction="column"
     justify="flex-end"
