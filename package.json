@@ -32,6 +32,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.2.1",
     "@nestjs/swagger": "^7.1.12",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^11.0.3",
     "@nx/eslint": "22.7.5",
     "@types/pg": "^8.15.5",
