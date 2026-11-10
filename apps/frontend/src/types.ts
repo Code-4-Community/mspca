@@ -1,22 +1,42 @@
+export enum Homebase {
+  BOSTON = 'Boston',
+  CAPE_COD = 'Cape Cod',
+  SALEM = 'Salem',
+  NEVINS_FARM = 'Nevins Farm',
+}
+
+export enum FosterType {
+  DOG = 'Dog',
+  CAT = 'Cat',
+  SMALL_ANIMALS = 'Small Animals',
+  BABY_BOTTLE_ANIMALS = 'Baby Bottle Animals',
+  FARM_ANIMALS = 'Farm Animals',
+}
+
+export enum Restriction {
+  NO_RESTRICTIONS = 'No Restrictions',
+  DOG_FREE_HOME = 'Dog-Free Home',
+  CAT_FREE_HOME = 'Cat-Free Home',
+  ACTIVITY_RESTRICTION = 'Activity Restriction',
+  CHILD_FREE_HOME = 'Child-Free Home',
+  PET_FREE_HOME = 'Pet-Free Home',
+  REQUIRES_MEDICATION = 'Requires Medication',
+}
+
 export interface Animal {
   animalId: number;
   chameleonAnimalId: string;
   name: string;
-  // Whole years of age, e.g. 4 for "4Y5M"
   ageYear: number;
-  // Remaining months of age, e.g. 5 for "4Y5M"
   ageMonth: number;
   sex: string;
-  // 'Dog' | 'Cat' | 'Small Animals' | 'Baby Bottle Animals' | 'Farm Animals'
-  species: string;
+  species: FosterType;
   breed: string[];
   weight: number;
-  // 'Boston' | 'Cape Cod' | 'Salem' | 'Nevins Farm'
-  location: string;
+  location: Homebase;
   pictures: string[];
   fosterBioMemo: string;
-  // Restriction tag labels (e.g. 'Dog-Free Home')
-  restrictions: string[];
+  restrictions: Restriction[];
 }
 
 export interface CreateMatchBody {
@@ -29,7 +49,6 @@ export interface Match {
   matchId: number;
   volunteerId: number;
   chameleonAnimalId: string;
-  // 'Pending' | 'Active' | 'Complete' | 'Denied' | 'Withdrawn' | 'Canceled'
   status: string;
   additionalComments: string | null;
   deniedReason: string | null;
