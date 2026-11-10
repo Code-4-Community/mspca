@@ -15,6 +15,7 @@ import apiClient, { type Animal } from '@api/apiClient';
 import AnimalCard from '@components/AnimalCard';
 import AnimalFilters from '@components/AnimalFilters';
 import AnimalModal from '@components/AnimalModal';
+import HomebaseMap from '@components/HomebaseMap';
 import {
   EMPTY_FILTERS,
   getAnimalCity,
@@ -130,6 +131,14 @@ const AnimalAvailability: React.FC = () => {
     [animals, activeFilters],
   );
 
+  const toggleLocation = (homebase: string) =>
+    setActiveFilters((filters) => ({
+      ...filters,
+      locations: filters.locations.includes(homebase)
+        ? filters.locations.filter((location) => location !== homebase)
+        : [...filters.locations, homebase],
+    }));
+
   const locations = useMemo(
     () => [...new Set(animals.map(getAnimalCity))].sort(),
     [animals],
@@ -191,13 +200,21 @@ const AnimalAvailability: React.FC = () => {
           )}
         </Flex>
 
-        {/* Space reserved for the map, which is out of scope for this ticket. */}
         <Box
           display={{ base: 'none', lg: 'block' }}
           flex="none"
           w="531px"
-          aria-hidden="true"
-        />
+          h="calc(100vh - 64px)"
+          position="sticky"
+          top="8"
+        >
+          <HomebaseMap
+            selected={activeFilters.locations}
+            // TODO: highlight the hovered animal's homebase.
+            hovered={null}
+            onToggle={toggleLocation}
+          />
+        </Box>
       </Flex>
 
       <AnimalModal
