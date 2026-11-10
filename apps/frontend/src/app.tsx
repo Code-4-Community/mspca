@@ -9,7 +9,6 @@ import apiClient from '@api/apiClient';
 import Root from '@containers/root';
 import Layout from '@containers/Layout';
 import NotFound from '@containers/404';
-import Test from '@containers/test';
 import AnimalAvailability from '@pages/AnimalAvailability';
 import { ROUTES } from './routes';
 
@@ -25,7 +24,6 @@ export const routes: RouteObject[] = [
         errorElement: <NotFound />,
         children: [
           { path: '/', element: <Root /> },
-          { path: '/test', element: <Test /> },
           {
             path: ROUTES.ANIMAL_AVAILABILITY,
             element: <AnimalAvailability />,
