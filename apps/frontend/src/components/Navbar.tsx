@@ -35,8 +35,6 @@ const VolunteerAvatar: React.FC<{ volunteer: Volunteer | null }> = ({
 const Navbar: React.FC = () => {
   const volunteerId = useVolunteerId();
   const [loaded, setLoaded] = useState<Volunteer | null>(null);
-  // Only show a volunteer that matches the current URL, so a previous
-  // volunteer never lingers while the next one loads.
   const volunteer = loaded?.volunteerId === volunteerId ? loaded : null;
 
   useEffect(() => {
@@ -49,7 +47,6 @@ const Navbar: React.FC = () => {
         if (!cancelled) setLoaded(result);
       })
       .catch((err: unknown) => {
-        // Unknown volunteer or network error: keep the fallback avatar.
         console.warn(`Could not load volunteer ${volunteerId}`, err);
       });
     return () => {

@@ -17,7 +17,6 @@ export const getInitials = (firstName: string, lastName: string): string =>
 export const getAvatarColor = (volunteerId: number): string =>
   AVATAR_COLORS[volunteerId % AVATAR_COLORS.length];
 
-/** Parses a volunteer ID from a URL value; anything but a positive integer is null. */
 export const parseVolunteerId = (raw: string | null): number | null => {
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const id = Number(raw);
