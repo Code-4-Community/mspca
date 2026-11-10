@@ -143,11 +143,11 @@ The tradeoff is that people sharing one network (for example, a shelter's Wi-Fi 
 
 #### Current limits
 
-| Route | Limit per IP |
-| --- | --- |
-| `POST /volunteers`, `POST /coordinators` | 3 per 10 minutes |
-| `POST /volunteers/confirm`, `POST /coordinators/confirm` | 5 per 10 minutes |
-| Any other `@Public()` route | 10 per minute (default) |
+| Route                                                    | Limit per IP            |
+| -------------------------------------------------------- | ----------------------- |
+| `POST /volunteers`, `POST /coordinators`                 | 3 per 10 minutes        |
+| `POST /volunteers/confirm`, `POST /coordinators/confirm` | 5 per 10 minutes        |
+| Any other `@Public()` route                              | 10 per minute (default) |
 
 Account creation is the strictest because every call makes Cognito send a verification email, and spam sign-ups could exhaust the email quota and block real users. On the confirm routes, a 429 can come either from this rate limit or from Cognito's own limit on wrong verification codes; clients should treat both as "try again later."
 
@@ -158,7 +158,9 @@ Account creation is the strictest because every call makes Cognito send a verifi
 Controller unit tests that build a testing module without `ThrottlerModule` will fail to resolve `ThrottlerGuard` if the controller has a `@Public()` route. Override the guard in those tests:
 
 ```typescript
-const module = await Test.createTestingModule({ /* ... */ })
+const module = await Test.createTestingModule({
+  /* ... */
+})
   .overrideGuard(ThrottlerGuard)
   .useValue({ canActivate: () => true })
   .compile();
@@ -169,6 +171,7 @@ const module = await Test.createTestingModule({ /* ... */ })
 - **Counts are stored in memory.** They live inside the server process, reset whenever it restarts, and aren't shared between instances. That works for a single long-running server. On AWS Lambda, each execution environment keeps its own counts, so the limits become best-effort: parallel requests can spread across environments, and counts reset when an environment is recycled. A shared store such as Redis would fix this, at extra cost.
 - **The client IP must be correct behind a proxy.** Behind API Gateway or any other proxy, `req.ip` may be the proxy's address, which would put every user on one shared counter. Verify `req.ip` once deployment is set up, and configure Express's `trust proxy` setting (or the Lambda adapter) as needed. Don't enable `trust proxy` without a proxy in front, because clients could then fake the `X-Forwarded-For` header to dodge limits.
 - **Infrastructure-level options (not yet decided).** These were considered as extra layers for deployment and are pending a cost discussion:
+
   - **AWS WAF rate-based rule:** per-IP limiting before requests reach the app. Fixed cost of about $5/month per web ACL plus $1 per rule, plus $0.60 per million requests. Its minimum limit is 10 per window and enforcement is approximate, so it would complement the in-app limits rather than replace them. It attaches to API Gateway REST APIs, but not HTTP APIs or Lambda function URLs unless CloudFront is added in front.
   - **API Gateway stage or route throttling:** a cap on total traffic and cost, included with API Gateway. It's shared by all callers, so it isn't a per-user limit on its own.
 
