@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -9,7 +9,13 @@ import {
   Portal,
   Text,
 } from '@chakra-ui/react';
-import { ListFilter, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ListFilter,
+  X,
+} from 'lucide-react';
 
 import {
   ANIMAL_TYPES,
@@ -18,36 +24,16 @@ import {
   getRestriction,
   type AnimalFilterState,
 } from '@utils/animals';
+import type { Homebase, Restriction } from '../types';
 
 type CategoryKey = keyof AnimalFilterState;
 
 interface AnimalFiltersProps {
   value: AnimalFilterState;
   onChange: (filters: AnimalFilterState) => void;
-  // Cities available to filter by, derived from the fetched animals.
-  locations: string[];
+  // Homebases available to filter by, derived from the fetched animals.
+  locations: Homebase[];
 }
-
-const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
-  <Icon
-    asChild
-    boxSize="6"
-    color="neutrals.black"
-    transform={open ? 'rotate(-180deg)' : undefined}
-  >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  </Icon>
-);
 
 interface FilterOption {
   label: string;
@@ -62,6 +48,12 @@ interface FilterSectionProps {
   onToggle: (option: string) => void;
 }
 
+/**
+ * One collapsible group of checkboxes inside the filters popover (e.g. "Animal
+ * Type"). Clicking the title expands or collapses its options; ticking one
+ * calls `onToggle` with that option's label. Each option's checkbox is filled
+ * with its own `color` when checked.
+ */
 const FilterSection: React.FC<FilterSectionProps> = ({
   title,
   options,
@@ -82,15 +74,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
         >
-          <Text
-            color="neutrals.black"
-            fontSize="16px"
-            fontWeight="semibold"
-            lineHeight="24px"
-          >
+          <Text color="neutrals.black" textStyle="h7">
             {title}
           </Text>
-          <ChevronIcon open={open} />
+          <Icon
+            asChild
+            boxSize="6"
+            color="neutrals.black"
+            transform={open ? 'rotate(-180deg)' : undefined}
+          >
+            <ChevronDown strokeWidth={2} aria-hidden />
+          </Icon>
         </Flex>
         <Box
           alignSelf="stretch"
@@ -108,55 +102,50 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           align="stretch"
           gap="4"
         >
-          {options.length === 0 ? (
-            <Text color="neutrals.black85" fontSize="14px" lineHeight="20px">
-              No options available
-            </Text>
-          ) : (
-            options.map((option) => {
-              const checked = selected.includes(option.label);
-              return (
-                <Checkbox.Root
-                  key={option.label}
-                  checked={checked}
-                  onCheckedChange={() => onToggle(option.label)}
-                  alignSelf="stretch"
-                  justifyContent="flex-start"
-                  alignItems="center"
-                  gap="2"
+          {options.map((option) => {
+            const checked = selected.includes(option.label);
+            return (
+              <Checkbox.Root
+                key={option.label}
+                checked={checked}
+                onCheckedChange={() => onToggle(option.label)}
+                alignSelf="stretch"
+                justifyContent="flex-start"
+                alignItems="center"
+                gap="2"
+              >
+                <Checkbox.HiddenInput />
+                <Checkbox.Control
+                  boxSize="4"
+                  minW="4"
+                  borderRadius="xs"
+                  borderWidth="0"
+                  bg={checked ? option.color : 'transparent'}
+                  outline={checked ? 'none' : '1px solid'}
+                  outlineColor="border"
+                  color="neutral.contrast"
                 >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control
-                    boxSize="4"
-                    minW="4"
-                    borderRadius="xs"
-                    borderWidth="0"
-                    bg={checked ? option.color : 'transparent'}
-                    outline={checked ? 'none' : '1px solid'}
-                    outlineColor="border"
-                    color="neutral.contrast"
-                  >
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Label
-                    color="neutrals.black"
-                    fontSize="14px"
-                    fontWeight="medium"
-                    lineHeight="20px"
-                    whiteSpace="nowrap"
-                  >
-                    {option.label}
-                  </Checkbox.Label>
-                </Checkbox.Root>
-              );
-            })
-          )}
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <Checkbox.Label
+                  color="neutrals.black"
+                  fontSize="14px"
+                  fontWeight="medium"
+                  lineHeight="20px"
+                  whiteSpace="nowrap"
+                >
+                  {option.label}
+                </Checkbox.Label>
+              </Checkbox.Root>
+            );
+          })}
         </Flex>
       )}
     </Flex>
   );
 };
 
+/** Small grey action button used for "Cancel" and "Apply" in the popover footer. */
 const PanelButton: React.FC<{
   onClick: () => void;
   children: React.ReactNode;
@@ -181,6 +170,40 @@ const PanelButton: React.FC<{
   </Button>
 );
 
+/** Arrow button that scrolls the row of filter chips left or right. */
+const ChipScrollButton: React.FC<{
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ label, onClick, children }) => (
+  <Button
+    aria-label={label}
+    flex="none"
+    boxSize="10"
+    minW="10"
+    p="0"
+    bg="neutral.subtle"
+    color="neutral.fg"
+    borderRadius="sm"
+    _hover={{ bg: 'neutral.muted' }}
+    onClick={onClick}
+  >
+    {children}
+  </Button>
+);
+
+/**
+ * The filter bar above the animal grid.
+ *
+ * A filter button opens a popover with collapsible sections for Animal Type,
+ * Restrictions and Location. Selections are held as a draft while the popover
+ * is open and only filter the grid once Apply is pressed (`onChange` is called
+ * with the new `AnimalFilterState`). Next to the button, "Clear Filters" resets
+ * everything, and each selected restriction or location is shown as a chip
+ * that removes itself when clicked. The chips stay on a single row; when there
+ * are too many to fit, arrow buttons appear to scroll through them. Animal
+ * type selections filter the grid but don't get a chip.
+ */
 const AnimalFilters: React.FC<AnimalFiltersProps> = ({
   value,
   onChange,
@@ -196,19 +219,23 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
   };
 
   const toggleDraft = (key: CategoryKey, option: string) =>
-    setDraft((prev) => ({
-      ...prev,
-      [key]: prev[key].includes(option)
-        ? prev[key].filter((o) => o !== option)
-        : [...prev[key], option],
-    }));
+    setDraft((prev) => {
+      const selected: string[] = prev[key];
+      return {
+        ...prev,
+        [key]: selected.includes(option)
+          ? selected.filter((o) => o !== option)
+          : [...selected, option],
+      };
+    });
 
   // While the panel is open the chips mirror the draft selection, so they show
   // up immediately as options are ticked. Apply is what filters the grid.
   const shown = open ? draft : value;
 
   const removeChip = (key: CategoryKey, option: string) => {
-    const next = { ...shown, [key]: shown[key].filter((o) => o !== option) };
+    const selected: string[] = shown[key];
+    const next = { ...shown, [key]: selected.filter((o) => o !== option) };
     if (open) setDraft(next);
     else onChange(next);
   };
@@ -222,14 +249,36 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
         label,
         color:
           key === 'restrictions'
-            ? getRestriction(label)?.color ?? 'neutrals.black'
+            ? getRestriction(label as Restriction).color
             : 'neutrals.black',
       })),
     );
 
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = useState({ left: false, right: false });
+
+  const updateScrollable = () => {
+    const el = chipsRef.current;
+    if (!el) return;
+    setScrollable({
+      left: el.scrollLeft > 0,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  };
+
+  // Re-measure whenever the chips change or the window is resized.
+  useEffect(() => {
+    updateScrollable();
+    window.addEventListener('resize', updateScrollable);
+    return () => window.removeEventListener('resize', updateScrollable);
+  }, [chips.length]);
+
+  const scrollChips = (direction: 1 | -1) =>
+    chipsRef.current?.scrollBy({ left: direction * 200, behavior: 'smooth' });
+
   return (
-    <Flex align="center" gap="3" wrap="wrap">
-      <Flex align="center" gap="2">
+    <Flex align="center" gap="3">
+      <Flex align="center" gap="2" flex="none">
         <Popover.Root
           open={open}
           onOpenChange={(e) => handleOpenChange(e.open)}
@@ -388,26 +437,56 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
           Clear Filters
         </Button>
       </Flex>
-      {chips.map((chip) => (
-        <Button
-          key={`${chip.key}-${chip.label}`}
-          h="auto"
-          px="4"
-          py="2.5"
-          gap="2.5"
-          bg={chip.color}
-          color="white"
-          borderRadius="12px"
-          fontSize="16px"
-          fontWeight="semibold"
-          lineHeight="24px"
-          onClick={() => removeChip(chip.key, chip.label)}
-          aria-label={`Remove ${chip.label} filter`}
+      <Flex align="center" gap="2" flex="1" minW="0">
+        {scrollable.left && (
+          <ChipScrollButton
+            label="Scroll filters left"
+            onClick={() => scrollChips(-1)}
+          >
+            <ChevronLeft size={20} aria-hidden />
+          </ChipScrollButton>
+        )}
+        <Flex
+          ref={chipsRef}
+          onScroll={updateScrollable}
+          align="center"
+          gap="3"
+          flex="1"
+          minW="0"
+          overflowX="hidden"
         >
-          <X size={12} strokeWidth={2} color="white" aria-hidden />
-          {chip.label}
-        </Button>
-      ))}
+          {chips.map((chip) => (
+            <Button
+              key={`${chip.key}-${chip.label}`}
+              flex="none"
+              whiteSpace="nowrap"
+              h="auto"
+              px="4"
+              py="2.5"
+              gap="2.5"
+              bg={chip.color}
+              color="white"
+              borderRadius="12px"
+              fontSize="16px"
+              fontWeight="semibold"
+              lineHeight="24px"
+              onClick={() => removeChip(chip.key, chip.label)}
+              aria-label={`Remove ${chip.label} filter`}
+            >
+              <X size={12} strokeWidth={2} color="white" aria-hidden />
+              {chip.label}
+            </Button>
+          ))}
+        </Flex>
+        {scrollable.right && (
+          <ChipScrollButton
+            label="Scroll filters right"
+            onClick={() => scrollChips(1)}
+          >
+            <ChevronRight size={20} aria-hidden />
+          </ChipScrollButton>
+        )}
+      </Flex>
     </Flex>
   );
 };

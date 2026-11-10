@@ -14,15 +14,20 @@ import apiClient from '@api/apiClient';
 import type { Animal } from '../types';
 import AnimalCard from '@components/AnimalCard';
 import AnimalFilters from '@components/AnimalFilters';
-import AnimalModal from '@components/AnimalModal';
+import AnimalModal from '@components/modals/AnimalModal';
 import {
   EMPTY_FILTERS,
-  getAnimalCity,
   matchesFilters,
   type AnimalFilterState,
 } from '@utils/animals';
 import logo from '../assets/mspca-logo.png';
 
+/**
+ * The top bar of the page: the MSPCA logo on the left and the volunteer's
+ * profile avatar and "My Profile" label on the right. The initials are
+ * hard-coded for now until the logged-in volunteer is available to the
+ * frontend.
+ */
 const PageHeader: React.FC = () => (
   <Flex
     alignSelf="stretch"
@@ -80,38 +85,41 @@ const PageHeader: React.FC = () => (
   </Flex>
 );
 
+/**
+ * Page where volunteers browse the animals that are available to foster.
+ *
+ * Fetches every animal from the API once and shows them as a grid of
+ * `AnimalCard`s inside a panel, with `AnimalFilters` above the grid. Filtering
+ * by animal type, restrictions and homebase happens in the browser on the
+ * already-fetched list, so the grid updates as soon as filters are applied.
+ * Clicking "See More" on a card opens `AnimalModal` for that animal, where the
+ * volunteer can submit a match request. While loading it shows a spinner, and
+ * if the request fails it shows an error with a "Try again" button. The space
+ * on the right is reserved for the map, which is not built yet.
+ */
 const AnimalAvailability: React.FC = () => {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
   const [activeFilters, setActiveFilters] =
     useState<AnimalFilterState>(EMPTY_FILTERS);
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .getAnimals()
-      .then((result) => {
-        if (!cancelled) setAnimals(result);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Something went wrong while loading animals.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
-
-  const loadAnimals = () => {
-    setLoading(true);
-    setError(null);
-    setReloadKey((key) => key + 1);
+  const fetchAnimals = async () => {
+    try {
+      setAnimals(await apiClient.getAnimals());
+    } catch {
+      setError('Something went wrong while loading animals.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    // Fetching on mount; the state updates happen after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAnimals();
+  }, []);
 
   // Animals are fetched once; filters are applied here in real time.
   const visibleAnimals = useMemo(
@@ -120,7 +128,7 @@ const AnimalAvailability: React.FC = () => {
   );
 
   const locations = useMemo(
-    () => [...new Set(animals.map(getAnimalCity))].sort(),
+    () => [...new Set(animals.map((animal) => animal.location))].sort(),
     [animals],
   );
 
@@ -152,7 +160,14 @@ const AnimalAvailability: React.FC = () => {
           ) : error ? (
             <Flex direction="column" align="center" gap="4" py="20">
               <Text color="fg.error">{error}</Text>
-              <Button variant="outline" onClick={loadAnimals}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLoading(true);
+                  setError(null);
+                  fetchAnimals();
+                }}
+              >
                 Try again
               </Button>
             </Flex>
