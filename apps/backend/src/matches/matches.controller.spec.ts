@@ -6,6 +6,8 @@ import { MatchesService } from './matches.service';
 import { MatchStatus } from './matches.types';
 import { Match } from './matches.entity';
 import { DenyMatchDto } from './dtos/deny-match.dto';
+import { ChameleonAnimalIdParamDto } from '../utils/dtos/chameleon-animal-id-param.dto';
+import { plainToInstance } from 'class-transformer';
 
 describe('MatchesController', () => {
   let controller: MatchesController;
@@ -14,6 +16,7 @@ describe('MatchesController', () => {
     withdraw: jest.Mock;
     approveMatch: jest.Mock;
     denyMatch: jest.Mock;
+    findPendingByChameleonAnimalId: jest.Mock;
   };
 
   const mockMatch = {
@@ -28,6 +31,7 @@ describe('MatchesController', () => {
       withdraw: jest.fn(),
       approveMatch: jest.fn(),
       denyMatch: jest.fn(),
+      findPendingByChameleonAnimalId: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +50,34 @@ describe('MatchesController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('getPendingMatches', () => {
+    it.each([
+      ['multiple pending matches', [mockMatch, { ...mockMatch, matchId: 2 }]],
+      ['one pending match', [mockMatch]],
+      ['no', []],
+    ])('returns %s pending matches from the service', async (_, matches) => {
+      service.findPendingByChameleonAnimalId.mockResolvedValue(matches);
+
+      const result = await controller.getPendingMatches({
+        chameleonAnimalId: 'A42',
+      });
+
+      expect(result).toBe(matches);
+      expect(service.findPendingByChameleonAnimalId).toHaveBeenCalledWith(
+        'A42',
+      );
+    });
+
+    it('surfaces a NotFoundException from the service', async () => {
+      service.findPendingByChameleonAnimalId.mockRejectedValue(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+
+      await expect(
+        controller.getPendingMatches({ chameleonAnimalId: 'A999' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
   describe('createMatch', () => {
     it('passes the body through to the service', async () => {
       service.create.mockResolvedValue({ matchId: 10 } as Match);
@@ -201,6 +233,18 @@ describe('MatchesController', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBe(0);
+    });
+  });
+  describe('ChameleonAnimalIdParamDto validation', () => {
+    it('should fail validation when chameleonAnimalId is whitespace-only', async () => {
+      const dto = plainToInstance(ChameleonAnimalIdParamDto, {
+        chameleonAnimalId: '   ',
+      });
+
+      const errors = await validate(dto);
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('chameleonAnimalId');
     });
   });
 });

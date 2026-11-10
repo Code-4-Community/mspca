@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpStatus,
   Param,
   ParseIntPipe,
@@ -13,6 +14,7 @@ import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
 import { DenyMatchDto } from './dtos/deny-match.dto';
+import { ChameleonAnimalIdParamDto } from '../utils/dtos/chameleon-animal-id-param.dto';
 
 @ApiTags('Matches')
 @Controller('matches')
@@ -41,6 +43,41 @@ export class MatchesController {
   })
   async createMatch(@Body() body: CreateMatchDto): Promise<Match> {
     return this.matchesService.create(body);
+  }
+
+  @Get(':chameleonAnimalId/pending')
+  @ApiOperation({
+    summary: 'Get pending matches for an animal',
+    description:
+      'Returns every PENDING match for a Chameleon animal, each with the full volunteer (including notes), oldest application first.',
+  })
+  @ApiParam({
+    name: 'chameleonAnimalId',
+    type: String,
+    description: 'The Chameleon ID of the animal.',
+    example: 'A476750',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "The animal's pending matches, or an empty array if it has none.",
+    type: [Match],
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'The Chameleon animal ID is blank or longer than 255 characters.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No animal exists with the given Chameleon ID.',
+  })
+  async getPendingMatches(
+    @Param() params: ChameleonAnimalIdParamDto,
+  ): Promise<Match[]> {
+    return this.matchesService.findPendingByChameleonAnimalId(
+      params.chameleonAnimalId,
+    );
   }
 
   @Patch(':matchId/withdraw')
