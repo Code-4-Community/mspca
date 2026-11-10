@@ -7,6 +7,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { MatchesModule } from './matches/matches.module';
 import { CoordinatorsModule } from './coordinators/coordinators.module';
 import { VolunteersModule } from './volunteers/volunteers.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AnimalsModule } from './animals/animals.module';
 
 @Module({
@@ -25,6 +26,7 @@ import { AnimalsModule } from './animals/animals.module';
     MatchesModule,
     CoordinatorsModule,
     VolunteersModule,
+    NotificationsModule,
     AnimalsModule,
   ],
 })
