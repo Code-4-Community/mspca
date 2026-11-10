@@ -10,9 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FosterVolunteer } from './volunteers.entity';
 import { VolunteerStatus } from './volunteers.types';
+import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
@@ -41,15 +43,29 @@ export class VolunteersService {
   ) {}
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinators.
+   * Removes fields only coordinators may see, so the Volunteer is safe to
+   * return from a standard endpoint.
    *
-   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   * @param volunteer - The full Volunteer.
+   * @returns The same Volunteer without coordinator-only fields.
+   */
+  private withoutPrivateFields(
+    volunteer: FosterVolunteer,
+  ): VolunteerWithoutPrivateFields {
+    delete volunteer.coordinatorNotes;
+    return volunteer;
+  }
+
+  /**
+   * Fetches a full Volunteer by ID, including coordinator-only fields such as
+   * coordinatorNotes. Only use this for coordinator-facing operations;
+   * everything else should use {@link findByIdOrFail}.
    *
    * @param id - The Volunteer's ID.
-   * @returns The Volunteer.
+   * @returns The full Volunteer, notes included.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
-  async findByIdOrFail(id: number): Promise<FosterVolunteer> {
+  async coordinatorFindByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
       relations: ['assignedCoordinators'],
@@ -60,6 +76,28 @@ export class VolunteersService {
     }
 
     return volunteer;
+  }
+
+  /**
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   *
+   * Returns the Volunteer so callers can reuse it instead of fetching again.
+   *
+   * @param id - The Volunteer's ID.
+   * @returns The Volunteer.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async findByIdOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
+    const volunteer = await this.repo.findOne({
+      where: { volunteerId: id },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer with ID ${id} not found`);
+    }
+
+    return this.withoutPrivateFields(volunteer);
   }
 
   /**
@@ -79,7 +117,9 @@ export class VolunteersService {
    * @throws {InternalServerErrorException} If the Cognito user could not be registered.
    * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
    */
-  async create(dto: CreateVolunteerDto): Promise<FosterVolunteer> {
+  async create(
+    dto: CreateVolunteerDto,
+  ): Promise<VolunteerWithoutPrivateFields> {
     // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
     const { password, ...profile } = dto;
     const email = profile.email.toLowerCase();
@@ -100,8 +140,7 @@ export class VolunteersService {
     try {
       const assignedCoordinators =
         await this.coordinatorsService.findActiveByHomebase(profile.homebase);
-
-      return await this.repo.save({
+      const saved = await this.repo.save({
         ...profile,
         email,
         status: VolunteerStatus.PENDING,
@@ -109,6 +148,7 @@ export class VolunteersService {
         cognitoSub,
         assignedCoordinators,
       });
+      return this.withoutPrivateFields(saved);
     } catch (error) {
       this.logger.error(`Failed to save Volunteer ${email}`, error);
       try {
@@ -161,7 +201,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Active.
    */
-  async deactivate(id: number): Promise<FosterVolunteer> {
+  async deactivate(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
@@ -170,7 +210,7 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.INACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
 
   /**
@@ -184,7 +224,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If the Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not currently Inactive.
    */
-  async reactivate(id: number): Promise<FosterVolunteer> {
+  async reactivate(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.INACTIVE) {
@@ -193,7 +233,7 @@ export class VolunteersService {
 
     volunteer.status = VolunteerStatus.ACTIVE;
 
-    return this.repo.save(volunteer);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
 
   /**
@@ -214,7 +254,7 @@ export class VolunteersService {
   async changeHomebase(
     id: number,
     homebase: Homebase,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     // Pending Volunteers can still fix the homebase they picked at sign-up.
@@ -250,7 +290,7 @@ export class VolunteersService {
       ),
     ]);
 
-    return saved;
+    return this.withoutPrivateFields(saved);
   }
 
   /**
@@ -302,7 +342,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {BadRequestException} If the Volunteer is not active.
    */
-  async findActiveOrFail(id: number): Promise<FosterVolunteer> {
+  async findActiveOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     this.checkVolunteerActive(volunteer);
@@ -316,7 +356,7 @@ export class VolunteersService {
    * @param volunteer - The Volunteer to check.
    * @throws {BadRequestException} If the Volunteer's status is not Active.
    */
-  checkVolunteerActive(volunteer: FosterVolunteer): void {
+  checkVolunteerActive(volunteer: VolunteerWithoutPrivateFields): void {
     if (volunteer.status !== VolunteerStatus.ACTIVE) {
       throw new BadRequestException(
         `Volunteer with ID ${volunteer.volunteerId} is not active`,
@@ -337,8 +377,29 @@ export class VolunteersService {
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
-  ): Promise<FosterVolunteer> {
+  ): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
+    Object.assign(volunteer, dto);
+    return this.withoutPrivateFields(await this.repo.save(volunteer));
+  }
+
+  /**
+   * Updates a Volunteer's profile as a coordinator. Accepts every field a
+   * Volunteer can edit themselves, plus coordinator-only fields
+   * (coordinator notes and completed trainings).
+   * Only the fields included in the DTO are changed; completed trainings
+   * are replaced as a whole list.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The fields to update.
+   * @returns The updated Volunteer, including private fields.
+   * @throws {NotFoundException} If no Volunteer with the ID exists.
+   */
+  async coordinatorUpdateVolunteerById(
+    id: number,
+    dto: CoordinatorUpdateVolunteerDto,
+  ): Promise<FosterVolunteer> {
+    const volunteer = await this.coordinatorFindByIdOrFail(id);
     Object.assign(volunteer, dto);
     return this.repo.save(volunteer);
   }
@@ -355,7 +416,7 @@ export class VolunteersService {
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    * @throws {ConflictException} If the Volunteer is not pending.
    */
-  async approve(id: number): Promise<FosterVolunteer> {
+  async approve(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
 
     if (volunteer.status !== VolunteerStatus.PENDING) {
@@ -377,7 +438,7 @@ export class VolunteersService {
       );
     }
 
-    return saved;
+    return this.withoutPrivateFields(saved);
   }
 
   /**
@@ -421,9 +482,10 @@ export class VolunteersService {
    * Each volunteer includes only their matches with status ACTIVE, or an empty array if there are no volunteers.
    * @returns A list of all volunteers
    */
-  async getAllVolunteers(): Promise<FosterVolunteer[]> {
-    return this.repo
+  async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
+    const volunteers = await this.repo
       .createQueryBuilder('volunteer')
+      .leftJoinAndSelect('volunteer.assignedCoordinators', 'coordinator')
       .leftJoinAndSelect(
         'volunteer.matches',
         'match',
@@ -431,8 +493,8 @@ export class VolunteersService {
         { status: MatchStatus.ACTIVE },
       )
       .getMany();
+    return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
-
   /**
    * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
    *

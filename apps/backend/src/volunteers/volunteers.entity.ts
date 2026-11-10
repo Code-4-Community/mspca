@@ -8,7 +8,11 @@ import {
   Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Match } from '../matches/matches.entity';
 
@@ -56,6 +60,9 @@ export class FosterVolunteer {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
+  @Column({ name: 'coordinator_notes', type: 'text', nullable: true })
+  coordinatorNotes?: string | null;
+
   @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
   fosterType!: FosterType[];
 
@@ -63,11 +70,14 @@ export class FosterVolunteer {
   animalUpdates!: boolean;
 
   @Column({
-    name: 'completed_canine_training',
-    type: 'boolean',
-    nullable: true,
+    name: 'completed_trainings',
+    type: 'enum',
+    enum: FosterTraining,
+    enumName: 'foster_training_enum',
+    array: true,
+    default: () => "'{}'",
   })
-  completedCanineTraining!: boolean | null;
+  completedTrainings!: FosterTraining[];
 
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
