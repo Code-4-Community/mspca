@@ -1,35 +1,11 @@
 import { useEffect, useState } from 'react';
-import { chakra, Flex, Image, Text } from '@chakra-ui/react';
+import { Button, Flex, Image, Text } from '@chakra-ui/react';
 
 import apiClient from '@api/apiClient';
 import type { Volunteer } from '../types';
 import { useVolunteerId } from '@utils/useVolunteerId';
 import { getAvatarColor, getInitials } from '@utils/volunteer';
 import logo from '../assets/mspca-logo.png';
-
-const VolunteerAvatar: React.FC<{ volunteer: Volunteer | null }> = ({
-  volunteer,
-}) => (
-  <Flex
-    data-testid="navbar-avatar"
-    boxSize={{ base: '50px', md: '66px' }}
-    flexShrink={0}
-    align="center"
-    justify="center"
-    bg={volunteer ? getAvatarColor(volunteer.volunteerId) : 'gray.300'}
-    color="white"
-    borderRadius="full"
-    boxShadow="card"
-    outline="3px solid"
-    outlineColor="neutrals.black"
-    outlineOffset="-3px"
-    fontSize={{ base: '20px', md: '24px' }}
-    fontWeight="semibold"
-    lineHeight="1"
-  >
-    {volunteer ? getInitials(volunteer.firstName, volunteer.lastName) : ''}
-  </Flex>
-);
 
 /** Site-wide header: MSPCA logo and the current volunteer's profile button. */
 const Navbar: React.FC = () => {
@@ -73,27 +49,47 @@ const Navbar: React.FC = () => {
         objectFit="contain"
       />
       {/* TODO: link to the volunteer profile page once it exists. */}
-      <chakra.button
+      <Button
         type="button"
         aria-label="My Profile"
-        className="group"
+        variant="plain"
         display="flex"
         alignItems="center"
         gap="4"
+        h="auto"
         cursor="pointer"
       >
-        <VolunteerAvatar volunteer={volunteer} />
+        <Flex
+          data-testid="navbar-avatar"
+          boxSize={{ base: '50px', md: '66px' }}
+          flexShrink={0}
+          align="center"
+          justify="center"
+          bg={volunteer ? getAvatarColor(volunteer.volunteerId) : 'gray.300'}
+          color="white"
+          borderRadius="full"
+          boxShadow="card"
+          outline="3px solid"
+          outlineColor="neutrals.black"
+          outlineOffset="-3px"
+          fontSize={{ base: '20px', md: '24px' }}
+          fontWeight="semibold"
+          lineHeight="1"
+        >
+          {volunteer
+            ? getInitials(volunteer.firstName, volunteer.lastName)
+            : ''}
+        </Flex>
         <Text
           display={{ base: 'none', md: 'block' }}
           color="neutrals.black"
           fontSize="24px"
           fontWeight="semibold"
           lineHeight="36px"
-          _groupHover={{ textDecoration: 'underline' }}
         >
           My Profile
         </Text>
-      </chakra.button>
+      </Button>
     </Flex>
   );
 };
