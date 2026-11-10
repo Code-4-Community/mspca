@@ -1,4 +1,5 @@
 import {
+  ArrayNotEmpty,
   ArrayUnique,
   IsArray,
   IsNotEmpty,
@@ -12,6 +13,7 @@ import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 export class UpdateAnimalPreferencesDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
+  @ArrayNotEmpty()
   @ArrayUnique()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
@@ -20,6 +22,7 @@ export class UpdateAnimalPreferencesDto {
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
+  @ArrayNotEmpty()
   @ArrayUnique()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
