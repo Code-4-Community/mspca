@@ -2,7 +2,13 @@ import { ArrayUnique, IsArray, IsEnum, ValidateIf } from 'class-validator';
 import { UpdateVolunteerDto } from './update-volunteer.dto';
 import { FosterTraining } from '../volunteers.types';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
+import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 
+@AtLeastOneValue<CoordinatorUpdateVolunteerDto>(
+  ['coordinatorNotes', 'completedTrainings'],
+  undefined,
+  ['completedTrainings'],
+)
 export class CoordinatorUpdateVolunteerDto extends UpdateVolunteerDto {
   @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
