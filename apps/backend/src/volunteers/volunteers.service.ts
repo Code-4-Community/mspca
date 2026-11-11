@@ -81,15 +81,22 @@ export class VolunteersService {
    * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
+   * Pets are only loaded when asked for, since most callers don't need them.
    *
    * @param id - The Volunteer's ID.
+   * @param options.withPets - Also load the Volunteer's pets.
    * @returns The Volunteer.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
-  async findByIdOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
+  async findByIdOrFail(
+    id: number,
+    { withPets = false }: { withPets?: boolean } = {},
+  ): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinators', 'pets'],
+      relations: withPets
+        ? ['assignedCoordinators', 'pets']
+        : ['assignedCoordinators'],
     });
 
     if (!volunteer) {
@@ -373,11 +380,12 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * Pets, when included, replace the whole list; pets left out are deleted.
+   * Setting hasChildren to false without sending childrenAges clears the saved ages.
    * The homebase is changed through changeHomebase instead, since changing it
    * also reassigns coordinators and emails them.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
-   * Pets, when included, replace the whole list; pets left out are deleted.
    * @returns The updated volunteer
    * @throws NotFoundException if no volunteer exists with the given ID
    * @throws BadRequestException if the saved and updated fields together leave
@@ -387,12 +395,8 @@ export class VolunteersService {
     id: number,
     dto: UpdateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
-    const volunteer = await this.findByIdOrFail(id);
-    this.checkChildrenConsistent(
-      dto.hasChildren ?? volunteer.hasChildren,
-      dto.childrenAges ?? volunteer.childrenAges,
-    );
-    Object.assign(volunteer, dto);
+    const volunteer = await this.findByIdOrFail(id, { withPets: true });
+    this.applyProfileUpdate(volunteer, dto);
     return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
 
@@ -401,7 +405,8 @@ export class VolunteersService {
    * Volunteer can edit themselves, plus coordinator-only fields
    * (coordinator notes and completed trainings).
    * Only the fields included in the DTO are changed; completed trainings
-   * and pets are replaced as whole lists.
+   * and pets are replaced as whole lists. Setting hasChildren to false
+   * without sending childrenAges clears the saved ages.
    *
    * @param id - The Volunteer's ID.
    * @param dto - The fields to update.
@@ -415,12 +420,26 @@ export class VolunteersService {
     dto: CoordinatorUpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     const volunteer = await this.coordinatorFindByIdOrFail(id);
-    this.checkChildrenConsistent(
-      dto.hasChildren ?? volunteer.hasChildren,
-      dto.childrenAges ?? volunteer.childrenAges,
-    );
-    Object.assign(volunteer, dto);
+    this.applyProfileUpdate(volunteer, dto);
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Copies an update onto a loaded Volunteer, after checking that the saved
+   * and updated fields together still satisfy the children rule.
+   *
+   * @throws {BadRequestException} If childrenAges doesn't match hasChildren.
+   */
+  private applyProfileUpdate(
+    volunteer: VolunteerWithoutPrivateFields,
+    dto: UpdateVolunteerDto,
+  ): void {
+    const hasChildren = dto.hasChildren ?? volunteer.hasChildren;
+    const childrenAges =
+      dto.childrenAges ??
+      (dto.hasChildren === false ? [] : volunteer.childrenAges);
+    this.checkChildrenConsistent(hasChildren, childrenAges);
+    Object.assign(volunteer, dto, { childrenAges });
   }
 
   /**

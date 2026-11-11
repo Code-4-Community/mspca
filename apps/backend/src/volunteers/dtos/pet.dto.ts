@@ -5,6 +5,7 @@ import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.dec
 export class PetDto {
   @IsInt()
   @Min(0)
+  @Max(50)
   ageYear!: number;
 
   @IsInt()

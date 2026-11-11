@@ -110,9 +110,26 @@ describe('VolunteersService', () => {
       expect(result).toBe(volunteer);
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
-        relations: ['assignedCoordinators', 'pets'],
+        relations: ['assignedCoordinators'],
       });
       expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('also loads the pets when asked to', async () => {
+      const volunteer = {
+        volunteerId: 7,
+        pets: [] as Pet[],
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      const result = await service.findByIdOrFail(7, { withPets: true });
+
+      expect(result).toBe(volunteer);
+      expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { volunteerId: 7 },
+        relations: ['assignedCoordinators', 'pets'],
+      });
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
@@ -123,7 +140,7 @@ describe('VolunteersService', () => {
       );
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
-        relations: ['assignedCoordinators', 'pets'],
+        relations: ['assignedCoordinators'],
       });
     });
 
@@ -594,7 +611,7 @@ describe('VolunteersService', () => {
 
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinators', 'pets'],
+        relations: ['assignedCoordinators'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,
@@ -670,7 +687,7 @@ describe('VolunteersService', () => {
 
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinators', 'pets'],
+        relations: ['assignedCoordinators'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,
@@ -874,14 +891,60 @@ describe('VolunteersService', () => {
       });
 
       await expect(
-        service.coordinatorUpdateVolunteerById(1, { hasChildren: false }),
+        service.coordinatorUpdateVolunteerById(1, { childrenAges: [] }),
       ).rejects.toThrow(
         new BadRequestException(
-          'childrenAges must be empty when hasChildren is false',
+          'childrenAges must not be empty when hasChildren is true',
         ),
       );
       expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('clears the saved children ages when hasChildren is set to false', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        hasChildren: true,
+        childrenAges: [6],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        hasChildren: false,
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
+        hasChildren: false,
+        childrenAges: [],
+      });
+      expect(result.childrenAges).toEqual([]);
+    });
+
+    it('replaces the pets list when pets is provided', async () => {
+      const pet = {
+        ageYear: 1,
+        ageMonth: 6,
+        species: FosterType.CAT,
+        breed: 'Siamese',
+      };
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        pets: [{ petId: 5, breed: 'Lab' } as Pet],
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.coordinatorUpdateVolunteerById(1, {
+        pets: [pet],
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
+        pets: [pet],
+      });
+      expect(result.pets).toEqual([pet]);
     });
   });
 
@@ -972,28 +1035,36 @@ describe('VolunteersService', () => {
       expect(result.childrenAges).toEqual([6]);
     });
 
-    it('removes children when both fields are sent', async () => {
+    it.each([
+      ['hasChildren false alone', { hasChildren: false }],
+      [
+        'hasChildren false with empty ages',
+        { hasChildren: false, childrenAges: [] },
+      ],
+    ])('removes children and clears the saved ages with %s', async (_, dto) => {
       mockRepo.findOne.mockResolvedValue({
         ...mockVolunteer,
         hasChildren: true,
         childrenAges: [6],
       });
 
-      const result = await service.updateVolunteerById(1, {
+      const result = await service.updateVolunteerById(1, dto);
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
         hasChildren: false,
         childrenAges: [],
       });
-
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(result.hasChildren).toBe(false);
       expect(result.childrenAges).toEqual([]);
     });
 
     it.each([
       [
-        'hasChildren false while the saved row still has ages',
+        'hasChildren false sent with ages',
         { hasChildren: true, childrenAges: [6] },
-        { hasChildren: false },
+        { hasChildren: false, childrenAges: [6] },
         'childrenAges must be empty when hasChildren is false',
       ],
       [

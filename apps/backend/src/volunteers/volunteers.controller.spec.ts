@@ -278,7 +278,29 @@ describe('VolunteersController', () => {
       },
     );
 
-    it.each([[[-1]], [[2.5]], [['4']], [null]])(
+    it('accepts the largest allowed pets and children lists and ages', async () => {
+      const pets = Array.from({ length: 20 }, () => ({ ...pet, ageYear: 50 }));
+      const childrenAges = Array.from({ length: 20 }, () => 25);
+
+      const result = await validationPipe.transform(
+        { ...dto, hasChildren: true, childrenAges, pets },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.pets).toHaveLength(20);
+      expect(result.childrenAges).toEqual(childrenAges);
+    });
+
+    it('rejects more than 20 pets', async () => {
+      await expect(
+        validationPipe.transform(
+          { ...dto, pets: Array.from({ length: 21 }, () => pet) },
+          { type: 'body', metatype: CreateVolunteerDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it.each([[[-1]], [[2.5]], [['4']], [null], [[26]], [Array(21).fill(5)]])(
       'rejects childrenAges %j',
       async (childrenAges) => {
         await expect(
@@ -294,6 +316,8 @@ describe('VolunteersController', () => {
       ['ageMonth 12', { ...pet, ageMonth: 12 }],
       ['a negative ageMonth', { ...pet, ageMonth: -1 }],
       ['a negative ageYear', { ...pet, ageYear: -1 }],
+      ['ageYear 51', { ...pet, ageYear: 51 }],
+      ['ageYear past the Postgres int range', { ...pet, ageYear: 3000000000 }],
       ['a non-integer ageYear', { ...pet, ageYear: 1.5 }],
       ['a species outside FosterType', { ...pet, species: 'Horse' }],
       ['an empty breed', { ...pet, breed: '  ' }],
@@ -354,6 +378,17 @@ describe('VolunteersController', () => {
       ['hasSeparateFosterRoom', null],
       ['childrenAges', null],
       ['childrenAges', [-3]],
+      ['childrenAges', [26]],
+      ['childrenAges', Array(21).fill(5)],
+      [
+        'pets',
+        Array(21).fill({
+          ageYear: 1,
+          ageMonth: 1,
+          species: 'Dog',
+          breed: 'Lab',
+        }),
+      ],
     ])('rejects %s %j', async (field, value) => {
       await expect(
         validationPipe.transform(
@@ -448,7 +483,10 @@ describe('VolunteersController', () => {
       const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
-      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledTimes(1);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1, {
+        withPets: true,
+      });
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {
