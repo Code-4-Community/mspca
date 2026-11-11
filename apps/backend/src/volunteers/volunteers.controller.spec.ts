@@ -171,7 +171,8 @@ describe('VolunteersController', () => {
       city: 'Boston',
       zipcode: '02130',
       homebase: Homebase.BOSTON,
-      residentAnimals: 'One cat',
+      hasChildren: false,
+      hasSeparateFosterRoom: true,
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
@@ -231,6 +232,144 @@ describe('VolunteersController', () => {
       });
 
       expect(result).not.toHaveProperty('completedTrainings');
+    });
+
+    const pet = {
+      ageYear: 3,
+      ageMonth: 11,
+      species: FosterType.CAT,
+      breed: 'Tabby',
+    };
+
+    it('accepts a volunteer with pets and children', async () => {
+      const result = await validationPipe.transform(
+        { ...dto, hasChildren: true, childrenAges: [4, 9], pets: [pet] },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.hasChildren).toBe(true);
+      expect(result.childrenAges).toEqual([4, 9]);
+      expect(result.pets).toEqual([pet]);
+    });
+
+    it('accepts a volunteer with no pets and no children', async () => {
+      const result = await validationPipe.transform(dto, {
+        type: 'body',
+        metatype: CreateVolunteerDto,
+      });
+
+      expect(result.hasChildren).toBe(false);
+      expect(result.hasSeparateFosterRoom).toBe(true);
+      expect(result).not.toHaveProperty('pets');
+    });
+
+    it.each(['hasChildren', 'hasSeparateFosterRoom'])(
+      'rejects a missing %s',
+      async (field) => {
+        const body: Record<string, unknown> = { ...dto };
+        delete body[field];
+
+        await expect(
+          validationPipe.transform(body, {
+            type: 'body',
+            metatype: CreateVolunteerDto,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([[[-1]], [[2.5]], [['4']], [null]])(
+      'rejects childrenAges %j',
+      async (childrenAges) => {
+        await expect(
+          validationPipe.transform(
+            { ...dto, hasChildren: true, childrenAges },
+            { type: 'body', metatype: CreateVolunteerDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each([
+      ['ageMonth 12', { ...pet, ageMonth: 12 }],
+      ['a negative ageMonth', { ...pet, ageMonth: -1 }],
+      ['a negative ageYear', { ...pet, ageYear: -1 }],
+      ['a non-integer ageYear', { ...pet, ageYear: 1.5 }],
+      ['a species outside FosterType', { ...pet, species: 'Horse' }],
+      ['an empty breed', { ...pet, breed: '  ' }],
+      ['a breed over 255 characters', { ...pet, breed: 'a'.repeat(256) }],
+      [
+        'a missing ageMonth',
+        { ageYear: 3, species: FosterType.CAT, breed: 'Tabby' },
+      ],
+    ])('rejects a pet with %s', async (_, invalidPet) => {
+      await expect(
+        validationPipe.transform(
+          { ...dto, pets: [invalidPet] },
+          { type: 'body', metatype: CreateVolunteerDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('UpdateVolunteerDto validation', () => {
+    it('accepts an empty body', async () => {
+      const result = await validationPipe.transform(
+        {},
+        { type: 'body', metatype: UpdateVolunteerDto },
+      );
+
+      expect(result).toEqual({});
+    });
+
+    it('accepts an empty pets list', async () => {
+      const result = await validationPipe.transform(
+        { pets: [] },
+        { type: 'body', metatype: UpdateVolunteerDto },
+      );
+
+      expect(result.pets).toEqual([]);
+    });
+
+    it('keeps the pets in the body', async () => {
+      const pet = {
+        ageYear: 0,
+        ageMonth: 0,
+        species: FosterType.DOG,
+        breed: 'Beagle',
+      };
+
+      const result = await validationPipe.transform(
+        { pets: [pet] },
+        { type: 'body', metatype: UpdateVolunteerDto },
+      );
+
+      expect(result.pets).toEqual([pet]);
+    });
+
+    it.each([
+      ['pets', null],
+      ['pets', [{ ageYear: 1, ageMonth: 12, species: 'Dog', breed: 'Lab' }]],
+      ['hasChildren', null],
+      ['hasSeparateFosterRoom', null],
+      ['childrenAges', null],
+      ['childrenAges', [-3]],
+    ])('rejects %s %j', async (field, value) => {
+      await expect(
+        validationPipe.transform(
+          { [field]: value },
+          { type: 'body', metatype: UpdateVolunteerDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('applies to the coordinator update DTO too', async () => {
+      await expect(
+        validationPipe.transform(
+          { pets: null },
+          { type: 'body', metatype: CoordinatorUpdateVolunteerDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
