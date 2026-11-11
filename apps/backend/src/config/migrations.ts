@@ -11,6 +11,7 @@ import { ReplaceCanineTrainingWithCompletedTrainings1793150103842 } from '../mig
 import { AddAnimalUpdatesAndFosterTypeArray1793163582751 } from '../migrations/1793163582751-AddAnimalUpdatesAndFosterTypeArray';
 import { AddFarmAnimalsToFosterType1793476100199 } from '../migrations/1793476100199-AddFarmAnimalsToFosterType';
 import { RenameAdminUsersToOwners1793485161630 } from '../migrations/1793485161630-RenameAdminUsersToOwners';
+import { AddPetsAndHouseholdDetails1794408338094 } from '../migrations/1794408338094-AddPetsAndHouseholdDetails';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -26,6 +27,7 @@ const schemaMigrations = [
   AddAnimalUpdatesAndFosterTypeArray1793163582751,
   AddFarmAnimalsToFosterType1793476100199,
   RenameAdminUsersToOwners1793485161630,
+  AddPetsAndHouseholdDetails1794408338094,
 ];
 
 export default schemaMigrations;
