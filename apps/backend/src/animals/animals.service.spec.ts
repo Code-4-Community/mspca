@@ -45,6 +45,23 @@ describe('AnimalsService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('findAll', () => {
+    it('returns every animal', async () => {
+      mockRepo.find.mockResolvedValue([mockAnimal]);
+
+      const result = await service.findAll();
+
+      expect(result).toEqual([mockAnimal]);
+      expect(mockRepo.find).toHaveBeenCalledWith();
+    });
+
+    it('returns an empty array when there are no animals', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await expect(service.findAll()).resolves.toEqual([]);
+    });
+  });
+
   describe('findByChameleonIdOrFail', () => {
     it('returns the animal when one with the Chameleon ID exists', async () => {
       mockRepo.findOneBy.mockResolvedValue(mockAnimal);
