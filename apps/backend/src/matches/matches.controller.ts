@@ -13,15 +13,11 @@ import { Match } from './matches.entity';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { validateId } from '../utils/validation.utils';
 import { DenyMatchDto } from './dtos/deny-match.dto';
-import { AnimalsService } from '../animals/animals.service';
 
 @ApiTags('Matches')
 @Controller('matches')
 export class MatchesController {
-  constructor(
-    private matchesService: MatchesService,
-    private animalsService: AnimalsService,
-  ) {}
+  constructor(private matchesService: MatchesService) {}
 
   @Post()
   @ApiOperation({
@@ -44,7 +40,6 @@ export class MatchesController {
     description: 'No volunteer or animal exists with the given ID.',
   })
   async createMatch(@Body() body: CreateMatchDto): Promise<Match> {
-    await this.animalsService.findByChameleonIdOrFail(body.chameleonAnimalId);
     return this.matchesService.create(body);
   }
 

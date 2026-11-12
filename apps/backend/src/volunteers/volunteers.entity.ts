@@ -2,12 +2,16 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
-  JoinColumn,
+  ManyToMany,
+  JoinTable,
   Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
-import { FosterType, VolunteerStatus } from './volunteers.types';
+import {
+  FosterTraining,
+  FosterType,
+  VolunteerStatus,
+} from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 
 @Entity('foster_volunteers')
@@ -33,7 +37,7 @@ export class FosterVolunteer {
   })
   secondaryPhone!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -54,15 +58,24 @@ export class FosterVolunteer {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ name: 'foster_type', type: 'enum', enum: FosterType })
-  fosterType!: FosterType;
+  @Column({ name: 'coordinator_notes', type: 'text', nullable: true })
+  coordinatorNotes?: string | null;
+
+  @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
+  fosterType!: FosterType[];
+
+  @Column({ name: 'animal_updates', type: 'boolean', default: true })
+  animalUpdates!: boolean;
 
   @Column({
-    name: 'completed_canine_training',
-    type: 'boolean',
-    nullable: true,
+    name: 'completed_trainings',
+    type: 'enum',
+    enum: FosterTraining,
+    enumName: 'foster_training_enum',
+    array: true,
+    default: () => "'{}'",
   })
-  completedCanineTraining!: boolean | null;
+  completedTrainings!: FosterTraining[];
 
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
@@ -79,17 +92,24 @@ export class FosterVolunteer {
 
   @Column({
     name: 'animal_preferences',
-    type: 'int',
+    type: 'text',
     array: true,
     default: () => "'{}'",
   })
-  animalPreferences!: number[];
+  animalPreferences!: string[];
 
-  @ManyToOne(
+  @ManyToMany(
     () => FosterCoordinator,
     (coordinator) => coordinator.assignedVolunteers,
-    { nullable: true },
+    { onDelete: 'CASCADE' },
   )
-  @JoinColumn({ name: 'assigned_coordinator_id' })
-  assignedCoordinator!: FosterCoordinator | null;
+  @JoinTable({
+    name: 'volunteer_coordinator_assignments',
+    joinColumn: { name: 'volunteer_id', referencedColumnName: 'volunteerId' },
+    inverseJoinColumn: {
+      name: 'coordinator_id',
+      referencedColumnName: 'coordinatorId',
+    },
+  })
+  assignedCoordinators!: FosterCoordinator[];
 }

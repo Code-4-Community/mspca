@@ -46,6 +46,7 @@
     "jwks-rsa": "^4.1.0",
     "leaflet": "^1.9.4",
     "listr2": "11",
+    "lucide-react": "^1.70.0",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

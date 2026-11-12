@@ -4,7 +4,8 @@ import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { HOMEBASES } from '@utils/homebases';
+import { Homebase } from '../types';
+import { HOMEBASE_POSITIONS } from '@utils/homebases';
 import pin from '../assets/map-pin.png';
 
 const PIN_SIZE = 36;
@@ -26,10 +27,10 @@ const makePinIcon = (highlighted: boolean) => {
 
 interface HomebaseMapProps {
   // Homebases picked with a pin or the Location filter.
-  selected: string[];
+  selected: Homebase[];
   // Homebase of the animal currently hovered in the list, if any.
-  hovered: string | null;
-  onToggle: (homebase: string) => void;
+  hovered: Homebase | null;
+  onToggle: (homebase: Homebase) => void;
 }
 
 const HomebaseMap: React.FC<HomebaseMapProps> = ({
@@ -51,7 +52,7 @@ const HomebaseMap: React.FC<HomebaseMapProps> = ({
       boxShadow="card"
     >
       <MapContainer
-        bounds={HOMEBASES.map((homebase) => homebase.position)}
+        bounds={Object.values(HOMEBASE_POSITIONS)}
         boundsOptions={{ padding: [40, 40] }}
         style={{ height: '100%', width: '100%' }}
       >
@@ -59,19 +60,19 @@ const HomebaseMap: React.FC<HomebaseMapProps> = ({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {HOMEBASES.map((homebase) => {
+        {Object.values(Homebase).map((homebase) => {
           const highlighted =
-            selected.includes(homebase.name) || hovered === homebase.name;
+            selected.includes(homebase) || hovered === homebase;
           return (
             <Marker
-              key={homebase.name}
-              position={homebase.position}
+              key={homebase}
+              position={HOMEBASE_POSITIONS[homebase]}
               icon={highlighted ? icons.highlighted : icons.normal}
               zIndexOffset={highlighted ? 1000 : 0}
-              eventHandlers={{ click: () => onToggle(homebase.name) }}
+              eventHandlers={{ click: () => onToggle(homebase) }}
             >
               <Tooltip direction="top" offset={[0, -PIN_SIZE]}>
-                {homebase.name}
+                {homebase}
               </Tooltip>
             </Marker>
           );

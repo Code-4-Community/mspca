@@ -1,12 +1,4 @@
-import { escapeHtml } from '../../utils/emails.utils';
-
-/**
- * The subject and HTML body of an email.
- */
-export interface EmailContent {
-  subject: string;
-  bodyHtml: string;
-}
+import { EmailContent, escapeHtml } from '../../utils/emails.utils';
 
 /**
  * Builds the email sent to a Volunteer once a coordinator approves their account.

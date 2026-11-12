@@ -1,28 +1,13 @@
 import { Box, Button, Flex, Icon, Image, Text } from '@chakra-ui/react';
+import { House } from 'lucide-react';
 
-import type { Animal } from '@api/apiClient';
-import { formatAge } from '@utils/animals';
+import type { Animal } from '../types';
+import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
 import RestrictionTag from './RestrictionTag';
 import catImage from '../assets/cat.png';
 
 // TODO: swap for animal.picture once animal images are supported.
 export const PLACEHOLDER_IMAGE = catImage;
-
-export const CalendarIcon: React.FC = () => (
-  <Icon asChild boxSize="5" color="neutrals.black">
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M13.333 1.667v3.333M6.667 1.667v3.333M16.25 3.333H3.75c-.69 0-1.25.56-1.25 1.25v12.083c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25V4.583c0-.69-.56-1.25-1.25-1.25zM2.5 8.333h15" />
-    </svg>
-  </Icon>
-);
 
 interface AnimalCardProps {
   animal: Animal;
@@ -30,6 +15,17 @@ interface AnimalCardProps {
   onHoverChange: (hovering: boolean) => void;
 }
 
+/**
+ * A summary card for one adoptable animal, shown in the grid on the Animal
+ * Availability page.
+ *
+ * Shows the animal's photo, name, breed, age, restriction tags and the address
+ * of the homebase it's at, with a "See More" button that calls `onSeeMore` so
+ * the page can open the animal's detail modal. Calls `onHoverChange` when the
+ * mouse enters or leaves the card, so the page can highlight the animal's
+ * homebase on the map. The card holds no state of its own: everything it
+ * displays comes from the `animal` prop.
+ */
 const AnimalCard: React.FC<AnimalCardProps> = ({
   animal,
   onSeeMore,
@@ -77,13 +73,20 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
             </Text>
             <Text
               color="neutrals.black85"
-              fontSize="14px"
+              textStyle="body-small"
               fontWeight="medium"
-              lineHeight="20px"
             >
               {animal.breed.join(', ')}
             </Text>
           </Box>
+          <Flex alignSelf="stretch" align="center" gap="1">
+            <Icon asChild boxSize="5" color="neutrals.black">
+              <House strokeWidth={1} aria-hidden />
+            </Icon>
+            <Text color="neutrals.black" textStyle="h7">
+              {formatAge(animal.ageYear)}
+            </Text>
+          </Flex>
           {animal.restrictions && animal.restrictions.length > 0 && (
             <Flex
               alignSelf="stretch"
@@ -99,27 +102,13 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
             </Flex>
           )}
         </Flex>
-        <Box alignSelf="stretch">
-          <Flex alignSelf="stretch" align="center" gap="1">
-            <CalendarIcon />
-            <Text
-              color="neutrals.black"
-              fontSize="16px"
-              fontWeight="semibold"
-              lineHeight="24px"
-            >
-              {formatAge(animal.age)}
-            </Text>
-          </Flex>
-          <Text
-            color="neutrals.black85"
-            fontSize="14px"
-            fontWeight="medium"
-            lineHeight="20px"
-          >
-            {animal.location}
-          </Text>
-        </Box>
+        <Text
+          color="neutrals.black85"
+          textStyle="body-small"
+          fontWeight="medium"
+        >
+          {HOMEBASE_ADDRESSES[animal.location]}
+        </Text>
       </Flex>
       <Button
         alignSelf="stretch"
@@ -128,7 +117,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
         px="5"
         py="0.5"
         gap="3"
-        bg="neutrals.black"
+        bg="blue.blue3"
         color="white"
         borderRadius="12px"
         overflow="hidden"
