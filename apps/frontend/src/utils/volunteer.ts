@@ -1,13 +1,10 @@
-// Avatar background colors, picked by volunteer ID so each volunteer keeps the
-// same color. Placeholder palette pending design confirmation.
-export const AVATAR_COLORS: readonly string[] = [
-  'purple.avatar',
-  'blue.blue2',
-  'teal.teal',
-  'green.green2',
-  'orange.orange3',
-  'brown.brown',
-];
+import { colors } from '../theme';
+
+// Avatars reuse the Trello label colors, so changing those in theme.ts
+// updates avatars too.
+export const AVATAR_COLORS: readonly string[] = Object.keys(colors.trello).map(
+  (key) => `trello.${key}`,
+);
 
 const initial = (name: string): string => name.trim().charAt(0).toUpperCase();
 

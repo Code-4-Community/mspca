@@ -1,4 +1,10 @@
-import { getAvatarColor, getInitials, parseVolunteerId } from './volunteer';
+import { colors } from '../theme';
+import {
+  AVATAR_COLORS,
+  getAvatarColor,
+  getInitials,
+  parseVolunteerId,
+} from './volunteer';
 
 describe('getInitials', () => {
   it('uses the first letter of each name', () => {
@@ -19,13 +25,19 @@ describe('getInitials', () => {
 });
 
 describe('getAvatarColor', () => {
-  it('maps volunteer IDs onto the palette in order', () => {
-    expect(getAvatarColor(0)).toBe('purple.avatar');
-    expect(getAvatarColor(1)).toBe('blue.blue2');
+  it('uses the Trello label colors in theme order', () => {
+    expect(getAvatarColor(0)).toBe('trello.noRestrictions');
+    expect(getAvatarColor(1)).toBe('trello.dogFreeHome');
   });
 
   it('wraps around the palette', () => {
-    expect(getAvatarColor(6)).toBe('purple.avatar');
+    expect(getAvatarColor(7)).toBe('trello.noRestrictions');
+  });
+
+  it('includes every Trello label color', () => {
+    expect(AVATAR_COLORS).toEqual(
+      Object.keys(colors.trello).map((key) => `trello.${key}`),
+    );
   });
 
   it('is stable for the same volunteer', () => {
