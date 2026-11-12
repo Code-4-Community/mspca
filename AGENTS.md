@@ -13,8 +13,8 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 
 ## Testing scope
 
-- Write tests only in controller and service spec files (`*.controller.spec.ts`, `*.service.spec.ts`) under `apps/backend`.
-- Existing specs for modules, guards, config, and utils stay as they are: update them when the code they cover changes, but don't add new ones and don't delete them.
+- Write specs for backend code that has logic: controllers, services, utils, decorators, guards, config, and modules with startup checks (`onModuleInit`).
+- Don't write specs for files that only wire things together (entities, DTOs, modules with no logic of their own). DTO validation is tested in a `describe('XDto validation')` block in the controller spec.
 - Don't add frontend tests beyond the existing `apps/frontend/src/app.spec.tsx` smoke test.
 - Don't write tests for `validateId`. It's covered once in `utils/validation.utils.spec.ts`, so skip per-endpoint "throws BadRequestException when id is invalid" cases. The same goes for `ParseIntPipe` and other shared validation.
 
@@ -34,6 +34,7 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 
 - Don't add comments that restate what the code already makes obvious.
 - Only comment on what the code can't say for itself: a non-obvious reason, a workaround, a constraint, or a TODO with a ticket number.
+- Keep inline comments (anything other than a function or class docblock) short and to the point, ideally one line.
 - When unsure, leave the comment out.
 
 ## Other conventions
