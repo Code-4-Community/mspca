@@ -25,6 +25,7 @@ import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
+import { minutes } from '@nestjs/throttler';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -35,7 +36,7 @@ export class VolunteersController {
   ) {}
 
   @Post()
-  @Public()
+  @Public({ limit: 3, ttl: minutes(10) })
   @ApiOperation({ summary: 'Create a foster volunteer account' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -58,6 +59,10 @@ export class VolunteersController {
       'The Cognito user could not be created; or the volunteer could not be saved and the Cognito user was deleted; ' +
       'or the save and the Cognito cleanup both failed (the orphaned Cognito user is logged)',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many sign-up attempts from this IP; try again later',
+  })
   async create(
     @Body() dto: CreateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
@@ -65,7 +70,7 @@ export class VolunteersController {
   }
 
   @Post('/confirm')
-  @Public()
+  @Public({ limit: 5, ttl: minutes(10) })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: "Confirm a foster volunteer's email with their verification code",

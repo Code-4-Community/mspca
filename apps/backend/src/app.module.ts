@@ -9,6 +9,7 @@ import { CoordinatorsModule } from './coordinators/coordinators.module';
 import { VolunteersModule } from './volunteers/volunteers.module';
 import { OwnersModule } from './owners/owners.module';
 import { AnimalsModule } from './animals/animals.module';
+import { ThrottlerModule, minutes } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AnimalsModule } from './animals/animals.module';
     VolunteersModule,
     OwnersModule,
     AnimalsModule,
+    ThrottlerModule.forRoot([{ ttl: minutes(1), limit: 10 }]),
   ],
 })
 export class AppModule {}

@@ -95,20 +95,87 @@ New controllers are protected automatically. Opt out with `@Public()` (see below
 
 ### Public Routes
 
-Use the `@Public()` decorator on routes that are technically protected, but don't require authentication. i.e. health checks, webhooks, or unauthenticated entry points:
+Use the `@Public()` decorator on routes that are technically protected, but don't require authentication. i.e. health checks, webhooks, or unauthenticated entry points: `@Public()` does two things:
+
+1. Marks the route public, so `CognitoJWTGuard` skips token verification.
+2. Rate limits the route per client IP, since anyone on the internet can call it. Requests over the limit receive `429 Too Many Requests`.
 
 ```typescript
+import { minutes } from '@nestjs/throttler';
 import { Public } from './aws/cognito/cognito.decorator';
 
 @Controller('health')
 export class HealthController {
+  // Uses the default limit (10 requests per minute per IP)
   @Public()
   @Get()
   check() {
     return { ok: true };
   }
 }
+
+@Controller('volunteers')
+export class VolunteersController {
+  // Sets its own limit: 3 requests per 10 minutes per IP
+  @Public({ limit: 3, ttl: minutes(10) })
+  @Post()
+  create() {
+    // ...
+  }
+}
 ```
+
+#### How rate limiting works
+
+- **Library:** [`@nestjs/throttler`](https://github.com/nestjs/throttler). `ThrottlerModule.forRoot(...)` in `app.module.ts` sets the default limit, and `@Public({ limit, ttl })` overrides it for a single route. `ttl` is the window length in milliseconds; use the package's `seconds()` / `minutes()` helpers for readability.
+- **Only public routes are limited.** `@Public()` attaches `ThrottlerGuard` to the route itself instead of registering it globally, so protected routes never receive a 429 from it.
+- **Keep the default in `ThrottlerModule.forRoot`.** If no throttler is defined there, the guard has nothing to check and lets every request through.
+- **Requests are counted per route.** An IP's sign-up attempts and confirmation attempts are tracked separately.
+- **Limits are set in code**, next to each route, rather than in environment variables. This keeps each route's limit visible where the route is defined.
+
+#### Why limits are keyed on IP address, not email
+
+- Sign-up emails are chosen by the caller, so a bot can use a new fake email on every request.
+- Guards run before `ValidationPipe`, so the throttler would see raw, unnormalized emails (`Jane@x.com` and `jane@x.com ` would count separately).
+- Login brute-force protection is handled by Cognito itself, since the frontend logs in with Cognito directly rather than through this backend.
+
+The tradeoff is that people sharing one network (for example, a shelter's Wi-Fi during an event) share one counter.
+
+#### Current limits
+
+| Route                                                    | Limit per IP            |
+| -------------------------------------------------------- | ----------------------- |
+| `POST /volunteers`, `POST /coordinators`                 | 3 per 10 minutes        |
+| `POST /volunteers/confirm`, `POST /coordinators/confirm` | 5 per 10 minutes        |
+| Any other `@Public()` route                              | 10 per minute (default) |
+
+Account creation is the strictest because every call makes Cognito send a verification email, and spam sign-ups could exhaust the email quota and block real users. On the confirm routes, a 429 can come either from this rate limit or from Cognito's own limit on wrong verification codes; clients should treat both as "try again later."
+
+#### Testing
+
+`cognito.decorator.spec.ts` tests the decorator on a throwaway controller, covering requests under, at, and over the limit; per-route counting; the default limit; and protected routes never being throttled.
+
+Controller unit tests that build a testing module without `ThrottlerModule` will fail to resolve `ThrottlerGuard` if the controller has a `@Public()` route. Override the guard in those tests:
+
+```typescript
+const module = await Test.createTestingModule({
+  /* ... */
+})
+  .overrideGuard(ThrottlerGuard)
+  .useValue({ canActivate: () => true })
+  .compile();
+```
+
+#### Limitations and deployment notes
+
+- **Counts are stored in memory.** They live inside the server process, reset whenever it restarts, and aren't shared between instances. That works for a single long-running server. On AWS Lambda, each execution environment keeps its own counts, so the limits become best-effort: parallel requests can spread across environments, and counts reset when an environment is recycled. A shared store such as Redis would fix this, at extra cost.
+- **The client IP must be correct behind a proxy.** Behind API Gateway or any other proxy, `req.ip` may be the proxy's address, which would put every user on one shared counter. Verify `req.ip` once deployment is set up, and configure Express's `trust proxy` setting (or the Lambda adapter) as needed. Don't enable `trust proxy` without a proxy in front, because clients could then fake the `X-Forwarded-For` header to dodge limits.
+- **Infrastructure-level options (not yet decided).** These were considered as extra layers for deployment and are pending a cost discussion:
+
+  - **AWS WAF rate-based rule:** per-IP limiting before requests reach the app. Fixed cost of about $5/month per web ACL plus $1 per rule, plus $0.60 per million requests. Its minimum limit is 10 per window and enforcement is approximate, so it would complement the in-app limits rather than replace them. It attaches to API Gateway REST APIs, but not HTTP APIs or Lambda function URLs unless CloudFront is added in front.
+  - **API Gateway stage or route throttling:** a cap on total traffic and cost, included with API Gateway. It's shared by all callers, so it isn't a per-user limit on its own.
+
+  The in-app throttler described above has no AWS cost and works without either of these.
 
 ### `CognitoService.getUser()`
 

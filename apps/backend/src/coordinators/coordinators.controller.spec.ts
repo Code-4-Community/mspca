@@ -6,6 +6,7 @@ import { FosterCoordinator } from './coordinators.entity';
 import { Homebase } from '../types';
 import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 describe('CoordinatorsController', () => {
   let controller: CoordinatorsController;
@@ -42,7 +43,10 @@ describe('CoordinatorsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CoordinatorsController],
       providers: [{ provide: CoordinatorsService, useValue: service }],
-    }).compile();
+    })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<CoordinatorsController>(CoordinatorsController);
   });
