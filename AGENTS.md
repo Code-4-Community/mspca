@@ -37,6 +37,13 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 - Keep inline comments (anything other than a function or class docblock) short and to the point, ideally one line.
 - When unsure, leave the comment out.
 
+## Docstrings
+
+- Every public service and util function gets a JSDoc block: a one-line summary, then any business rules the signature can't show; `@param name - description` per parameter; `@returns` (for `void`, "A promise that resolves when … is complete"); and one `@throws {ExceptionClass} If …` per error case, noting side effects such as cleanup on failure.
+- Update the docblock whenever the behavior, params, or thrown errors change.
+- Controllers don't get JSDoc. Document endpoints with `@ApiOperation({ summary })` and an `@ApiResponse` for each status code.
+- These docblocks are the exception to the comment rules above.
+
 ## Other conventions
 
 - Use the `gh` CLI with `--repo Code-4-Community/mspca`. Without it, `gh` targets the upstream scaffolding repo.
