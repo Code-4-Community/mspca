@@ -151,6 +151,26 @@ export class MatchesService {
   }
 
   /**
+   * Fetches all PENDING Matches for a Chameleon animal, each with its Volunteer
+   * loaded, oldest application first.
+   *
+   * @param chameleonAnimalId - The animal's Chameleon ID.
+   * @returns The animal's pending Matches, or an empty array if it has none.
+   * @throws NotFoundException if no animal with the Chameleon ID exists
+   */
+  async findPendingByChameleonAnimalId(
+    chameleonAnimalId: string,
+  ): Promise<Match[]> {
+    await this.animalsService.findByChameleonIdOrFail(chameleonAnimalId);
+
+    return this.repo.find({
+      where: { chameleonAnimalId, status: MatchStatus.PENDING },
+      relations: ['volunteer'],
+      order: { matchId: 'ASC' },
+    });
+  }
+
+  /**
    * Approves a pending match and cancels other pending matches for the same animal.
    * Sends cancellation emails to affected applicants in batches of up to 50.
    * Email failures are logged without affecting the committed match statuses.
