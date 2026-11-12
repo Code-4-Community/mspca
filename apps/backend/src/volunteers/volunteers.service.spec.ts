@@ -20,6 +20,8 @@ import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { EmailsService } from '../aws/ses/email.service';
+import { MatchStatus } from '../matches/matches.types';
+import { Match } from '../matches/matches.entity';
 import { AnimalsService } from '../animals/animals.service';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
@@ -42,6 +44,12 @@ describe('VolunteersService', () => {
     find: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+
+  let mockQueryBuilder: {
+    leftJoinAndSelect: jest.Mock;
+    getMany: jest.Mock;
   };
   let mockCognitoService: {
     signUpUser: jest.Mock;
@@ -52,11 +60,6 @@ describe('VolunteersService', () => {
   let emailsService: { sendEmail: jest.Mock };
   let mockAnimalsService: { checkAllExistOrFail: jest.Mock };
 
-  const mockVolunteers = [
-    { volunteerId: 1, firstName: 'Jane', lastName: 'Doe' },
-    { volunteerId: 2, firstName: 'John', lastName: 'Smith' },
-  ] as FosterVolunteer[];
-
   beforeEach(async () => {
     mockRepo = {
       findOne: jest.fn(),
@@ -64,7 +67,16 @@ describe('VolunteersService', () => {
       find: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
+
+    mockQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
+
+    mockRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
     mockCognitoService = {
       signUpUser: jest.fn(),
       confirmUser: jest.fn(),
@@ -1038,28 +1050,124 @@ describe('VolunteersService', () => {
   });
 
   describe('getAllVolunteers', () => {
-    it('should return all volunteers', async () => {
-      mockRepo.find.mockResolvedValue(mockVolunteers);
+    it('should return volunteers with multiple active matches', async () => {
+      const matches = [
+        {
+          matchId: 1,
+          volunteerId: 1,
+          chameleonAnimalId: '42',
+          status: MatchStatus.ACTIVE,
+        } as Match,
+        {
+          matchId: 2,
+          volunteerId: 1,
+          chameleonAnimalId: '55',
+          status: MatchStatus.ACTIVE,
+        } as Match,
+      ];
+      const otherVolunteerMatches = [
+        {
+          matchId: 3,
+          volunteerId: 2,
+          chameleonAnimalId: '77',
+          status: MatchStatus.ACTIVE,
+        } as Match,
+      ];
+      const coordinators = [
+        {
+          coordinatorId: 1,
+          email: 'coordinator@mspca.org',
+        } as FosterCoordinator,
+      ];
+      const volunteers = [
+        {
+          ...mockVolunteer,
+          assignedCoordinators: coordinators,
+          matches,
+        } as FosterVolunteer,
+        {
+          ...mockVolunteer,
+          volunteerId: 2,
+          matches: otherVolunteerMatches,
+        } as FosterVolunteer,
+      ];
+
+      mockQueryBuilder.getMany.mockResolvedValue(volunteers);
 
       const result = await service.getAllVolunteers();
 
-      expect(result).toEqual(mockVolunteers);
-      expect(mockRepo.find).toHaveBeenCalledWith({
-        relations: ['assignedCoordinators'],
+      expect(result).toEqual(volunteers);
+      expect(result[0].matches).toHaveLength(2);
+      expect(result[0].assignedCoordinators).toEqual(coordinators);
+      result.forEach((volunteer) => {
+        volunteer.matches.forEach((match) => {
+          expect(match.status).toBe(MatchStatus.ACTIVE);
+          expect(match.volunteerId).toBe(volunteer.volunteerId);
+        });
       });
+      expect(mockRepo.createQueryBuilder).toHaveBeenCalledWith('volunteer');
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'volunteer.assignedCoordinators',
+        'coordinator',
+      );
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      );
+      expect(mockQueryBuilder.getMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('should filter matches by ACTIVE status', async () => {
+      const volunteers = [
+        {
+          ...mockVolunteer,
+          matches: [],
+        } as FosterVolunteer,
+      ];
+
+      mockQueryBuilder.getMany.mockResolvedValue(volunteers);
+
+      const result = await service.getAllVolunteers();
+
+      expect(result[0].matches).toEqual([]);
+
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      );
+    });
+
+    it('should return an empty matches list when a volunteer has no active matches', async () => {
+      const volunteers = [
+        {
+          ...mockVolunteer,
+          matches: [],
+        } as FosterVolunteer,
+      ];
+
+      mockQueryBuilder.getMany.mockResolvedValue(volunteers);
+
+      const result = await service.getAllVolunteers();
+
+      expect(result).toEqual(volunteers);
+      expect(result[0].matches).toEqual([]);
     });
 
     it('should return an empty array when there are no volunteers', async () => {
-      mockRepo.find.mockResolvedValue([]);
+      mockQueryBuilder.getMany.mockResolvedValue([]);
 
       const result = await service.getAllVolunteers();
 
       expect(result).toEqual([]);
-      expect(mockRepo.find).toHaveBeenCalled();
+      expect(mockQueryBuilder.getMany).toHaveBeenCalledTimes(1);
     });
 
     it('removes coordinatorNotes from every returned volunteer', async () => {
-      mockRepo.find.mockResolvedValue([
+      mockQueryBuilder.getMany.mockResolvedValue([
         { ...mockVolunteer, coordinatorNotes: 'a' },
         { ...mockVolunteer, volunteerId: 2, coordinatorNotes: 'b' },
       ]);

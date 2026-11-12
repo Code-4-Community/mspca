@@ -14,7 +14,9 @@ export class Match {
   @PrimaryGeneratedColumn({ name: 'match_id' })
   matchId!: number;
 
-  @ManyToOne(() => FosterVolunteer, { nullable: false })
+  @ManyToOne(() => FosterVolunteer, (volunteer) => volunteer.matches, {
+    nullable: false,
+  })
   @JoinColumn({ name: 'volunteer_id' })
   volunteer!: FosterVolunteer;
 
