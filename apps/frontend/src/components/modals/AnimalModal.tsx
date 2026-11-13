@@ -14,12 +14,9 @@ import { ExternalLink, House } from 'lucide-react';
 import apiClient from '@api/apiClient';
 import type { Animal } from '../../types';
 import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
+import { useVolunteerId } from '@utils/useVolunteerId';
 import { PLACEHOLDER_IMAGE } from '../AnimalCard';
 import RestrictionTag from '../RestrictionTag';
-
-// TODO: replace with the logged-in volunteer's ID once the frontend has access
-// to the current user's profile.
-const CURRENT_VOLUNTEER_ID = 1;
 
 interface AnimalModalProps {
   animal: Animal | null;
@@ -42,6 +39,8 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   const [submitting, setSubmitting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // TEMPORARY: comes from the URL until sign-in is implemented.
+  const volunteerId = useVolunteerId();
 
   // Reset the form when a different animal is opened.
   const [formAnimalId, setFormAnimalId] = useState(animal?.animalId);
@@ -54,12 +53,12 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   }
 
   const handleRequest = async () => {
-    if (!animal) return;
+    if (!animal || volunteerId === null) return;
     setSubmitting(true);
     setError(null);
     try {
       await apiClient.createMatch({
-        volunteerId: CURRENT_VOLUNTEER_ID,
+        volunteerId,
         chameleonAnimalId: animal.chameleonAnimalId,
         additionalComments: comments.trim() || undefined,
       });
@@ -328,6 +327,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                       lineHeight="24px"
                       onClick={handleRequest}
                       loading={submitting}
+                      disabled={volunteerId === null}
                     >
                       Apply
                     </Button>

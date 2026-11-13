@@ -4,7 +4,6 @@ import {
   Button,
   Flex,
   Heading,
-  Image,
   SimpleGrid,
   Spinner,
   Text,
@@ -20,70 +19,6 @@ import {
   matchesFilters,
   type AnimalFilterState,
 } from '@utils/animals';
-import logo from '../assets/mspca-logo.png';
-
-/**
- * The top bar of the page: the MSPCA logo on the left and the volunteer's
- * profile avatar and "My Profile" label on the right. The initials are
- * hard-coded for now until the logged-in volunteer is available to the
- * frontend.
- */
-const PageHeader: React.FC = () => (
-  <Flex
-    alignSelf="stretch"
-    px="8"
-    py="4"
-    bg="gray.50"
-    boxShadow="card"
-    justify="space-between"
-    align="center"
-    overflow="hidden"
-  >
-    <Image
-      src={logo}
-      alt="MSPCA - Kindness and Care for Animals"
-      w="48"
-      h="20"
-    />
-    <Flex justify="center" align="center" gap="4">
-      <Box
-        display="flex"
-        flexDirection="column"
-        justifyContent="center"
-        alignItems="center"
-        boxSize="16"
-        bg="purple.avatar"
-        borderRadius="full"
-        boxShadow="card"
-        outline="3px solid"
-        outlineColor="neutrals.black"
-        outlineOffset="-3px"
-        overflow="hidden"
-      >
-        {/* TODO: use the logged-in volunteer's initials */}
-        <Text
-          alignSelf="stretch"
-          textAlign="center"
-          color="white"
-          fontSize="20px"
-          fontWeight="semibold"
-          lineHeight="32px"
-        >
-          MW
-        </Text>
-      </Box>
-      <Text
-        textAlign="center"
-        color="neutrals.black"
-        fontSize="2xl"
-        fontWeight="semibold"
-        lineHeight="36px"
-      >
-        My Profile
-      </Text>
-    </Flex>
-  </Flex>
-);
 
 /**
  * Page where volunteers browse the animals that are available to foster.
@@ -133,8 +68,7 @@ const AnimalAvailability: React.FC = () => {
   );
 
   return (
-    <Box bg="bg.muted" minH="100vh">
-      <PageHeader />
+    <Box bg="bg.muted" flex="1">
       <Flex gap="8" px="8" py="8" align="flex-start">
         <Flex
           direction="column"
