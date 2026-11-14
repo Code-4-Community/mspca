@@ -101,8 +101,11 @@ describe('VolunteersService', () => {
   });
 
   describe('findByIdOrFail', () => {
-    it('returns the volunteer when one with the id exists', async () => {
-      const volunteer = { volunteerId: 7 } as FosterVolunteer;
+    it('returns the volunteer with their coordinators and pets', async () => {
+      const volunteer = {
+        volunteerId: 7,
+        pets: [] as Pet[],
+      } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
 
       const result = await service.findByIdOrFail(7);
@@ -110,26 +113,9 @@ describe('VolunteersService', () => {
       expect(result).toBe(volunteer);
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
-        relations: ['assignedCoordinators'],
-      });
-      expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
-    });
-
-    it('also loads the pets when asked to', async () => {
-      const volunteer = {
-        volunteerId: 7,
-        pets: [] as Pet[],
-      } as FosterVolunteer;
-      mockRepo.findOne.mockResolvedValue(volunteer);
-
-      const result = await service.findByIdOrFail(7, { withPets: true });
-
-      expect(result).toBe(volunteer);
-      expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
-      expect(mockRepo.findOne).toHaveBeenCalledWith({
-        where: { volunteerId: 7 },
         relations: ['assignedCoordinators', 'pets'],
       });
+      expect(mockRepo.findOne).toHaveBeenCalledTimes(1);
     });
 
     it('throws NotFoundException when no volunteer with the id exists', async () => {
@@ -140,7 +126,7 @@ describe('VolunteersService', () => {
       );
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 7 },
-        relations: ['assignedCoordinators'],
+        relations: ['assignedCoordinators', 'pets'],
       });
     });
 
@@ -611,7 +597,7 @@ describe('VolunteersService', () => {
 
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinators'],
+        relations: ['assignedCoordinators', 'pets'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,
@@ -687,7 +673,7 @@ describe('VolunteersService', () => {
 
       expect(mockRepo.findOne).toHaveBeenCalledWith({
         where: { volunteerId: 1 },
-        relations: ['assignedCoordinators'],
+        relations: ['assignedCoordinators', 'pets'],
       });
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...volunteer,

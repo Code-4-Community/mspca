@@ -164,9 +164,7 @@ export class VolunteersController {
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
   ): Promise<VolunteerWithoutPrivateFields> {
     validateId(volunteerId, 'Volunteer');
-    return this.volunteersService.findByIdOrFail(volunteerId, {
-      withPets: true,
-    });
+    return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
   // TODO: restrict to coordinators once role guarding is added

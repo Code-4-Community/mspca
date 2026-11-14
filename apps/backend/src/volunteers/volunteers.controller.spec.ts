@@ -329,9 +329,7 @@ describe('VolunteersController', () => {
 
       expect(result).toEqual(mockVolunteer);
       expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledTimes(1);
-      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1, {
-        withPets: true,
-      });
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException when volunteer does not exist', async () => {

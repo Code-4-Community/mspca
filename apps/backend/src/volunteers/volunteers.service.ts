@@ -78,25 +78,18 @@ export class VolunteersService {
   }
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator and pets.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
-   * Pets are only loaded when asked for, since most callers don't need them.
    *
    * @param id - The Volunteer's ID.
-   * @param options.withPets - Also load the Volunteer's pets.
    * @returns The Volunteer.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
    */
-  async findByIdOrFail(
-    id: number,
-    { withPets = false }: { withPets?: boolean } = {},
-  ): Promise<VolunteerWithoutPrivateFields> {
+  async findByIdOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: withPets
-        ? ['assignedCoordinators', 'pets']
-        : ['assignedCoordinators'],
+      relations: ['assignedCoordinators', 'pets'],
     });
 
     if (!volunteer) {
@@ -395,7 +388,7 @@ export class VolunteersService {
     id: number,
     dto: UpdateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
-    const volunteer = await this.findByIdOrFail(id, { withPets: true });
+    const volunteer = await this.findByIdOrFail(id);
     this.applyProfileUpdate(volunteer, dto);
     return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
