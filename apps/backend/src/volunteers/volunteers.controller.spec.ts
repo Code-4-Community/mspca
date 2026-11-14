@@ -171,7 +171,8 @@ describe('VolunteersController', () => {
       city: 'Boston',
       zipcode: '02130',
       homebase: Homebase.BOSTON,
-      residentAnimals: 'One cat',
+      hasChildren: false,
+      hasSeparateFosterRoom: true,
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
@@ -231,6 +232,24 @@ describe('VolunteersController', () => {
       });
 
       expect(result).not.toHaveProperty('completedTrainings');
+    });
+
+    const pet = {
+      ageYear: 3,
+      ageMonth: 11,
+      species: FosterType.CAT,
+      breed: 'Tabby',
+    };
+
+    it('accepts a volunteer with pets and children', async () => {
+      const result = await validationPipe.transform(
+        { ...dto, hasChildren: true, childrenAges: [4, 9], pets: [pet] },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.hasChildren).toBe(true);
+      expect(result.childrenAges).toEqual([4, 9]);
+      expect(result.pets).toEqual([pet]);
     });
   });
 
@@ -309,6 +328,7 @@ describe('VolunteersController', () => {
       const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
     });
 

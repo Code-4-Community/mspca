@@ -2,19 +2,24 @@ import {
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsPhoneNumber,
   IsString,
   IsStrongPassword,
   MaxLength,
+  Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
 import { FosterTraining, FosterType } from '../volunteers.types';
+import { PetDto } from './pet.dto';
 
 export class CreateVolunteerDto {
   @IsNonEmptyString()
@@ -70,8 +75,23 @@ export class CreateVolunteerDto {
   @IsEnum(Homebase)
   homebase!: Homebase;
 
-  @IsNonEmptyString()
-  residentAnimals!: string;
+  @IsBoolean()
+  hasChildren!: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  childrenAges?: number[];
+
+  @IsBoolean()
+  hasSeparateFosterRoom!: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PetDto)
+  pets?: PetDto[];
 
   @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
