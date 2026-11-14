@@ -964,15 +964,12 @@ describe('VolunteersService', () => {
       breed: 'Siamese',
     };
 
-    beforeEach(() => {
-      mockRepo.save.mockImplementation(async (v) => v);
-    });
-
     it('replaces the pets list when pets is provided', async () => {
       mockRepo.findOne.mockResolvedValue({
         ...mockVolunteer,
         pets: [existingPet],
       });
+      mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.updateVolunteerById(1, { pets: [newPet] });
 
@@ -989,6 +986,7 @@ describe('VolunteersService', () => {
         ...mockVolunteer,
         pets: [existingPet],
       });
+      mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.updateVolunteerById(1, { pets: [] });
 
@@ -1005,6 +1003,7 @@ describe('VolunteersService', () => {
         ...mockVolunteer,
         pets: [existingPet],
       });
+      mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.updateVolunteerById(1, { notes: 'x' });
 
@@ -1019,6 +1018,7 @@ describe('VolunteersService', () => {
 
     it('adds children with their ages', async () => {
       mockRepo.findOne.mockResolvedValue({ ...mockVolunteer });
+      mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.updateVolunteerById(1, {
         hasChildren: true,
@@ -1047,6 +1047,7 @@ describe('VolunteersService', () => {
         hasChildren: true,
         childrenAges: [6],
       });
+      mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.updateVolunteerById(1, dto);
 

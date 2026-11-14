@@ -388,8 +388,8 @@ export class VolunteersService {
    * @param dto - The fields to update
    * @returns The updated volunteer
    * @throws NotFoundException if no volunteer exists with the given ID
-   * @throws BadRequestException if the saved and updated fields together leave
-   * childrenAges not matching hasChildren
+   * @throws {BadRequestException} If the saved and updated fields together
+   * leave childrenAges not matching hasChildren.
    */
   async updateVolunteerById(
     id: number,

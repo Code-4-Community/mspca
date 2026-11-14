@@ -27,6 +27,7 @@ export class AddPetsAndHouseholdDetails1794408338094
     `);
 
     // The defaults only let rows in local dev databases migrate; the API requires both booleans.
+    // Separate statement: Postgres can't alter a column added in the same ALTER TABLE.
     await queryRunner.query(`
       ALTER TABLE "foster_volunteers"
         ALTER COLUMN "has_children" DROP DEFAULT,
@@ -51,6 +52,7 @@ export class AddPetsAndHouseholdDetails1794408338094
         ADD COLUMN "resident_animals" text NOT NULL DEFAULT ''
     `);
 
+    // Separate statement for the same reason as in up.
     await queryRunner.query(`
       ALTER TABLE "foster_volunteers" ALTER COLUMN "resident_animals" DROP DEFAULT
     `);
