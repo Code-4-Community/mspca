@@ -1,13 +1,11 @@
 import { FosterType } from '../volunteers.types';
 import {
-  ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
-  Max,
   MaxLength,
   Min,
   IsPhoneNumber,
@@ -68,10 +66,8 @@ export class UpdateVolunteerDto {
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
-  @ArrayMaxSize(20)
   @IsInt({ each: true })
   @Min(0, { each: true })
-  @Max(25, { each: true })
   childrenAges?: number[];
 
   @ValidateIf((_, value) => value !== undefined)
@@ -80,7 +76,6 @@ export class UpdateVolunteerDto {
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
-  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => PetDto)
   pets?: PetDto[];

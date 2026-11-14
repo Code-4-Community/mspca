@@ -1,5 +1,4 @@
 import {
-  ArrayMaxSize,
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
@@ -11,7 +10,6 @@ import {
   IsPhoneNumber,
   IsString,
   IsStrongPassword,
-  Max,
   MaxLength,
   Min,
   ValidateIf,
@@ -82,10 +80,8 @@ export class CreateVolunteerDto {
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
-  @ArrayMaxSize(20)
   @IsInt({ each: true })
   @Min(0, { each: true })
-  @Max(25, { each: true })
   childrenAges?: number[];
 
   @IsBoolean()
@@ -93,7 +89,6 @@ export class CreateVolunteerDto {
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()
-  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => PetDto)
   pets?: PetDto[];
