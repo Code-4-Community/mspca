@@ -1100,7 +1100,7 @@ describe('VolunteersService', () => {
       expect(result[0].matches).toHaveLength(2);
       expect(result[0].assignedCoordinators).toEqual(coordinators);
       result.forEach((volunteer) => {
-        volunteer.matches.forEach((match) => {
+        (volunteer.matches ?? []).forEach((match) => {
           expect(match.status).toBe(MatchStatus.ACTIVE);
           expect(match.volunteerId).toBe(volunteer.volunteerId);
         });
@@ -1149,7 +1149,7 @@ describe('VolunteersService', () => {
           );
         return volunteers.map((volunteer) => ({
           ...volunteer,
-          matches: volunteer.matches.filter(
+          matches: (volunteer.matches ?? []).filter(
             (match) => match.status === params.status,
           ),
         }));
