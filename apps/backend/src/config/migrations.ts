@@ -10,6 +10,8 @@ import { AddVolunteerCoordinatorNotes1793055981679 } from '../migrations/1793055
 import { ReplaceCanineTrainingWithCompletedTrainings1793150103842 } from '../migrations/1793150103842-ReplaceCanineTrainingWithCompletedTrainings';
 import { AddAnimalUpdatesAndFosterTypeArray1793163582751 } from '../migrations/1793163582751-AddAnimalUpdatesAndFosterTypeArray';
 import { AddFarmAnimalsToFosterType1793476100199 } from '../migrations/1793476100199-AddFarmAnimalsToFosterType';
+import { RenameAdminUsersToOwners1793485161630 } from '../migrations/1793485161630-RenameAdminUsersToOwners';
+import { AddFosterTypePreferences1793600000000 } from '../migrations/1793600000000-AddFosterTypePreferences';
 import { AddMatchAdditionalComments1794784721012 } from '../migrations/1794784721012-AddMatchAdditionalComments';
 
 const schemaMigrations = [
@@ -25,6 +27,8 @@ const schemaMigrations = [
   ReplaceCanineTrainingWithCompletedTrainings1793150103842,
   AddAnimalUpdatesAndFosterTypeArray1793163582751,
   AddFarmAnimalsToFosterType1793476100199,
+  RenameAdminUsersToOwners1793485161630,
+  AddFosterTypePreferences1793600000000,
   AddMatchAdditionalComments1794784721012,
 ];
 
