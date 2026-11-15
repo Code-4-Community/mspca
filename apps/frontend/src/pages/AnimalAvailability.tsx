@@ -62,11 +62,6 @@ const AnimalAvailability: React.FC = () => {
     [animals, activeFilters],
   );
 
-  const locations = useMemo(
-    () => [...new Set(animals.map((animal) => animal.location))].sort(),
-    [animals],
-  );
-
   return (
     <Box bg="bg.muted" flex="1">
       <Flex gap="8" px="8" py="8" align="flex-start">
@@ -81,11 +76,7 @@ const AnimalAvailability: React.FC = () => {
           boxShadow="card"
           overflow="hidden"
         >
-          <AnimalFilters
-            value={activeFilters}
-            onChange={setActiveFilters}
-            locations={locations}
-          />
+          <AnimalFilters value={activeFilters} onChange={setActiveFilters} />
 
           {loading ? (
             <Flex justify="center" py="20">

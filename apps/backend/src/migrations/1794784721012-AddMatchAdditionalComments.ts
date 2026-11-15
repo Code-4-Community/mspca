@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMatchAdditionalComments1793300000000
+export class AddMatchAdditionalComments1794784721012
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {

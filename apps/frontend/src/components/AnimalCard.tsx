@@ -75,7 +75,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
               <House strokeWidth={1} aria-hidden />
             </Icon>
             <Text color="neutrals.black" textStyle="h7">
-              {formatAge(animal.ageYear)}
+              {formatAge(animal.ageYear, animal.ageMonth)}
             </Text>
           </Flex>
           {animal.restrictions && animal.restrictions.length > 0 && (

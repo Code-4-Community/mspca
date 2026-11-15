@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
@@ -11,6 +16,7 @@ import { VolunteersService } from '../volunteers/volunteers.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
+import { In } from 'typeorm';
 
 const coordinator = {
   coordinatorId: 7,
@@ -193,6 +199,48 @@ describe('MatchesService', () => {
         deniedReason: null,
       });
       expect(match.status).toEqual(MatchStatus.PENDING);
+    });
+
+    it.each([MatchStatus.PENDING, MatchStatus.ACTIVE])(
+      'throws ConflictException when the volunteer already has a %s match for the animal',
+      async (status) => {
+        volunteersService.findActiveOrFail.mockResolvedValue(
+          volunteerWithCoordinator,
+        );
+        matchRepo.findOneBy.mockResolvedValue({
+          matchId: 5,
+          volunteerId: 1,
+          chameleonAnimalId: 'A42',
+          status,
+        });
+
+        await expect(
+          service.create({ volunteerId: 1, chameleonAnimalId: 'A42' }),
+        ).rejects.toThrow(ConflictException);
+        expect(matchRepo.save).not.toHaveBeenCalled();
+        expect(emailsService.sendEmail).not.toHaveBeenCalled();
+      },
+    );
+
+    it('only treats PENDING and ACTIVE matches as duplicates', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinator,
+      );
+      emailsService.sendEmail.mockResolvedValue(undefined);
+      matchRepo.findOneBy.mockResolvedValue(null);
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+
+      await service.create({ volunteerId: 1, chameleonAnimalId: 'A42' });
+
+      expect(matchRepo.findOneBy).toHaveBeenCalledWith({
+        volunteerId: 1,
+        chameleonAnimalId: 'A42',
+        status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+      });
+      expect(matchRepo.save).toHaveBeenCalled();
     });
 
     it('saves additional comments when provided', async () => {

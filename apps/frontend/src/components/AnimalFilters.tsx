@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -9,35 +9,28 @@ import {
   Portal,
   Text,
 } from '@chakra-ui/react';
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ListFilter,
-  X,
-} from 'lucide-react';
+import { ChevronDown, ListFilter, X } from 'lucide-react';
 
 import {
   ANIMAL_TYPES,
   EMPTY_FILTERS,
+  HOMEBASE_LABELS,
+  LOCATIONS,
   RESTRICTIONS,
-  getRestriction,
   type AnimalFilterState,
 } from '@utils/animals';
-import type { Homebase, Restriction } from '../types';
+import type { Restriction } from '../types';
 
 type CategoryKey = keyof AnimalFilterState;
 
 interface AnimalFiltersProps {
   value: AnimalFilterState;
   onChange: (filters: AnimalFilterState) => void;
-  // Homebases available to filter by, derived from the fetched animals.
-  locations: Homebase[];
 }
 
 interface FilterOption {
   label: string;
-  // Fill color of the checkbox when checked (theme token).
+  displayLabel?: string;
   color: string;
 }
 
@@ -134,7 +127,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   lineHeight="20px"
                   whiteSpace="nowrap"
                 >
-                  {option.label}
+                  {option.displayLabel ?? option.label}
                 </Checkbox.Label>
               </Checkbox.Root>
             );
@@ -170,28 +163,6 @@ const PanelButton: React.FC<{
   </Button>
 );
 
-/** Arrow button that scrolls the row of filter chips left or right. */
-const ChipScrollButton: React.FC<{
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}> = ({ label, onClick, children }) => (
-  <Button
-    aria-label={label}
-    flex="none"
-    boxSize="10"
-    minW="10"
-    p="0"
-    bg="neutral.subtle"
-    color="neutral.fg"
-    borderRadius="sm"
-    _hover={{ bg: 'neutral.muted' }}
-    onClick={onClick}
-  >
-    {children}
-  </Button>
-);
-
 /**
  * The filter bar above the animal grid.
  *
@@ -200,15 +171,10 @@ const ChipScrollButton: React.FC<{
  * is open and only filter the grid once Apply is pressed (`onChange` is called
  * with the new `AnimalFilterState`). Next to the button, "Clear Filters" resets
  * everything, and each selected restriction or location is shown as a chip
- * that removes itself when clicked. The chips stay on a single row; when there
- * are too many to fit, arrow buttons appear to scroll through them. Animal
- * type selections filter the grid but don't get a chip.
+ * that removes itself when clicked. Animal type selections filter the grid
+ * but don't get a chip.
  */
-const AnimalFilters: React.FC<AnimalFiltersProps> = ({
-  value,
-  onChange,
-  locations,
-}) => {
+const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);
   // Edits are held in a draft until Apply is pressed.
   const [draft, setDraft] = useState<AnimalFilterState>(value);
@@ -249,32 +215,10 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
         label,
         color:
           key === 'restrictions'
-            ? getRestriction(label as Restriction).color
+            ? RESTRICTIONS[label as Restriction].color
             : 'neutrals.black',
       })),
     );
-
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const [scrollable, setScrollable] = useState({ left: false, right: false });
-
-  const updateScrollable = () => {
-    const el = chipsRef.current;
-    if (!el) return;
-    setScrollable({
-      left: el.scrollLeft > 0,
-      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
-    });
-  };
-
-  // Re-measure whenever the chips change or the window is resized.
-  useEffect(() => {
-    updateScrollable();
-    window.addEventListener('resize', updateScrollable);
-    return () => window.removeEventListener('resize', updateScrollable);
-  }, [chips.length]);
-
-  const scrollChips = (direction: 1 | -1) =>
-    chipsRef.current?.scrollBy({ left: direction * 200, behavior: 'smooth' });
 
   return (
     <Flex align="center" gap="3">
@@ -371,14 +315,15 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
                     />
                     <FilterSection
                       title="Restrictions"
-                      options={RESTRICTIONS}
+                      options={Object.values(RESTRICTIONS)}
                       selected={draft.restrictions}
                       onToggle={(o) => toggleDraft('restrictions', o)}
                     />
                     <FilterSection
                       title="Location"
-                      options={locations.map((label) => ({
+                      options={LOCATIONS.map((label) => ({
                         label,
+                        displayLabel: HOMEBASE_LABELS[label],
                         color: 'neutral.solid',
                       }))}
                       selected={draft.locations}
@@ -438,23 +383,7 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
         </Button>
       </Flex>
       <Flex align="center" gap="2" flex="1" minW="0">
-        {scrollable.left && (
-          <ChipScrollButton
-            label="Scroll filters left"
-            onClick={() => scrollChips(-1)}
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </ChipScrollButton>
-        )}
-        <Flex
-          ref={chipsRef}
-          onScroll={updateScrollable}
-          align="center"
-          gap="3"
-          flex="1"
-          minW="0"
-          overflowX="hidden"
-        >
+        <Flex align="center" gap="3" flex="1" minW="0" overflowX="hidden">
           {chips.map((chip) => (
             <Button
               key={`${chip.key}-${chip.label}`}
@@ -478,14 +407,6 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({
             </Button>
           ))}
         </Flex>
-        {scrollable.right && (
-          <ChipScrollButton
-            label="Scroll filters right"
-            onClick={() => scrollChips(1)}
-          >
-            <ChevronRight size={20} aria-hidden />
-          </ChipScrollButton>
-        )}
       </Flex>
     </Flex>
   );
