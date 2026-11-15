@@ -116,5 +116,5 @@ export class FosterVolunteer {
   assignedCoordinators!: FosterCoordinator[];
 
   @OneToMany(() => Match, (match) => match.volunteer)
-  matches!: Match[];
+  matches?: Match[];
 }

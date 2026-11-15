@@ -1057,40 +1057,40 @@ describe('VolunteersService', () => {
           volunteerId: 1,
           chameleonAnimalId: '42',
           status: MatchStatus.ACTIVE,
-        } as Match,
+        },
         {
           matchId: 2,
           volunteerId: 1,
           chameleonAnimalId: '55',
           status: MatchStatus.ACTIVE,
-        } as Match,
-      ];
+        },
+      ] as Match[];
       const otherVolunteerMatches = [
         {
           matchId: 3,
           volunteerId: 2,
           chameleonAnimalId: '77',
           status: MatchStatus.ACTIVE,
-        } as Match,
-      ];
+        },
+      ] as Match[];
       const coordinators = [
         {
           coordinatorId: 1,
           email: 'coordinator@mspca.org',
-        } as FosterCoordinator,
-      ];
+        },
+      ] as FosterCoordinator[];
       const volunteers = [
         {
           ...mockVolunteer,
           assignedCoordinators: coordinators,
           matches,
-        } as FosterVolunteer,
+        },
         {
           ...mockVolunteer,
           volunteerId: 2,
           matches: otherVolunteerMatches,
-        } as FosterVolunteer,
-      ];
+        },
+      ] as FosterVolunteer[];
 
       mockQueryBuilder.getMany.mockResolvedValue(volunteers);
 
@@ -1119,26 +1119,45 @@ describe('VolunteersService', () => {
       expect(mockQueryBuilder.getMany).toHaveBeenCalledTimes(1);
     });
 
-    it('should filter matches by ACTIVE status', async () => {
+    it('should not include matches that are not active', async () => {
+      const activeMatch = {
+        matchId: 1,
+        volunteerId: 1,
+        chameleonAnimalId: '42',
+        status: MatchStatus.ACTIVE,
+      } as Match;
+      const inactiveMatches = Object.values(MatchStatus)
+        .filter((status) => status !== MatchStatus.ACTIVE)
+        .map((status, i) => ({
+          matchId: i + 2,
+          volunteerId: 1,
+          chameleonAnimalId: `${100 + i}`,
+          status,
+        })) as Match[];
       const volunteers = [
         {
           ...mockVolunteer,
-          matches: [],
-        } as FosterVolunteer,
-      ];
+          matches: [activeMatch, ...inactiveMatches],
+        },
+      ] as FosterVolunteer[];
 
-      mockQueryBuilder.getMany.mockResolvedValue(volunteers);
+      // Simulate the database applying the join condition passed by the service
+      mockQueryBuilder.getMany.mockImplementation(async () => {
+        const [, , , params] =
+          mockQueryBuilder.leftJoinAndSelect.mock.calls.find(
+            ([relation]) => relation === 'volunteer.matches',
+          );
+        return volunteers.map((volunteer) => ({
+          ...volunteer,
+          matches: volunteer.matches.filter(
+            (match) => match.status === params.status,
+          ),
+        }));
+      });
 
       const result = await service.getAllVolunteers();
 
-      expect(result[0].matches).toEqual([]);
-
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'volunteer.matches',
-        'match',
-        'match.status = :status',
-        { status: MatchStatus.ACTIVE },
-      );
+      expect(result[0].matches).toEqual([activeMatch]);
     });
 
     it('should return an empty matches list when a volunteer has no active matches', async () => {
@@ -1155,6 +1174,12 @@ describe('VolunteersService', () => {
 
       expect(result).toEqual(volunteers);
       expect(result[0].matches).toEqual([]);
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      );
     });
 
     it('should return an empty array when there are no volunteers', async () => {
