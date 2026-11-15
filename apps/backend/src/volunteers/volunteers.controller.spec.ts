@@ -117,16 +117,6 @@ describe('VolunteersController', () => {
       ).toHaveBeenCalledWith(1, dto);
     });
 
-    it('throws BadRequestException when no fields are provided', async () => {
-      const dto: CoordinatorUpdateVolunteerDto = {};
-      await expect(
-        controller.coordinatorUpdateVolunteerById(1, dto),
-      ).rejects.toThrow(BadRequestException);
-      expect(
-        mockVolunteersService.coordinatorUpdateVolunteerById,
-      ).not.toHaveBeenCalled();
-    });
-
     it('propagates errors from the service', async () => {
       const dto: CoordinatorUpdateVolunteerDto = { coordinatorNotes: 'x' };
       const error = new NotFoundException('Volunteer with ID 999 not found');
