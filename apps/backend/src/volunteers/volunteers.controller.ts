@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -188,7 +187,7 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid ID, invalid field, or no fields provided',
+    description: 'Invalid ID or invalid field',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -199,9 +198,6 @@ export class VolunteersController {
     @Body() dto: CoordinatorUpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'Volunteer');
-    if (Object.keys(dto).length === 0) {
-      throw new BadRequestException('At least one field must be provided');
-    }
     return this.volunteersService.coordinatorUpdateVolunteerById(
       volunteerId,
       dto,
