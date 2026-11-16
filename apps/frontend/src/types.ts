@@ -45,11 +45,20 @@ export interface CreateMatchBody {
   additionalComments?: string;
 }
 
+export enum MatchStatus {
+  PENDING = 'Pending',
+  ACTIVE = 'Active',
+  COMPLETE = 'Complete',
+  DENIED = 'Denied',
+  WITHDRAWN = 'Withdrawn',
+  CANCELED = 'Canceled',
+}
+
 export interface Match {
   matchId: number;
   volunteerId: number;
   chameleonAnimalId: string;
-  status: string;
+  status: MatchStatus;
   additionalComments: string | null;
   deniedReason: string | null;
 }
@@ -92,4 +101,21 @@ export interface Volunteer {
   cognitoSub: string;
   animalPreferences: string[];
   assignedCoordinators: Coordinator[];
+}
+
+// Fields a volunteer can change on their own profile. Mirrors the backend's
+// UpdateVolunteerDto; every other Volunteer field is read-only for them.
+export interface UpdateVolunteerBody {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  secondaryPhone?: string | null;
+  email?: string;
+  address?: string;
+  city?: string;
+  zipcode?: string;
+  residentAnimals?: string;
+  notes?: string | null;
+  fosterType?: FosterType[];
+  animalUpdates?: boolean;
 }

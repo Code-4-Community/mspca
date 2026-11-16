@@ -10,6 +10,7 @@ import Root from '@containers/root';
 import Layout from '@containers/Layout';
 import NotFound from '@containers/404';
 import AnimalAvailability from '@pages/AnimalAvailability';
+import VolunteerProfile from '@pages/VolunteerProfile';
 import { ROUTES } from './routes';
 
 // Every page is a child of Layout so the navbar renders once, above all pages.
@@ -27,6 +28,10 @@ export const routes: RouteObject[] = [
           {
             path: ROUTES.ANIMAL_AVAILABILITY,
             element: <AnimalAvailability />,
+          },
+          {
+            path: ROUTES.VOLUNTEER_PROFILE,
+            element: <VolunteerProfile />,
           },
           { path: '*', element: <NotFound /> },
         ],
