@@ -47,6 +47,10 @@ export const colors = {
   purple: {
     avatar: '#B67CF9',
   },
+  // Match status badges on the volunteer profile dashboard.
+  status: {
+    submitted: '#0e7490',
+  },
   neutrals: {
     black: '#231f20',
     black85: '#4d4d4f',

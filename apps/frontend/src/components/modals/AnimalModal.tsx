@@ -21,6 +21,9 @@ import RestrictionTag from '../RestrictionTag';
 interface AnimalModalProps {
   animal: Animal | null;
   onClose: () => void;
+  // Set to false to hide the comments box and Apply button, e.g. on the
+  // Volunteer Profile where the volunteer already has a match for the animal.
+  canApply?: boolean;
 }
 
 /**
@@ -32,9 +35,14 @@ interface AnimalModalProps {
  * optional comments and press Apply to submit a match request for the animal
  * (`apiClient.createMatch`); the modal closes once the request succeeds, and
  * Back closes it too. Pass `animal={null}` to keep it closed. The form resets
- * whenever a different animal is opened.
+ * whenever a different animal is opened. With `canApply={false}` only Back
+ * is shown at the bottom.
  */
-const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
+const AnimalModal: React.FC<AnimalModalProps> = ({
+  animal,
+  onClose,
+  canApply = true,
+}) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,28 +245,30 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
               </Flex>
 
               <Flex alignSelf="stretch" direction="column" gap="4">
-                <Textarea
-                  alignSelf="stretch"
-                  h="11"
-                  minH="11"
-                  px="2.5"
-                  py="2"
-                  placeholder="Additional Comments"
-                  value={comments}
-                  onChange={(e) => setComments(e.target.value)}
-                  disabled={submitting}
-                  borderRadius="sm"
-                  borderWidth="0"
-                  outline="1px solid"
-                  outlineColor="border.emphasized"
-                  outlineOffset="-1px"
-                  fontSize="14px"
-                  fontWeight="normal"
-                  lineHeight="20px"
-                  resize="vertical"
-                  _placeholder={{ color: 'fg.muted' }}
-                />
-                {error && <Text color="fg.error">{error}</Text>}
+                {canApply && (
+                  <Textarea
+                    alignSelf="stretch"
+                    h="11"
+                    minH="11"
+                    px="2.5"
+                    py="2"
+                    placeholder="Additional Comments"
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    disabled={submitting}
+                    borderRadius="sm"
+                    borderWidth="0"
+                    outline="1px solid"
+                    outlineColor="border.emphasized"
+                    outlineOffset="-1px"
+                    fontSize="14px"
+                    fontWeight="normal"
+                    lineHeight="20px"
+                    resize="vertical"
+                    _placeholder={{ color: 'fg.muted' }}
+                  />
+                )}
+                {canApply && error && <Text color="fg.error">{error}</Text>}
                 <Flex
                   alignSelf="stretch"
                   justify="flex-start"
@@ -287,26 +297,28 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                   >
                     Back
                   </Button>
-                  <Button
-                    flex="1"
-                    h="11"
-                    minW="11"
-                    px="5"
-                    py="0.5"
-                    gap="3"
-                    bg="neutral.solid"
-                    color="neutral.contrast"
-                    borderRadius="12px"
-                    overflow="hidden"
-                    fontSize="16px"
-                    fontWeight="semibold"
-                    lineHeight="24px"
-                    onClick={() => handleRequest(animal)}
-                    loading={submitting}
-                    disabled={volunteerId === null}
-                  >
-                    Apply
-                  </Button>
+                  {canApply && (
+                    <Button
+                      flex="1"
+                      h="11"
+                      minW="11"
+                      px="5"
+                      py="0.5"
+                      gap="3"
+                      bg="neutral.solid"
+                      color="neutral.contrast"
+                      borderRadius="12px"
+                      overflow="hidden"
+                      fontSize="16px"
+                      fontWeight="semibold"
+                      lineHeight="24px"
+                      onClick={() => handleRequest(animal)}
+                      loading={submitting}
+                      disabled={volunteerId === null}
+                    >
+                      Apply
+                    </Button>
+                  )}
                 </Flex>
               </Flex>
             </Dialog.Content>
