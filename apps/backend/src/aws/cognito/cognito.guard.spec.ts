@@ -106,7 +106,7 @@ function createContext(authorization?: string): {
   return { context, request };
 }
 
-describe.skip('CognitoJWTGuard', () => {
+describe('CognitoJWTGuard', () => {
   let guard: CognitoJWTGuard;
   let reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>>;
 
