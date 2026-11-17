@@ -99,3 +99,29 @@ export interface Volunteer {
   animalPreferences: string[];
   assignedCoordinators: Coordinator[];
 }
+
+// Must match the backend's CognitoRole values exactly, since /api/auth/me
+// returns these strings as the user's role.
+export enum UserRole {
+  FOSTER_VOLUNTEER = 'FosterVolunteer',
+  FOSTER_COORDINATOR = 'FosterCoordinator',
+  OWNER = 'Owner',
+}
+
+export interface Owner {
+  ownerId: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  secondaryPhone: string | null;
+  email: string;
+  active: boolean;
+  cognitoSub: string;
+}
+
+// The signed-in user returned by GET /api/auth/me: their role, plus their
+// record from the table that matches that role.
+export type AuthenticatedUser =
+  | { role: UserRole.FOSTER_VOLUNTEER; user: Volunteer }
+  | { role: UserRole.FOSTER_COORDINATOR; user: Coordinator }
+  | { role: UserRole.OWNER; user: Owner };
