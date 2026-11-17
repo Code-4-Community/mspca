@@ -325,7 +325,7 @@ export class VolunteersController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      'All volunteers with their active matches, or an empty matches list',
+      'All volunteers with their active matches, or an empty matches list.',
     type: [VolunteerWithoutPrivateFields],
   })
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
