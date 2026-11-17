@@ -1,17 +1,17 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMatchAdditionalComments1793300000000
+export class AddFosterTypePreferences1793600000000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "matches" ADD COLUMN "additional_comments" text`,
+      `ALTER TABLE "foster_volunteers" ADD "foster_type_preferences" "foster_type_enum"[] NOT NULL DEFAULT '{}'`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "matches" DROP COLUMN "additional_comments"`,
+      `ALTER TABLE "foster_volunteers" DROP COLUMN "foster_type_preferences"`,
     );
   }
 }

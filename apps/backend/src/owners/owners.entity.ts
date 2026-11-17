@@ -1,9 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-@Entity('admin_users')
-export class AdminUser {
-  @PrimaryGeneratedColumn({ name: 'admin_id' })
-  adminId!: number;
+@Entity('owners')
+export class Owner {
+  @PrimaryGeneratedColumn({ name: 'owner_id' })
+  ownerId!: number;
 
   @Column({ name: 'first_name', type: 'varchar', length: 255 })
   firstName!: string;
@@ -27,4 +27,12 @@ export class AdminUser {
 
   @Column({ type: 'boolean' })
   active!: boolean;
+
+  @Column({
+    name: 'cognito_sub',
+    type: 'varchar',
+    length: 255,
+    default: '',
+  })
+  cognitoSub!: string;
 }

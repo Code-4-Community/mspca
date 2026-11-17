@@ -14,12 +14,12 @@ import { ExternalLink, House } from 'lucide-react';
 import apiClient from '@api/apiClient';
 import type { Animal } from '../../types';
 import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
+import { useVolunteerId } from '@utils/useVolunteerId';
 import { PLACEHOLDER_IMAGE } from '../AnimalCard';
 import RestrictionTag from '../RestrictionTag';
 
 interface AnimalModalProps {
   animal: Animal | null;
-  volunteerId: number;
   onClose: () => void;
 }
 
@@ -30,41 +30,28 @@ interface AnimalModalProps {
  * Shows the animal's photo, the address of its homebase, name, breed, age,
  * restriction tags and foster bio. At the bottom the volunteer can type
  * optional comments and press Apply to submit a match request for the animal
- * on behalf of `volunteerId` (`apiClient.createMatch`); the form then shows a confirmation, and Back
- * closes the modal. Pass `animal={null}` to keep it closed. The form resets
+ * (`apiClient.createMatch`); the modal closes once the request succeeds, and
+ * Back closes it too. Pass `animal={null}` to keep it closed. The form resets
  * whenever a different animal is opened.
  */
-const AnimalModal: React.FC<AnimalModalProps> = ({
-  animal,
-  volunteerId,
-  onClose,
-}) => {
+const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // TEMPORARY: comes from the URL until sign-in is implemented.
+  const volunteerId = useVolunteerId();
 
-  // Reset the form when a different animal is opened.
-  const [formAnimalId, setFormAnimalId] = useState(animal?.animalId);
-  if (animal?.animalId !== formAnimalId) {
-    setFormAnimalId(animal?.animalId);
-    setComments('');
-    setSubmitting(false);
-    setRequested(false);
-    setError(null);
-  }
-
-  const handleRequest = async () => {
-    if (!animal) return;
+  const handleApply = async (selectedAnimal: Animal) => {
+    if (volunteerId === null) return;
     setSubmitting(true);
     setError(null);
     try {
       await apiClient.createMatch({
         volunteerId,
-        chameleonAnimalId: animal.chameleonAnimalId,
+        chameleonAnimalId: selectedAnimal.chameleonAnimalId,
         additionalComments: comments.trim() || undefined,
       });
-      setRequested(true);
+      onClose();
     } catch {
       setError('Could not submit your request. Please try again.');
     } finally {
@@ -94,7 +81,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({
               maxH="calc(100vh - 32px)"
               p="8"
               m="0"
-              bg="white"
+              bg="bg"
               borderRadius="3xl"
               boxShadow="card"
               display="flex"
@@ -217,7 +204,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({
                         {/* TODO: Figma shows "5 Month Foster" (foster length), which
                     the schema doesn't have. Showing the animal's age. */}
                         <Text color="neutrals.black" textStyle="h7">
-                          {formatAge(animal.ageYear)}
+                          {formatAge(animal.ageYear, animal.ageMonth)}
                         </Text>
                       </Flex>
                     </Flex>
@@ -238,7 +225,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({
                   </Flex>
                   <Text
                     alignSelf="stretch"
-                    color="black"
+                    color="neutrals.black"
                     fontSize="16px"
                     fontWeight="normal"
                     lineHeight="24px"
@@ -250,39 +237,27 @@ const AnimalModal: React.FC<AnimalModalProps> = ({
               </Flex>
 
               <Flex alignSelf="stretch" direction="column" gap="4">
-                {requested ? (
-                  <Text
-                    textAlign="center"
-                    color="green.green2"
-                    fontSize="16px"
-                    fontWeight="semibold"
-                    lineHeight="24px"
-                  >
-                    Request submitted!
-                  </Text>
-                ) : (
-                  <Textarea
-                    alignSelf="stretch"
-                    h="11"
-                    minH="11"
-                    px="2.5"
-                    py="2"
-                    placeholder="Additional Comments"
-                    value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    disabled={submitting}
-                    borderRadius="sm"
-                    borderWidth="0"
-                    outline="1px solid"
-                    outlineColor="border.emphasized"
-                    outlineOffset="-1px"
-                    fontSize="14px"
-                    fontWeight="normal"
-                    lineHeight="20px"
-                    resize="vertical"
-                    _placeholder={{ color: 'fg.muted' }}
-                  />
-                )}
+                <Textarea
+                  alignSelf="stretch"
+                  h="11"
+                  minH="11"
+                  px="2.5"
+                  py="2"
+                  placeholder="Additional Comments"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  disabled={submitting}
+                  borderRadius="sm"
+                  borderWidth="0"
+                  outline="1px solid"
+                  outlineColor="border.emphasized"
+                  outlineOffset="-1px"
+                  fontSize="14px"
+                  fontWeight="normal"
+                  lineHeight="20px"
+                  resize="vertical"
+                  _placeholder={{ color: 'fg.muted' }}
+                />
                 {error && <Text color="fg.error">{error}</Text>}
                 <Flex
                   alignSelf="stretch"
@@ -312,27 +287,26 @@ const AnimalModal: React.FC<AnimalModalProps> = ({
                   >
                     Back
                   </Button>
-                  {!requested && (
-                    <Button
-                      flex="1"
-                      h="11"
-                      minW="11"
-                      px="5"
-                      py="0.5"
-                      gap="3"
-                      bg="neutral.solid"
-                      color="neutral.contrast"
-                      borderRadius="12px"
-                      overflow="hidden"
-                      fontSize="16px"
-                      fontWeight="semibold"
-                      lineHeight="24px"
-                      onClick={handleRequest}
-                      loading={submitting}
-                    >
-                      Apply
-                    </Button>
-                  )}
+                  <Button
+                    flex="1"
+                    h="11"
+                    minW="11"
+                    px="5"
+                    py="0.5"
+                    gap="3"
+                    bg="neutral.solid"
+                    color="neutral.contrast"
+                    borderRadius="12px"
+                    overflow="hidden"
+                    fontSize="16px"
+                    fontWeight="semibold"
+                    lineHeight="24px"
+                    onClick={() => handleApply(animal)}
+                    loading={submitting}
+                    disabled={volunteerId === null}
+                  >
+                    Apply
+                  </Button>
                 </Flex>
               </Flex>
             </Dialog.Content>

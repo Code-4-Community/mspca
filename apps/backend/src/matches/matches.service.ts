@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -7,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
@@ -43,12 +44,24 @@ export class MatchesService {
    * @returns the created match
    * @throws NotFoundException if the volunteer or animal does not exist
    * @throws BadRequestException if the volunteer is not active
+   * @throws ConflictException if the volunteer already has a PENDING or ACTIVE match for the animal
    */
   async create(dto: CreateMatchDto): Promise<Match> {
     const volunteer = await this.volunteersService.findActiveOrFail(
       dto.volunteerId,
     );
     await this.animalsService.findByChameleonIdOrFail(dto.chameleonAnimalId);
+
+    const existingMatch = await this.repo.findOneBy({
+      volunteerId: dto.volunteerId,
+      chameleonAnimalId: dto.chameleonAnimalId,
+      status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+    });
+    if (existingMatch) {
+      throw new ConflictException(
+        `Volunteer ${dto.volunteerId} already has a ${existingMatch.status} match for animal ${dto.chameleonAnimalId}`,
+      );
+    }
 
     const match = await this.repo.save(
       this.repo.create({
@@ -149,6 +162,26 @@ export class MatchesService {
    */
   findByVolunteerId(volunteerId: number): Promise<Match[]> {
     return this.repo.find({ where: { volunteerId } });
+  }
+
+  /**
+   * Fetches all PENDING Matches for a Chameleon animal, each with its Volunteer
+   * loaded, oldest application first.
+   *
+   * @param chameleonAnimalId - The animal's Chameleon ID.
+   * @returns The animal's pending Matches, or an empty array if it has none.
+   * @throws NotFoundException if no animal with the Chameleon ID exists
+   */
+  async findPendingByChameleonAnimalId(
+    chameleonAnimalId: string,
+  ): Promise<Match[]> {
+    await this.animalsService.findByChameleonIdOrFail(chameleonAnimalId);
+
+    return this.repo.find({
+      where: { chameleonAnimalId, status: MatchStatus.PENDING },
+      relations: ['volunteer'],
+      order: { matchId: 'ASC' },
+    });
   }
 
   /**

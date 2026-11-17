@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
@@ -11,6 +16,7 @@ import { VolunteersService } from '../volunteers/volunteers.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
+import { In } from 'typeorm';
 
 const coordinator = {
   coordinatorId: 7,
@@ -193,6 +199,61 @@ describe('MatchesService', () => {
         deniedReason: null,
       });
       expect(match.status).toEqual(MatchStatus.PENDING);
+    });
+
+    it('throws ConflictException when the volunteer already has a PENDING match for the animal', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinator,
+      );
+      matchRepo.findOneBy.mockResolvedValue({
+        matchId: 5,
+        volunteerId: 1,
+        chameleonAnimalId: 'A42',
+        status: MatchStatus.PENDING,
+      });
+
+      await expect(
+        service.create({ volunteerId: 1, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(ConflictException);
+      expect(matchRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('only treats PENDING and ACTIVE matches as duplicates', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinator,
+      );
+      emailsService.sendEmail.mockResolvedValue(undefined);
+      const existingMatches = [
+        {
+          matchId: 5,
+          volunteerId: 1,
+          chameleonAnimalId: 'A42',
+          status: MatchStatus.WITHDRAWN,
+        },
+      ];
+      matchRepo.findOneBy.mockImplementation(
+        async (where) =>
+          existingMatches.find(
+            (m) =>
+              m.volunteerId === where.volunteerId &&
+              m.chameleonAnimalId === where.chameleonAnimalId &&
+              where.status.value.includes(m.status),
+          ) ?? null,
+      );
+      matchRepo.create.mockImplementation((attrs) => attrs);
+      matchRepo.save.mockImplementation((match) =>
+        Promise.resolve({ matchId: 10, ...match }),
+      );
+
+      await service.create({ volunteerId: 1, chameleonAnimalId: 'A42' });
+
+      expect(matchRepo.findOneBy).toHaveBeenCalledWith({
+        volunteerId: 1,
+        chameleonAnimalId: 'A42',
+        status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+      });
+      expect(matchRepo.save).toHaveBeenCalled();
     });
 
     it('saves additional comments when provided', async () => {
@@ -886,6 +947,82 @@ describe('MatchesService', () => {
 
       expect(matchRepo.findOneBy).toHaveBeenCalledWith({ matchId: 1 });
       expect(matchRepo.save).not.toHaveBeenCalled();
+    });
+  });
+  describe('findPendingByChameleonAnimalId', () => {
+    const pendingMatches = [
+      { ...mockMatch, volunteer: volunteerWithCoordinator },
+      {
+        ...mockMatch,
+        matchId: 2,
+        volunteer: { ...volunteerWithCoordinator, volunteerId: 2 },
+      },
+    ] as Match[];
+
+    const otherMatches = [
+      { ...mockMatch, matchId: 3, status: MatchStatus.WITHDRAWN },
+      { ...mockMatch, matchId: 4, status: MatchStatus.DENIED },
+      { ...mockMatch, matchId: 5, status: MatchStatus.ACTIVE },
+      { ...mockMatch, matchId: 6, status: MatchStatus.CANCELED },
+      { ...mockMatch, matchId: 7, chameleonAnimalId: 'A43' },
+    ] as Match[];
+
+    const expectedQuery = {
+      where: { chameleonAnimalId: 'A42', status: MatchStatus.PENDING },
+      relations: ['volunteer'],
+      order: { matchId: 'ASC' },
+    };
+
+    const mockMatchesTable = (rows: Match[]) =>
+      matchRepo.find.mockImplementation(async ({ where }) =>
+        rows.filter(
+          (row) =>
+            row.chameleonAnimalId === where.chameleonAnimalId &&
+            row.status === where.status,
+        ),
+      );
+
+    it('returns only the pending matches for the animal, each with its volunteer', async () => {
+      mockMatchesTable([...pendingMatches, ...otherMatches]);
+
+      const result = await service.findPendingByChameleonAnimalId('A42');
+
+      expect(result).toEqual(pendingMatches);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns a single pending match among non-pending ones', async () => {
+      mockMatchesTable([pendingMatches[0], ...otherMatches]);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([pendingMatches[0]]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns an empty array when the animal has no pending matches', async () => {
+      mockMatchesTable(otherMatches);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('throws when the animal does not exist', async () => {
+      animalsService.findByChameleonIdOrFail.mockRejectedValue(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A999'),
+      ).rejects.toThrow(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+      expect(matchRepo.find).not.toHaveBeenCalled();
     });
   });
 });

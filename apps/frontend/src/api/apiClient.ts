@@ -2,7 +2,7 @@ import axios, { type AxiosInstance } from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 import { isAuthEnabled } from '../auth/auth.config';
-import type { Animal, CreateMatchBody, Match } from '../types';
+import type { Animal, CreateMatchBody, Match, Volunteer } from '../types';
 
 const defaultBaseUrl =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
@@ -48,6 +48,10 @@ export class ApiClient {
 
   public async getAnimals(): Promise<Animal[]> {
     return this.get('/api/animals') as Promise<Animal[]>;
+  }
+
+  public async getVolunteer(volunteerId: number): Promise<Volunteer> {
+    return this.get(`/api/volunteers/${volunteerId}`) as Promise<Volunteer>;
   }
 
   public async createMatch(body: CreateMatchBody): Promise<Match> {

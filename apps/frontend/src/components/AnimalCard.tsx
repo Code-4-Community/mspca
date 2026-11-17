@@ -40,7 +40,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
     align="flex-start"
     gap="4"
     p="4"
-    bg="white"
+    bg="bg"
     borderRadius="3xl"
     boxShadow="card"
   >
@@ -84,10 +84,10 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
               <House strokeWidth={1} aria-hidden />
             </Icon>
             <Text color="neutrals.black" textStyle="h7">
-              {formatAge(animal.ageYear)}
+              {formatAge(animal.ageYear, animal.ageMonth)}
             </Text>
           </Flex>
-          {animal.restrictions && animal.restrictions.length > 0 && (
+          {animal.restrictions.length > 0 && (
             <Flex
               alignSelf="stretch"
               wrap="wrap"
@@ -118,7 +118,7 @@ const AnimalCard: React.FC<AnimalCardProps> = ({
         py="0.5"
         gap="3"
         bg="blue.blue3"
-        color="white"
+        color="neutral.contrast"
         borderRadius="12px"
         overflow="hidden"
         fontSize="16px"

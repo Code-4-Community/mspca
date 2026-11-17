@@ -1,6 +1,6 @@
 import { Flex, Text } from '@chakra-ui/react';
 
-import { getRestriction } from '@utils/animals';
+import { RESTRICTIONS } from '@utils/animals';
 import type { Restriction } from '../types';
 
 interface RestrictionTagProps {
@@ -15,7 +15,7 @@ interface RestrictionTagProps {
  * the same color on the animal card, the modal and anywhere else it appears.
  */
 const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => {
-  const restriction = getRestriction(label);
+  const restriction = RESTRICTIONS[label];
 
   return (
     <Flex justify="flex-start" align="flex-start">
@@ -30,7 +30,7 @@ const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => {
         justify="center"
         align="center"
       >
-        <Text color="white" textStyle="xs" fontWeight="semibold">
+        <Text color="gray.0" textStyle="xs" fontWeight="semibold">
           {label}
         </Text>
       </Flex>

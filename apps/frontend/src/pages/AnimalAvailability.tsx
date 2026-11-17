@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Box,
   Button,
   Flex,
   Heading,
-  Image,
   SimpleGrid,
   Spinner,
   Text,
@@ -24,71 +22,6 @@ import {
   matchesFilters,
   type AnimalFilterState,
 } from '@utils/animals';
-import logo from '../assets/mspca-logo.png';
-
-/**
- * The top bar of the page: the MSPCA logo on the left and the volunteer's
- * profile avatar and "My Profile" label on the right. The initials are
- * hard-coded for now until the logged-in volunteer is available to the
- * frontend.
- */
-const PageHeader: React.FC = () => (
-  <Flex
-    alignSelf="stretch"
-    px={{ base: '4', md: '8' }}
-    py={{ base: '2', md: '4' }}
-    bg="gray.50"
-    boxShadow="card"
-    justify="space-between"
-    align="center"
-    overflow="hidden"
-  >
-    <Image
-      src={logo}
-      alt="MSPCA - Kindness and Care for Animals"
-      w={{ base: '32', md: '48' }}
-      h={{ base: '14', md: '20' }}
-    />
-    <Flex justify="center" align="center" gap="4">
-      <Box
-        display="flex"
-        flexDirection="column"
-        justifyContent="center"
-        alignItems="center"
-        boxSize={{ base: '12', md: '16' }}
-        bg="purple.avatar"
-        borderRadius="full"
-        boxShadow="card"
-        outline="3px solid"
-        outlineColor="neutrals.black"
-        outlineOffset="-3px"
-        overflow="hidden"
-      >
-        {/* TODO: use the logged-in volunteer's initials */}
-        <Text
-          alignSelf="stretch"
-          textAlign="center"
-          color="white"
-          fontSize="20px"
-          fontWeight="semibold"
-          lineHeight="32px"
-        >
-          MW
-        </Text>
-      </Box>
-      <Text
-        display={{ base: 'none', md: 'block' }}
-        textAlign="center"
-        color="neutrals.black"
-        fontSize="2xl"
-        fontWeight="semibold"
-        lineHeight="36px"
-      >
-        My Profile
-      </Text>
-    </Flex>
-  </Flex>
-);
 
 /**
  * Page where volunteers browse the animals that are available to foster.
@@ -102,12 +35,10 @@ const PageHeader: React.FC = () => (
  * if the request fails it shows an error with a "Try again" button. A
  * `HomebaseMap` shows each homebase: clicking its pins toggles the Location
  * filter, and hovering a card highlights that animal's homebase. On large
- * screens the map sits to the right of the cards; on mobile it fills the
- * screen and the cards sit in a `BottomSheet` over it.
+ * screens the map sits to the right of the cards; on mobile it fills the space
+ * under the navbar and the cards sit in a `BottomSheet` over it.
  */
 const AnimalAvailability: React.FC = () => {
-  // TODO: use the signed-in volunteer instead once sign-in is implemented.
-  const volunteerId = Number(useParams().volunteerId);
   // Below the `lg` breakpoint the page switches to the mobile layout.
   const isMobile = useBreakpointValue(
     { base: true, lg: false },
@@ -151,17 +82,8 @@ const AnimalAvailability: React.FC = () => {
         : [...filters.locations, homebase],
     }));
 
-  const locations = useMemo(
-    () => [...new Set(animals.map((animal) => animal.location))].sort(),
-    [animals],
-  );
-
   const filters = (
-    <AnimalFilters
-      value={activeFilters}
-      onChange={setActiveFilters}
-      locations={locations}
-    />
+    <AnimalFilters value={activeFilters} onChange={setActiveFilters} />
   );
 
   const map = (
@@ -227,17 +149,15 @@ const AnimalAvailability: React.FC = () => {
   const modal = (
     <AnimalModal
       animal={selectedAnimal}
-      volunteerId={volunteerId}
       onClose={() => setSelectedAnimal(null)}
     />
   );
 
-  // Mobile: the map fills the screen and the animals sit in a bottom sheet
-  // over it.
+  // Mobile: the map fills the space under the navbar and the animals sit in a
+  // bottom sheet over it.
   if (isMobile) {
     return (
-      <Flex direction="column" h="100dvh" bg="bg.muted">
-        <PageHeader />
+      <Flex direction="column" flex="1" minH="0" bg="bg.muted">
         <Box px="4" py="3" flex="none">
           {filters}
         </Box>
@@ -253,8 +173,7 @@ const AnimalAvailability: React.FC = () => {
   }
 
   return (
-    <Box bg="bg.muted" minH="100vh">
-      <PageHeader />
+    <Box bg="bg.muted" flex="1">
       <Flex gap="8" px="8" py="8" align="flex-start">
         <Flex
           direction="column"

@@ -13,6 +13,17 @@ export enum FosterType {
   FARM_ANIMALS = 'Farm Animals',
 }
 
+export enum FosterTraining {
+  DOG = 'Dog',
+  CAT = 'Cat',
+}
+
+export enum VolunteerStatus {
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  PENDING = 'Pending',
+}
+
 export enum Restriction {
   NO_RESTRICTIONS = 'No Restrictions',
   DOG_FREE_HOME = 'Dog-Free Home',
@@ -50,6 +61,41 @@ export interface Match {
   volunteerId: number;
   chameleonAnimalId: string;
   status: string;
-  additionalComments: string | null;
-  deniedReason: string | null;
+  additionalComments?: string | null;
+  deniedReason?: string | null;
+}
+
+export interface Coordinator {
+  coordinatorId: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  secondaryPhone: string | null;
+  email: string;
+  homebase: Homebase;
+  active: boolean;
+  cognitoSub: string;
+}
+
+export interface Volunteer {
+  volunteerId: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  secondaryPhone: string | null;
+  email: string;
+  address: string;
+  city: string;
+  zipcode: string;
+  homebase: Homebase;
+  residentAnimals: string;
+  notes: string | null;
+  fosterType: FosterType[];
+  animalUpdates: boolean;
+  completedTrainings: FosterTraining[];
+  mostRecentWaiverSigned: boolean;
+  status: VolunteerStatus;
+  cognitoSub: string;
+  animalPreferences: string[];
+  assignedCoordinators: Coordinator[];
 }
