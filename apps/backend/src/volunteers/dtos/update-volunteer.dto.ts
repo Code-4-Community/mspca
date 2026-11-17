@@ -17,7 +17,25 @@ import {
 import { Type } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { PetDto } from './pet.dto';
+import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 
+@AtLeastOneValue<UpdateVolunteerDto>([
+  'firstName',
+  'lastName',
+  'phone',
+  'secondaryPhone',
+  'email',
+  'address',
+  'city',
+  'zipcode',
+  'hasChildren',
+  'childrenAges',
+  'hasSeparateFosterRoom',
+  'pets',
+  'notes',
+  'fosterType',
+  'animalUpdates',
+])
 export class UpdateVolunteerDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsNonEmptyString()
