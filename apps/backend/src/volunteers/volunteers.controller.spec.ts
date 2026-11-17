@@ -24,7 +24,6 @@ import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunte
 import { Homebase } from '../types';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -85,10 +84,7 @@ describe('VolunteersController', () => {
         { provide: VolunteersService, useValue: mockVolunteersService },
         { provide: MatchesService, useValue: mockMatchesService },
       ],
-    })
-      .overrideGuard(ThrottlerGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+    }).compile();
 
     controller = module.get<VolunteersController>(VolunteersController);
   });

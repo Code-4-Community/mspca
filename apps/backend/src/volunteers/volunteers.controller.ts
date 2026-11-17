@@ -26,6 +26,7 @@ import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 import { VolunteerWithoutPrivateFields } from './dtos/volunteer-without-private-fields.dto';
 import { minutes } from '@nestjs/throttler';
+import { RateLimit } from '../rate-limit/rate-limit.decorators';
 
 @ApiTags('Volunteers')
 @Controller('volunteers')
@@ -36,7 +37,8 @@ export class VolunteersController {
   ) {}
 
   @Post()
-  @Public({ limit: 3, ttl: minutes(10) })
+  @Public()
+  @RateLimit({ limit: 3, ttl: minutes(10) })
   @ApiOperation({ summary: 'Create a foster volunteer account' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -70,7 +72,8 @@ export class VolunteersController {
   }
 
   @Post('/confirm')
-  @Public({ limit: 5, ttl: minutes(10) })
+  @Public()
+  @RateLimit({ limit: 5, ttl: minutes(10) })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: "Confirm a foster volunteer's email with their verification code",
