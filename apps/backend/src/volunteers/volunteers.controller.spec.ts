@@ -24,6 +24,7 @@ import { UpdateSpeciesPreferencesDto } from './dtos/update-species-preferences.d
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
+import { PetDto } from '../pets/dtos/pet.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -165,6 +166,7 @@ describe('VolunteersController', () => {
       homebase: Homebase.BOSTON,
       hasChildren: false,
       hasSeparateFosterRoom: true,
+      livelyNeighborhood: false,
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
@@ -231,7 +233,7 @@ describe('VolunteersController', () => {
       ageMonth: 11,
       species: FosterType.CAT,
       breed: 'Tabby',
-    };
+    } as PetDto;
 
     it('accepts a volunteer with pets and children', async () => {
       const result = await validationPipe.transform(

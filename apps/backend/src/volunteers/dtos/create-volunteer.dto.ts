@@ -19,7 +19,7 @@ import { Transform, Type } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
 import { FosterTraining, FosterType } from '../volunteers.types';
-import { PetDto } from './pet.dto';
+import { PetDto } from '../../pets/dtos/pet.dto';
 
 export class CreateVolunteerDto {
   @IsNonEmptyString()
@@ -86,6 +86,9 @@ export class CreateVolunteerDto {
 
   @IsBoolean()
   hasSeparateFosterRoom!: boolean;
+
+  @IsBoolean()
+  livelyNeighborhood!: boolean;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()

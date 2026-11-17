@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, Max, MaxLength, Min } from 'class-validator';
-import { FosterType } from '../volunteers.types';
+import { FosterType } from '../../volunteers/volunteers.types';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 
 export class PetDto {

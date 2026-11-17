@@ -16,7 +16,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
-import { PetDto } from './pet.dto';
+import { PetDto } from '../../pets/dtos/pet.dto';
 import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 
 @AtLeastOneValue<UpdateVolunteerDto>([
@@ -31,6 +31,7 @@ import { AtLeastOneValue } from './validators/at-least-one-value.validator';
   'hasChildren',
   'childrenAges',
   'hasSeparateFosterRoom',
+  'livelyNeighborhood',
   'pets',
   'notes',
   'fosterType',
@@ -91,6 +92,10 @@ export class UpdateVolunteerDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   hasSeparateFosterRoom?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  livelyNeighborhood?: boolean;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsArray()

@@ -25,6 +25,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
 import { Pet } from '../pets/pets.entity';
+import { PetDto } from '../pets/dtos/pet.dto';
 
 describe('VolunteersService', () => {
   let service: VolunteersService;
@@ -104,6 +105,7 @@ describe('VolunteersService', () => {
     it('returns the volunteer with their coordinators and pets', async () => {
       const volunteer = {
         volunteerId: 7,
+        assignedCoordinators: [] as FosterCoordinator[],
         pets: [] as Pet[],
       } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
@@ -193,6 +195,7 @@ describe('VolunteersService', () => {
       homebase: Homebase.BOSTON,
       hasChildren: false,
       hasSeparateFosterRoom: true,
+      livelyNeighborhood: false,
       notes: 'Prefers kittens',
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
@@ -909,28 +912,29 @@ describe('VolunteersService', () => {
     });
 
     it('replaces the pets list when pets is provided', async () => {
-      const pet = {
-        ageYear: 1,
-        ageMonth: 6,
-        species: FosterType.CAT,
-        breed: 'Siamese',
-      };
+      const newPets = [
+        { ageYear: 1, ageMonth: 6, species: FosterType.CAT, breed: 'Siamese' },
+        { ageYear: 8, ageMonth: 0, species: FosterType.DOG, breed: 'Beagle' },
+      ] as PetDto[];
       mockRepo.findOne.mockResolvedValue({
         ...mockVolunteer,
-        pets: [{ petId: 5, breed: 'Lab' } as Pet],
+        pets: [
+          { petId: 5, breed: 'Lab' } as Pet,
+          { petId: 6, breed: 'Tabby' } as Pet,
+        ],
       });
       mockRepo.save.mockImplementation(async (v) => v);
 
       const result = await service.coordinatorUpdateVolunteerById(1, {
-        pets: [pet],
+        pets: newPets,
       });
 
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...mockVolunteer,
-        pets: [pet],
+        pets: newPets,
       });
-      expect(result.pets).toEqual([pet]);
+      expect(result.pets).toEqual(newPets);
     });
   });
 
@@ -948,7 +952,26 @@ describe('VolunteersService', () => {
       ageMonth: 6,
       species: FosterType.CAT,
       breed: 'Siamese',
-    };
+    } as PetDto;
+
+    it('updates livelyNeighborhood', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        livelyNeighborhood: false,
+      });
+      mockRepo.save.mockImplementation(async (v) => v);
+
+      const result = await service.updateVolunteerById(1, {
+        livelyNeighborhood: true,
+      });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith({
+        ...mockVolunteer,
+        livelyNeighborhood: true,
+      });
+      expect(result.livelyNeighborhood).toBe(true);
+    });
 
     it('replaces the pets list when pets is provided', async () => {
       mockRepo.findOne.mockResolvedValue({

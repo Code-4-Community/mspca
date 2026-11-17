@@ -23,6 +23,7 @@ export class AddPetsAndHouseholdDetails1794408338094
         ADD COLUMN "has_children" boolean NOT NULL DEFAULT false,
         ADD COLUMN "children_ages" int[] NOT NULL DEFAULT '{}',
         ADD COLUMN "has_separate_foster_room" boolean NOT NULL DEFAULT false,
+        ADD COLUMN "lively_neighborhood" boolean NOT NULL DEFAULT false,
         DROP COLUMN "resident_animals"
     `);
 
@@ -30,6 +31,7 @@ export class AddPetsAndHouseholdDetails1794408338094
       ALTER TABLE "foster_volunteers"
         ALTER COLUMN "has_children" DROP DEFAULT,
         ALTER COLUMN "has_separate_foster_room" DROP DEFAULT,
+        ALTER COLUMN "lively_neighborhood" DROP DEFAULT,
         ADD CONSTRAINT "CHK_foster_volunteers_children_ages" CHECK (
           ("has_children" AND cardinality("children_ages") > 0)
           OR (NOT "has_children" AND cardinality("children_ages") = 0)
@@ -44,6 +46,7 @@ export class AddPetsAndHouseholdDetails1794408338094
       ALTER TABLE "foster_volunteers"
         DROP CONSTRAINT "CHK_foster_volunteers_children_ages_nonnegative",
         DROP CONSTRAINT "CHK_foster_volunteers_children_ages",
+        DROP COLUMN "lively_neighborhood",
         DROP COLUMN "has_separate_foster_room",
         DROP COLUMN "children_ages",
         DROP COLUMN "has_children",

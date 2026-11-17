@@ -422,6 +422,8 @@ export class VolunteersService {
    * Copies an update onto a loaded Volunteer, after checking that the saved
    * and updated fields together still satisfy the children rule.
    *
+   * @param volunteer - The loaded Volunteer to update.
+   * @param dto - The fields to copy onto the Volunteer.
    * @throws {BadRequestException} If childrenAges doesn't match hasChildren.
    */
   private applyProfileUpdate(
@@ -441,6 +443,8 @@ export class VolunteersService {
    * and none when it is false. Mirrors CHK_foster_volunteers_children_ages,
    * so a bad request is a 400 instead of a database error.
    *
+   * @param hasChildren - Whether the Volunteer has children.
+   * @param childrenAges - The children's ages.
    * @throws {BadRequestException} If childrenAges doesn't match hasChildren.
    */
   private checkChildrenConsistent(

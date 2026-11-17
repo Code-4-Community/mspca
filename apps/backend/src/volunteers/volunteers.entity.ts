@@ -77,6 +77,9 @@ export class FosterVolunteer {
   @Column({ name: 'has_separate_foster_room', type: 'boolean' })
   hasSeparateFosterRoom!: boolean;
 
+  @Column({ name: 'lively_neighborhood', type: 'boolean' })
+  livelyNeighborhood!: boolean;
+
   @OneToMany(() => Pet, (pet) => pet.volunteer, { cascade: true })
   pets!: Pet[];
 
