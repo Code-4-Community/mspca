@@ -34,6 +34,9 @@ export class Match {
   @Column({ type: 'enum', enum: MatchStatus })
   status!: MatchStatus;
 
+  @Column({ name: 'additional_comments', type: 'text', nullable: true })
+  additionalComments!: string | null;
+
   @Column({ name: 'denied_reason', type: 'text', nullable: true })
   deniedReason!: string | null;
 }
