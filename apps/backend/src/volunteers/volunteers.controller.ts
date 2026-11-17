@@ -187,7 +187,8 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid ID or invalid field',
+    description:
+      'Invalid ID, invalid field, no fields provided, or childrenAges does not match hasChildren',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -215,6 +216,15 @@ export class VolunteersController {
     status: HttpStatus.OK,
     description: 'The volunteer was updated',
     type: VolunteerWithoutPrivateFields,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid ID, invalid field, no fields provided, or childrenAges does not match hasChildren',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
   })
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
