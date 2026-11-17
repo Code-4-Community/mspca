@@ -12,14 +12,12 @@ import {
 import { ChevronDown, ListFilter, X } from 'lucide-react';
 
 import {
-  ANIMAL_TYPES,
   EMPTY_FILTERS,
   HOMEBASE_LABELS,
-  LOCATIONS,
   RESTRICTIONS,
   type AnimalFilterState,
 } from '@utils/animals';
-import type { Restriction } from '../types';
+import { FosterType, Homebase, type Restriction } from '../types';
 
 type CategoryKey = keyof AnimalFilterState;
 
@@ -241,12 +239,9 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
               borderRadius="12px"
               overflow="hidden"
             >
-              <ListFilter
-                size={20}
-                strokeWidth={1.5}
-                color="white"
-                aria-hidden
-              />
+              <Icon asChild boxSize="5" color="neutral.contrast">
+                <ListFilter strokeWidth={1.5} aria-hidden />
+              </Icon>
             </Button>
           </Popover.Trigger>
           <Portal>
@@ -306,7 +301,7 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
                   >
                     <FilterSection
                       title="Animal Type"
-                      options={ANIMAL_TYPES.map((label) => ({
+                      options={Object.values(FosterType).map((label) => ({
                         label,
                         color: 'neutral.solid',
                       }))}
@@ -321,7 +316,7 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
                     />
                     <FilterSection
                       title="Location"
-                      options={LOCATIONS.map((label) => ({
+                      options={Object.values(Homebase).map((label) => ({
                         label,
                         displayLabel: HOMEBASE_LABELS[label],
                         color: 'neutral.solid',
@@ -402,7 +397,9 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
               onClick={() => removeChip(chip.key, chip.label)}
               aria-label={`Remove ${chip.label} filter`}
             >
-              <X size={12} strokeWidth={2} color="white" aria-hidden />
+              <Icon asChild boxSize="3" color="neutral.contrast">
+                <X strokeWidth={2} aria-hidden />
+              </Icon>
               {chip.label}
             </Button>
           ))}

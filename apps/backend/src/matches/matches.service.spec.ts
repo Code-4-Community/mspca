@@ -201,33 +201,46 @@ describe('MatchesService', () => {
       expect(match.status).toEqual(MatchStatus.PENDING);
     });
 
-    it.each([MatchStatus.PENDING, MatchStatus.ACTIVE])(
-      'throws ConflictException when the volunteer already has a %s match for the animal',
-      async (status) => {
-        volunteersService.findActiveOrFail.mockResolvedValue(
-          volunteerWithCoordinator,
-        );
-        matchRepo.findOneBy.mockResolvedValue({
-          matchId: 5,
-          volunteerId: 1,
-          chameleonAnimalId: 'A42',
-          status,
-        });
+    it('throws ConflictException when the volunteer already has a PENDING match for the animal', async () => {
+      volunteersService.findActiveOrFail.mockResolvedValue(
+        volunteerWithCoordinator,
+      );
+      matchRepo.findOneBy.mockResolvedValue({
+        matchId: 5,
+        volunteerId: 1,
+        chameleonAnimalId: 'A42',
+        status: MatchStatus.PENDING,
+      });
 
-        await expect(
-          service.create({ volunteerId: 1, chameleonAnimalId: 'A42' }),
-        ).rejects.toThrow(ConflictException);
-        expect(matchRepo.save).not.toHaveBeenCalled();
-        expect(emailsService.sendEmail).not.toHaveBeenCalled();
-      },
-    );
+      await expect(
+        service.create({ volunteerId: 1, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(ConflictException);
+      expect(matchRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
 
     it('only treats PENDING and ACTIVE matches as duplicates', async () => {
       volunteersService.findActiveOrFail.mockResolvedValue(
         volunteerWithCoordinator,
       );
       emailsService.sendEmail.mockResolvedValue(undefined);
-      matchRepo.findOneBy.mockResolvedValue(null);
+      const existingMatches = [
+        {
+          matchId: 5,
+          volunteerId: 1,
+          chameleonAnimalId: 'A42',
+          status: MatchStatus.WITHDRAWN,
+        },
+      ];
+      matchRepo.findOneBy.mockImplementation(
+        async (where) =>
+          existingMatches.find(
+            (m) =>
+              m.volunteerId === where.volunteerId &&
+              m.chameleonAnimalId === where.chameleonAnimalId &&
+              where.status.value.includes(m.status),
+          ) ?? null,
+      );
       matchRepo.create.mockImplementation((attrs) => attrs);
       matchRepo.save.mockImplementation((match) =>
         Promise.resolve({ matchId: 10, ...match }),

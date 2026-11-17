@@ -39,13 +39,11 @@ export const RESTRICTIONS: Record<Restriction, RestrictionOption> = {
 export const formatAge = (ageYear: number, ageMonth: number): string => {
   const parts: string[] = [];
   if (ageYear > 0) parts.push(`${ageYear} ${ageYear === 1 ? 'yr' : 'yrs'}`);
-  if (ageMonth > 0 || ageYear === 0) {
+  if (ageMonth > 0) {
     parts.push(`${ageMonth} ${ageMonth === 1 ? 'mo' : 'mos'}`);
   }
   return parts.join(' ');
 };
-
-export const ANIMAL_TYPES: readonly FosterType[] = Object.values(FosterType);
 
 // Exact address of each homebase, shown wherever an animal's location is.
 export const HOMEBASE_ADDRESSES: Record<Homebase, string> = {
@@ -54,13 +52,6 @@ export const HOMEBASE_ADDRESSES: Record<Homebase, string> = {
   [Homebase.SALEM]: '347 Highland Ave, Salem, MA',
   [Homebase.NEVINS_FARM]: '400 Broadway, Methuen, MA',
 };
-
-export const LOCATIONS: readonly Homebase[] = [
-  Homebase.BOSTON,
-  Homebase.CAPE_COD,
-  Homebase.NEVINS_FARM,
-  Homebase.SALEM,
-];
 
 export const HOMEBASE_LABELS: Record<Homebase, string> = {
   [Homebase.BOSTON]: 'Boston',

@@ -30,7 +30,7 @@ const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => {
         justify="center"
         align="center"
       >
-        <Text color="white" textStyle="xs" fontWeight="semibold">
+        <Text color="gray.0" textStyle="xs" fontWeight="semibold">
           {label}
         </Text>
       </Flex>

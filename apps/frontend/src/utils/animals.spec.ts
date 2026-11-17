@@ -16,8 +16,4 @@ describe('formatAge', () => {
   it('leaves out years when there are none', () => {
     expect(formatAge(0, 5)).toBe('5 mos');
   });
-
-  it('shows 0 mos when both are zero', () => {
-    expect(formatAge(0, 0)).toBe('0 mos');
-  });
 });

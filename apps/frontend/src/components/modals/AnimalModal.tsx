@@ -41,7 +41,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   // TEMPORARY: comes from the URL until sign-in is implemented.
   const volunteerId = useVolunteerId();
 
-  const handleRequest = async (selectedAnimal: Animal) => {
+  const handleApply = async (selectedAnimal: Animal) => {
     if (volunteerId === null) return;
     setSubmitting(true);
     setError(null);
@@ -81,7 +81,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
               maxH="calc(100vh - 32px)"
               p="8"
               m="0"
-              bg="white"
+              bg="bg"
               borderRadius="3xl"
               boxShadow="card"
               display="flex"
@@ -225,7 +225,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                   </Flex>
                   <Text
                     alignSelf="stretch"
-                    color="black"
+                    color="neutrals.black"
                     fontSize="16px"
                     fontWeight="normal"
                     lineHeight="24px"
@@ -301,7 +301,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                     fontSize="16px"
                     fontWeight="semibold"
                     lineHeight="24px"
-                    onClick={() => handleRequest(animal)}
+                    onClick={() => handleApply(animal)}
                     loading={submitting}
                     disabled={volunteerId === null}
                   >
