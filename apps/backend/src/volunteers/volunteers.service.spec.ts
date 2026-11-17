@@ -135,6 +135,51 @@ describe('VolunteersService', () => {
     });
   });
 
+  describe('findByCognitoSubOrFail', () => {
+    it('returns the volunteer with the matching Cognito sub and their coordinators', async () => {
+      const volunteer = {
+        ...mockVolunteer,
+        cognitoSub: 'cognito-sub-123',
+      } as FosterVolunteer;
+      mockRepo.findOne.mockResolvedValue(volunteer);
+
+      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { cognitoSub: 'cognito-sub-123' },
+        relations: ['assignedCoordinators'],
+      });
+      expect(result).toBe(volunteer);
+    });
+
+    it('removes coordinatorNotes from the returned volunteer', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...mockVolunteer,
+        cognitoSub: 'cognito-sub-123',
+        coordinatorNotes: 'secret',
+      });
+
+      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(result).not.toHaveProperty('coordinatorNotes');
+    });
+
+    it('throws NotFoundException when no volunteer has the Cognito sub', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findByCognitoSubOrFail('unknown-sub'),
+      ).rejects.toThrow(new NotFoundException('Volunteer not found'));
+    });
+
+    it('throws NotFoundException without querying when the sub is empty', async () => {
+      await expect(service.findByCognitoSubOrFail('')).rejects.toThrow(
+        new NotFoundException('Volunteer not found'),
+      );
+
+      expect(mockRepo.findOne).not.toHaveBeenCalled();
+    });
+  });
   describe('findActiveOrFail', () => {
     it('returns the volunteer when they are active', async () => {
       const volunteer = {
