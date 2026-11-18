@@ -351,6 +351,35 @@ export class VolunteersService {
   }
 
   /**
+   * Fetches the Volunteer who owns a Cognito account, with their assigned
+   * Foster Coordinators. Used to look up the signed-in user from their token.
+   *
+   * @param cognitoSub - The `sub` claim from the user's Cognito access token.
+   * @returns The Volunteer, without coordinator-only fields.
+   * @throws {NotFoundException} If no Volunteer has this Cognito sub.
+   */
+
+  async findByCognitoSubOrFail(
+    cognitoSub: string,
+  ): Promise<VolunteerWithoutPrivateFields> {
+    // Older rows default to an empty sub, so never match on ''.
+    if (!cognitoSub) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    const volunteer = await this.repo.findOne({
+      where: { cognitoSub },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    return this.withoutPrivateFields(volunteer);
+  }
+
+  /**
    * Ensures a Volunteer's account is active.
    *
    * @param volunteer - The Volunteer to check.

@@ -12,11 +12,11 @@ import {
 import { ExternalLink, House } from 'lucide-react';
 
 import apiClient from '@api/apiClient';
-import type { Animal } from '../../types';
+import { UserRole, type Animal } from '../../types';
 import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
-import { useVolunteerId } from '@utils/useVolunteerId';
 import { PLACEHOLDER_IMAGE } from '../AnimalCard';
 import RestrictionTag from '../RestrictionTag';
+import { useCurrentUser } from '../../auth/userContext';
 
 interface AnimalModalProps {
   animal: Animal | null;
@@ -38,8 +38,11 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // TEMPORARY: comes from the URL until sign-in is implemented.
-  const volunteerId = useVolunteerId();
+  const { currentUser } = useCurrentUser();
+  const volunteerId =
+    currentUser?.role === UserRole.FOSTER_VOLUNTEER
+      ? currentUser.user.volunteerId
+      : null;
 
   const handleApply = async (selectedAnimal: Animal) => {
     if (volunteerId === null) return;

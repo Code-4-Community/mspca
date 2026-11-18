@@ -303,6 +303,43 @@ describe('CoordinatorsService', () => {
     });
   });
 
+  describe('findByCognitoSubOrFail', () => {
+    it('returns the coordinator with the matching Cognito sub', async () => {
+      repo.findOneBy.mockResolvedValue(coordinator);
+
+      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        cognitoSub: 'cognito-sub-123',
+      });
+      expect(result).toBe(coordinator);
+    });
+
+    it('does not load assigned volunteers', async () => {
+      repo.findOneBy.mockResolvedValue(coordinator);
+
+      await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when no coordinator has the Cognito sub', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.findByCognitoSubOrFail('unknown-sub'),
+      ).rejects.toThrow(new NotFoundException('Coordinator not found'));
+    });
+
+    it('throws NotFoundException without querying when the sub is empty', async () => {
+      await expect(service.findByCognitoSubOrFail('')).rejects.toThrow(
+        new NotFoundException('Coordinator not found'),
+      );
+
+      expect(repo.findOneBy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findActiveByHomebase', () => {
     it('returns the active coordinators at the homebase ordered by id', async () => {
       const coordinators = [
