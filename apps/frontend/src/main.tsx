@@ -6,6 +6,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { configureAmplify, isAuthEnabled } from './auth/auth.config';
 import App from './app';
 import { system } from './theme';
+import { UserProvider } from './auth/userContext';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
@@ -15,17 +16,21 @@ const root = ReactDOM.createRoot(
 configureAmplify();
 
 root.render(
-  <ChakraProvider value={system}>
-    {isAuthEnabled() ? (
-      <Authenticator>
-        <StrictMode>
-          <App />
-        </StrictMode>
-      </Authenticator>
-    ) : (
-      <StrictMode>
-        <App />
-      </StrictMode>
-    )}
-  </ChakraProvider>,
+  <StrictMode>
+    <ChakraProvider value={system}>
+      <Authenticator.Provider>
+        {isAuthEnabled() ? (
+          <Authenticator>
+            <UserProvider>
+              <App />
+            </UserProvider>
+          </Authenticator>
+        ) : (
+          <UserProvider>
+            <App />
+          </UserProvider>
+        )}
+      </Authenticator.Provider>
+    </ChakraProvider>
+  </StrictMode>,
 );
