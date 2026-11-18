@@ -252,7 +252,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
       expect(mockRepo.save).toHaveBeenCalledWith({
         ...profile,
-        status: VolunteerStatus.PENDING,
+        status: VolunteerStatus.UNCONFIRMED,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
         assignedCoordinators: bostonCoordinators,
@@ -260,7 +260,7 @@ describe('VolunteersService', () => {
       expect(result).toEqual({
         volunteerId: 1,
         ...profile,
-        status: VolunteerStatus.PENDING,
+        status: VolunteerStatus.UNCONFIRMED,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
         assignedCoordinators: bostonCoordinators,
@@ -436,7 +436,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           ...profile,
-          status: VolunteerStatus.PENDING,
+          status: VolunteerStatus.UNCONFIRMED,
           cognitoSub: 'cognito-sub-123',
         }),
       );
@@ -468,6 +468,51 @@ describe('VolunteersService', () => {
       );
       expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
       expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('moves an unconfirmed volunteer to pending once their email is confirmed', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
+      } as FosterVolunteer);
+      mockCognitoService.confirmUser.mockResolvedValue(undefined);
+
+      await service.confirm({ email: 'jane@example.com', code: '123456' });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          volunteerId: 1,
+          status: VolunteerStatus.PENDING,
+        }),
+      );
+    });
+
+    it('does not change the status of a volunteer who is not unconfirmed', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.ACTIVE,
+      } as FosterVolunteer);
+      mockCognitoService.confirmUser.mockResolvedValue(undefined);
+
+      await service.confirm({ email: 'jane@example.com', code: '123456' });
+
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('does not move the volunteer to pending when Cognito confirmation fails', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
+      } as FosterVolunteer);
+      mockCognitoService.confirmUser.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
+      );
+
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '000000' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException without calling Cognito when no volunteer has the email', async () => {
@@ -1059,6 +1104,19 @@ describe('VolunteersService', () => {
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
+    it('throws ConflictException if the volunteer is unconfirmed', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.UNCONFIRMED,
+      });
+
+      await expect(service.approve(1)).rejects.toThrow(
+        new ConflictException('Only pending Volunteers can be approved'),
+      );
+      expect(mockRepo.save).not.toHaveBeenCalled();
+      expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundException if volunteer does not exist', async () => {
       mockRepo.findOne.mockResolvedValue(null);
       const findSpy = jest.spyOn(service, 'findByIdOrFail');
@@ -1132,6 +1190,19 @@ describe('VolunteersService', () => {
       mockRepo.findOne.mockResolvedValue({
         ...pendingVolunteer(),
         status: VolunteerStatus.ACTIVE,
+      });
+
+      await expect(service.deny(1)).rejects.toThrow(
+        new ConflictException('Only pending Volunteers can be denied'),
+      );
+      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException if the volunteer is unconfirmed', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        ...pendingVolunteer(),
+        status: VolunteerStatus.UNCONFIRMED,
       });
 
       await expect(service.deny(1)).rejects.toThrow(
