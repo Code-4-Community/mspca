@@ -6,10 +6,12 @@ import {
   Field,
   Flex,
   Heading,
+  Icon,
   Input,
   Stack,
   Text,
 } from '@chakra-ui/react';
+import { Mail } from 'lucide-react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { signIn, signOut } from 'aws-amplify/auth';
 
@@ -17,8 +19,31 @@ import { useCurrentUser } from '../auth/userContext';
 import { getSignInErrorMessage } from '../auth/signInErrors';
 
 /**
- * Email and password sign-in, built from the Lo-Fi. Forgot password, create
- * account, and remember me are not implemented yet.
+ * A small input with an envelope icon inside its left edge, as in the Lo-Fi.
+ * The Lo-Fi uses the envelope for the password field too.
+ */
+const IconInput: React.FC<React.ComponentProps<typeof Input>> = (props) => (
+  <Box position="relative" w="full">
+    <Icon
+      asChild
+      position="absolute"
+      left="3"
+      top="50%"
+      transform="translateY(-50%)"
+      boxSize="4"
+      color="fg.muted"
+      pointerEvents="none"
+      zIndex="1"
+    >
+      <Mail strokeWidth={1.5} aria-hidden />
+    </Icon>
+    <Input size="sm" ps="9" {...props} />
+  </Box>
+);
+
+/**
+ * Email and password sign-in, built from the Lo-Fi. Remember me, forgot
+ * password, and create account are shown but not implemented yet.
  */
 const SignIn: React.FC = () => {
   const location = useLocation();
@@ -72,21 +97,32 @@ const SignIn: React.FC = () => {
   };
 
   return (
-    <Flex minH="100vh" align="center" justify="center" bg="gray.50" px="4">
+    <Flex
+      minH="100vh"
+      bg={{ base: 'gray.200', lg: 'white' }}
+      p={{ base: '8', lg: '16' }}
+      gap="87px"
+      justify={{ base: 'center', lg: 'flex-start' }}
+      align={{ base: 'center', lg: 'stretch' }}
+    >
+      {/* Sizes and spacing are from the Lo-Fi's Desktop - 1 and iPhone 17 frames. */}
       <Box
-        w="full"
-        maxW="420px"
-        bg="white"
-        p="8"
-        borderRadius="lg"
-        boxShadow="card"
+        alignSelf="center"
+        w={{ base: 'full', lg: '517px' }}
+        flexShrink={0}
+        minH={{ base: '452px', lg: '589px' }}
+        bg="gray.50"
+        borderRadius="3xl"
+        boxShadow="md"
+        px={{ base: '9', lg: '14' }}
+        py={{ base: '12', lg: '20' }}
       >
-        <Stack gap="6">
+        <Stack gap="9">
           <Stack gap="2">
-            <Heading as="h1" size="2xl">
+            <Heading as="h1" size="3xl" fontWeight="bold">
               Sign in
             </Heading>
-            <Text color="gray.600">
+            <Text textStyle="sm" color="gray.600">
               Enter your email and password to bring home an animal in need
             </Text>
           </Stack>
@@ -104,40 +140,61 @@ const SignIn: React.FC = () => {
           ) : (
             <form onSubmit={handleSubmit}>
               <Stack gap="4">
-                <Field.Root>
-                  <Field.Label>Email</Field.Label>
-                  <Input
+                <Field.Root invalid={error !== null}>
+                  <IconInput
                     type="email"
                     autoComplete="email"
+                    placeholder="Email"
+                    aria-label="Email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                   />
                 </Field.Root>
 
-                <Field.Root>
-                  <Field.Label>Password</Field.Label>
-                  <Input
+                <Field.Root invalid={error !== null}>
+                  <IconInput
                     type="password"
                     autoComplete="current-password"
+                    placeholder="Password"
+                    aria-label="Password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
+                  <Field.ErrorText>{error}</Field.ErrorText>
                 </Field.Root>
+              </Stack>
 
-                {error && (
-                  <Text role="alert" color="red.600">
-                    {error}
-                  </Text>
-                )}
+              {/* TODO: implement remember me and forgot password. */}
+              <Flex justify="space-between" mt="3">
+                <Text textStyle="xs" fontWeight="medium">
+                  Remember me
+                </Text>
+                <Text textStyle="xs" fontWeight="medium">
+                  Forgot password
+                </Text>
+              </Flex>
 
+              <Stack gap="4" mt="9">
                 <Button type="submit" loading={submitting || checkingAccount}>
                   Log in
+                </Button>
+                {/* TODO: link to the create account flow. */}
+                <Button type="button" variant="outline">
+                  Create Account
                 </Button>
               </Stack>
             </form>
           )}
         </Stack>
       </Box>
+
+      {/* Placeholder from the Lo-Fi; desktop only. */}
+      <Box
+        display={{ base: 'none', lg: 'block' }}
+        flex="1"
+        bg="gray.200"
+        borderRadius="3xl"
+      />
     </Flex>
   );
 };
