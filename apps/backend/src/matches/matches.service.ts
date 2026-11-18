@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -7,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
@@ -43,6 +44,7 @@ export class MatchesService {
    * @returns the created match
    * @throws NotFoundException if the volunteer or animal does not exist
    * @throws BadRequestException if the volunteer is not active
+   * @throws ConflictException if the volunteer already has a PENDING or ACTIVE match for the animal
    */
   async create(dto: CreateMatchDto): Promise<Match> {
     const volunteer = await this.volunteersService.findActiveOrFail(
@@ -50,11 +52,23 @@ export class MatchesService {
     );
     await this.animalsService.findByChameleonIdOrFail(dto.chameleonAnimalId);
 
+    const existingMatch = await this.repo.findOneBy({
+      volunteerId: dto.volunteerId,
+      chameleonAnimalId: dto.chameleonAnimalId,
+      status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+    });
+    if (existingMatch) {
+      throw new ConflictException(
+        `Volunteer ${dto.volunteerId} already has a ${existingMatch.status} match for animal ${dto.chameleonAnimalId}`,
+      );
+    }
+
     const match = await this.repo.save(
       this.repo.create({
         volunteerId: dto.volunteerId,
         chameleonAnimalId: dto.chameleonAnimalId,
         status: MatchStatus.PENDING,
+        additionalComments: dto.additionalComments ?? null,
         deniedReason: null,
       }),
     );
