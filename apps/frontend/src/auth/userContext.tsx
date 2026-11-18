@@ -40,17 +40,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     // Ignores a response that arrives after the user has signed out.
     let cancelled = false;
 
-    apiClient
-      .getMe()
-      .then((me) => {
+    const loadCurrentUser = async () => {
+      try {
+        const me = await apiClient.getMe();
         if (!cancelled) setFetched({ currentUser: me });
-      })
-      .catch((error) => {
+      } catch (error) {
         if (!cancelled) {
           console.error('Failed to load the signed-in user', error);
           setFetched({ currentUser: null });
         }
-      });
+      }
+    };
+
+    loadCurrentUser();
 
     return () => {
       cancelled = true;

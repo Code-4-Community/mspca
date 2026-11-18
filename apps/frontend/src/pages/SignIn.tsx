@@ -6,8 +6,8 @@ import {
   Field,
   Flex,
   Heading,
-  Icon,
   Input,
+  InputGroup,
   Stack,
   Text,
 } from '@chakra-ui/react';
@@ -17,29 +17,6 @@ import { signIn, signOut } from 'aws-amplify/auth';
 
 import { useCurrentUser } from '../auth/userContext';
 import { getSignInErrorMessage } from '../auth/signInErrors';
-
-/**
- * A small input with an envelope icon inside its left edge, as in the Lo-Fi.
- * The Lo-Fi uses the envelope for the password field too.
- */
-const IconInput: React.FC<React.ComponentProps<typeof Input>> = (props) => (
-  <Box position="relative" w="full">
-    <Icon
-      asChild
-      position="absolute"
-      left="3"
-      top="50%"
-      transform="translateY(-50%)"
-      boxSize="4"
-      color="fg.muted"
-      pointerEvents="none"
-      zIndex="1"
-    >
-      <Mail strokeWidth={1.5} aria-hidden />
-    </Icon>
-    <Input size="sm" ps="9" {...props} />
-  </Box>
-);
 
 /**
  * Email and password sign-in, built from the Lo-Fi. Remember me, forgot
@@ -67,39 +44,39 @@ const SignIn: React.FC = () => {
     authStatus === 'authenticated' && !loading && currentUser === null;
   const checkingAccount = authStatus === 'authenticated' && loading;
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     // Stops the browser from reloading the page, its default for forms.
     event.preventDefault();
     setError(null);
     setSubmitting(true);
 
-    signIn({ username: email.trim(), password })
-      .then(({ nextStep }) => {
-        // Other steps (like setting a new password) aren't supported yet.
-        if (nextStep.signInStep !== 'DONE') {
-          setError(
-            'This account needs more setup before it can sign in. Please contact an MSPCA staff member.',
-          );
-        }
-      })
-      .catch((err: unknown) => {
-        setError(getSignInErrorMessage(err));
-      })
-      .finally(() => {
-        setSubmitting(false);
-      });
+    try {
+      const { nextStep } = await signIn({ username: email.trim(), password });
+      // Other steps (like setting a new password) aren't supported yet.
+      if (nextStep.signInStep !== 'DONE') {
+        setError(
+          'This account needs more setup before it can sign in. Please contact an MSPCA staff member.',
+        );
+      }
+    } catch (err) {
+      setError(getSignInErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSignOut = () => {
-    signOut().catch((err: unknown) => {
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err) {
       console.error('Failed to sign out', err);
-    });
+    }
   };
 
   return (
     <Flex
       minH="100vh"
-      bg={{ base: 'gray.200', lg: 'white' }}
+      bg={{ base: 'gray.200', lg: 'gray.0' }}
       p={{ base: '8', lg: '16' }}
       gap="87px"
       justify={{ base: 'center', lg: 'flex-start' }}
@@ -113,23 +90,23 @@ const SignIn: React.FC = () => {
         minH={{ base: '452px', lg: '589px' }}
         bg="gray.50"
         borderRadius="3xl"
-        boxShadow="md"
+        boxShadow="card"
         px={{ base: '9', lg: '14' }}
         py={{ base: '12', lg: '20' }}
       >
         <Stack gap="9">
           <Stack gap="2">
-            <Heading as="h1" size="3xl" fontWeight="bold">
+            <Heading as="h1" textStyle="h4" fontWeight="bold">
               Sign in
             </Heading>
-            <Text textStyle="sm" color="gray.600">
+            <Text textStyle="body-sm" color="fg.muted">
               Enter your email and password to bring home an animal in need
             </Text>
           </Stack>
 
           {accountMissing ? (
             <Stack gap="4">
-              <Text role="alert" color="red.600">
+              <Text role="alert" color="fg.error">
                 You signed in, but we couldn&apos;t load your account. Please
                 contact an MSPCA staff member.
               </Text>
@@ -141,25 +118,40 @@ const SignIn: React.FC = () => {
             <form onSubmit={handleSubmit}>
               <Stack gap="4">
                 <Field.Root invalid={error !== null}>
-                  <IconInput
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Email"
-                    aria-label="Email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
+                  <InputGroup
+                    startElement={
+                      <Mail size={16} strokeWidth={1.5} aria-hidden />
+                    }
+                  >
+                    <Input
+                      size="sm"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="Email"
+                      aria-label="Email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                  </InputGroup>
                 </Field.Root>
 
                 <Field.Root invalid={error !== null}>
-                  <IconInput
-                    type="password"
-                    autoComplete="current-password"
-                    placeholder="Password"
-                    aria-label="Password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
+                  {/* The Lo-Fi uses the envelope icon for the password too. */}
+                  <InputGroup
+                    startElement={
+                      <Mail size={16} strokeWidth={1.5} aria-hidden />
+                    }
+                  >
+                    <Input
+                      size="sm"
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="Password"
+                      aria-label="Password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
+                  </InputGroup>
                   <Field.ErrorText>{error}</Field.ErrorText>
                 </Field.Root>
               </Stack>
