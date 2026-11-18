@@ -12,9 +12,8 @@ type UserContextValue = {
   loading: boolean;
 };
 
-/** A /api/auth/me result, tagged with the Cognito user it was fetched for. */
-type FetchedUser = {
-  userId: string;
+/** The finished /api/auth/me request: the user, or null if it failed. */
+type FetchResult = {
   currentUser: AuthenticatedUser | null;
 };
 
@@ -32,17 +31,11 @@ const UserContext = createContext<UserContextValue>({
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { authStatus, user } = useAuthenticator((context) => [
-    context.authStatus,
-    context.user,
-  ]);
-  const [fetched, setFetched] = useState<FetchedUser | null>(null);
-
-  // The signed-in user's Cognito ID (their sub), or undefined if signed out.
-  const userId = authStatus === 'authenticated' ? user?.userId : undefined;
+  const { authStatus } = useAuthenticator((context) => [context.authStatus]);
+  const [fetched, setFetched] = useState<FetchResult | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (authStatus !== 'authenticated') return;
 
     // Ignores a response that arrives after the user has signed out.
     let cancelled = false;
@@ -50,22 +43,24 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     apiClient
       .getMe()
       .then((me) => {
-        if (!cancelled) setFetched({ userId, currentUser: me });
+        if (!cancelled) setFetched({ currentUser: me });
       })
       .catch((error) => {
         if (!cancelled) {
           console.error('Failed to load the signed-in user', error);
-          setFetched({ userId, currentUser: null });
+          setFetched({ currentUser: null });
         }
       });
 
     return () => {
       cancelled = true;
+      // Forget this user, so the next sign-in loads from scratch.
+      setFetched(null);
     };
-  }, [userId]);
+  }, [authStatus]);
 
-  // Only trust a result fetched for the user who is signed in right now.
-  const result = fetched !== null && fetched.userId === userId ? fetched : null;
+  // A result only counts while someone is signed in.
+  const result = authStatus === 'authenticated' ? fetched : null;
   const currentUser = result?.currentUser ?? null;
 
   // Without the VITE_ Cognito variables no one can sign in, so never load.
