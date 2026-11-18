@@ -16,7 +16,10 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import { signIn, signOut } from 'aws-amplify/auth';
 
 import { useCurrentUser } from '../auth/userContext';
-import { getSignInErrorMessage } from '../auth/signInErrors';
+import {
+  getSignInErrorMessage,
+  getSignInStepMessage,
+} from '../auth/signInErrors';
 
 /**
  * Email and password sign-in, built from the Lo-Fi. Remember me, forgot
@@ -52,11 +55,9 @@ const SignIn: React.FC = () => {
 
     try {
       const { nextStep } = await signIn({ username: email.trim(), password });
-      // Other steps (like setting a new password) aren't supported yet.
+      // Cognito accepted the credentials but needs another step first.
       if (nextStep.signInStep !== 'DONE') {
-        setError(
-          'This account needs more setup before it can sign in. Please contact an MSPCA staff member.',
-        );
+        setError(getSignInStepMessage(nextStep.signInStep));
       }
     } catch (err) {
       setError(getSignInErrorMessage(err));
