@@ -1,34 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Button, Flex, Image, Text } from '@chakra-ui/react';
 
-import apiClient from '@api/apiClient';
-import type { Volunteer } from '../types';
-import { useVolunteerId } from '@utils/useVolunteerId';
+import { useCurrentUser } from '../auth/userContext';
+import { getUserId } from '@utils/user';
 import { getAvatarColor, getInitials } from '@utils/volunteer';
 import logo from '../assets/mspca-logo.png';
 
-/** Site-wide header: MSPCA logo and the current volunteer's profile button. */
+/** Site-wide header: MSPCA logo and the signed-in user's profile button. */
 const Navbar: React.FC = () => {
-  const volunteerId = useVolunteerId();
-  const [loaded, setLoaded] = useState<Volunteer | null>(null);
-  const volunteer = loaded?.volunteerId === volunteerId ? loaded : null;
-
-  useEffect(() => {
-    if (volunteerId === null) return;
-
-    let cancelled = false;
-    apiClient
-      .getVolunteer(volunteerId)
-      .then((result) => {
-        if (!cancelled) setLoaded(result);
-      })
-      .catch((err: unknown) => {
-        console.warn(`Could not load volunteer ${volunteerId}`, err);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [volunteerId]);
+  const { currentUser } = useCurrentUser();
 
   return (
     <Flex
@@ -48,7 +27,7 @@ const Navbar: React.FC = () => {
         h={{ base: '64px', md: '88px' }}
         objectFit="contain"
       />
-      {/* TODO: link to the volunteer profile page once it exists. */}
+      {/* TODO: link to the profile page once it exists. */}
       <Button
         type="button"
         aria-label="My Profile"
@@ -65,7 +44,7 @@ const Navbar: React.FC = () => {
           flexShrink={0}
           align="center"
           justify="center"
-          bg={volunteer ? getAvatarColor(volunteer.volunteerId) : 'gray.300'}
+          bg={currentUser ? getAvatarColor(getUserId(currentUser)) : 'gray.300'}
           color="white"
           borderRadius="full"
           boxShadow="card"
@@ -76,8 +55,8 @@ const Navbar: React.FC = () => {
           fontWeight="semibold"
           lineHeight="1"
         >
-          {volunteer
-            ? getInitials(volunteer.firstName, volunteer.lastName)
+          {currentUser
+            ? getInitials(currentUser.user.firstName, currentUser.user.lastName)
             : ''}
         </Flex>
         <Text
