@@ -15,14 +15,17 @@ import { CreateCoordinatorDto } from './dtos/create-coordinator.dto';
 import { ConfirmCoordinatorDto } from './dtos/confirm-coordinator.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 import { validateId } from '../utils/validation.utils';
+import { minutes } from '@nestjs/throttler';
+import { RateLimit } from '../rate-limit/rate-limit.decorators';
 
 @ApiTags('Coordinators')
 @Controller('coordinators')
 export class CoordinatorsController {
   constructor(private coordinatorsService: CoordinatorsService) {}
 
-  @Public()
   @Post()
+  @Public()
+  @RateLimit({ limit: 3, ttl: minutes(10) })
   @ApiOperation({
     summary: 'Create a foster coordinator account',
   })
@@ -44,12 +47,17 @@ export class CoordinatorsController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to register or save the coordinator',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many sign-up attempts from this IP; try again later',
+  })
   async create(@Body() dto: CreateCoordinatorDto): Promise<FosterCoordinator> {
     return this.coordinatorsService.create(dto);
   }
 
-  @Public()
   @Post('/confirm')
+  @Public()
+  @RateLimit({ limit: 5, ttl: minutes(10) })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Confirm a foster coordinator email',

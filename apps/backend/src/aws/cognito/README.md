@@ -23,7 +23,7 @@ Some key concepts you'll need to know are:
    - `fetchAuthSession()` returns the cached access token and silently refreshes it when expired, so the 1 hour token lifetime needs no handling
    - if no one is signed in or if errors occur with fetching the auth session it sends the request unauthenticated and lets the guard answer `401`
 
-5. **The Guard checks the token.** `CognitoJWTGuard` runs on every route (it's registered as a global `APP_GUARD`). For each request it:
+5. **The Guard checks the token.** `CognitoJWTGuard` runs on every route: the app's global guard, `AuthThenRateLimitGuard`, calls it first and then applies rate limiting (see [Rate limiting](#rate-limiting)). For each request it:
 
    - lets the request through immediately if auth is explicitly disabled (`AUTH_DISABLED=true`) or if the route is marked `@Public()` (intentional bypass)
    - extracts and verifies the Bearer token, then checks the RS256 signature against the pool's public keys (JWKS), the issuer, expiration, that `token_use === 'access'`, and that `client_id` matches our app client.
@@ -74,7 +74,7 @@ export const REQUIRED_ENV_VARS_WHEN_ENABLED = ['COGNITO_USER_POOL_ID', 'COGNITO_
 ### Auth model
 
 - **Verification** — `CognitoJWTGuard` is the only component that validates JWTs (See [Token validation](#token-validation))
-- **Global guard** — `CognitoModule` registers `CognitoJWTGuard` as an `APP_GUARD`, so every route is protected by default. You do **not** need `@UseGuards(CognitoJWTGuard)` on controllers when using this setup.
+- **Global guard** — `CognitoModule` registers `AuthThenRateLimitGuard` as the app's only `APP_GUARD`. It runs `CognitoJWTGuard`, then `RateLimitGuard`, so every route is protected and rate limited by default. You do **not** need `@UseGuards(...)` on controllers.
 - **`request.user`** — After a successful check, the guard sets `request.user` to the decoded JWT payload (`AccessTokenPayload`: `sub`, `client_id`, `cognito:groups`, `token_use`, etc.)
 
 ### Using Cognito in your app (recommended + implemented: global guard)
@@ -109,6 +109,72 @@ export class HealthController {
   }
 }
 ```
+
+### Rate limiting
+
+Every route is rate limited, using [`@nestjs/throttler`](https://github.com/nestjs/throttler). Requests over the limit receive `429 Too Many Requests`.
+
+#### Defaults
+
+| Route type           | Default limit  | Counted per                                                                |
+| -------------------- | -------------- | -------------------------------------------------------------------------- |
+| Public (`@Public()`) | 10 per minute  | Client IP address                                                          |
+| Protected            | 100 per minute | Logged-in Cognito user (`sub` claim); IP address when `AUTH_DISABLED=true` |
+
+Public routes are keyed by IP because there's no logged-in user, and on sign-up routes the email is chosen by the caller, so a bot could use a new one on every request. Protected routes are keyed by user, so people sharing a network (for example, a shelter's Wi-Fi) each get their own limit.
+
+#### Custom limits and opting out
+
+Use the wrappers in `rate-limit/rate-limit.decorators.ts`:
+
+```typescript
+import { minutes } from '@nestjs/throttler';
+import { RateLimit, SkipRateLimit } from '../rate-limit/rate-limit.decorators';
+
+@Post()
+@Public()
+@RateLimit({ limit: 3, ttl: minutes(10) }) // 3 requests per 10 minutes
+create() {}
+
+@Get('health')
+@SkipRateLimit() // never rate limited
+check() {}
+```
+
+- `limit` and `ttl` (the window, in milliseconds) must be positive integers. An invalid value throws at startup, so the app won't boot with a broken limit.
+- Don't use the package's `@Throttle()` or `@SkipThrottle()` directly. The two throttlers are named (`public` and `protected`), and with named throttlers a bare `@SkipThrottle()` skips nothing. The wrappers always pass both names.
+
+Current custom limits:
+
+| Route                                                    | Limit            |
+| -------------------------------------------------------- | ---------------- |
+| `POST /volunteers`, `POST /coordinators`                 | 3 per 10 minutes |
+| `POST /volunteers/confirm`, `POST /coordinators/confirm` | 5 per 10 minutes |
+
+Account creation is strictest because every call makes Cognito send a verification email. On the confirm routes, a 429 can come from this rate limit or from Cognito's own limit on wrong codes; clients should treat both as "try again later."
+
+#### How it works
+
+- `rate-limit/rate-limit.utils.ts` defines the two throttlers (`DEFAULT_THROTTLERS`), their names, and `isPublicRoute()`. Each throttler skips the other route type, so every route uses exactly one.
+- `rate-limit/rate-limit.guard.ts` (`RateLimitGuard`) extends `ThrottlerGuard` and overrides `getTracker()` to count by `request.user.sub` when present, otherwise by IP.
+- `rate-limit/auth-then-rate-limit.guard.ts` (`AuthThenRateLimitGuard`) is the single global guard. It runs `CognitoJWTGuard`, then `RateLimitGuard`. The order matters, since `request.user` only exists after authentication, and registering the two as separate global guards did not keep that order in practice. Unauthenticated requests get `401` before rate limiting runs.
+- `CognitoModule` imports `ThrottlerModule.forRoot(DEFAULT_THROTTLERS)` itself, so the module provides everything its guards need.
+- Requests are counted per route: an IP's sign-up attempts and confirmation attempts are tracked separately.
+
+#### Testing
+
+- `rate-limit.guard.spec.ts` runs a small app with the real `AuthThenRateLimitGuard` and a `FakeAuthGuard` standing in for `CognitoJWTGuard`, covering both defaults, custom limits (under, at, and over), skipping, and keying by IP vs. user.
+- `auth-then-rate-limit.guard.spec.ts` checks that authentication runs first and that failed authentication skips rate limiting.
+- `rate-limit.decorators.spec.ts` and `rate-limit.utils.spec.ts` cover validation and `isPublicRoute()`.
+- Controller unit tests need no setup for rate limiting, since the global guard isn't created in them.
+
+To test with real users locally, set `AUTH_DISABLED=false`, then get access tokens with `aws cognito-idp initiate-auth` (`USER_PASSWORD_AUTH` flow) for two users. One user going over a limit shouldn't affect the other.
+
+#### Limitations and deployment notes
+
+- **Counts are stored in memory.** They reset when the server restarts and aren't shared between instances. That works for a single long-running server. On AWS Lambda, each execution environment keeps its own counts, so limits become best-effort. A shared store such as Redis would fix this, at extra cost.
+- **The client IP must be correct behind a proxy.** Behind API Gateway or another proxy, `req.ip` may be the proxy's address, which would put all anonymous users on one counter. Verify `req.ip` once deployment is set up and configure Express's `trust proxy` setting (or the Lambda adapter) as needed. Don't enable `trust proxy` without a proxy in front, since clients could then fake `X-Forwarded-For`.
+- **Infrastructure-level options (not yet decided):** an AWS WAF rate-based rule (per-IP, before requests reach the app; about $5/month per web ACL plus $1 per rule and $0.60 per million requests; minimum limit of 10 per window) and API Gateway throttling (a cap on total traffic, shared by all callers). The in-app limits work without either.
 
 ### `CognitoService.getUser()`
 
