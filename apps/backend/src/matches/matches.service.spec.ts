@@ -863,4 +863,80 @@ describe('MatchesService', () => {
       expect(matchRepo.save).not.toHaveBeenCalled();
     });
   });
+  describe('findPendingByChameleonAnimalId', () => {
+    const pendingMatches = [
+      { ...mockMatch, volunteer: volunteerWithCoordinator },
+      {
+        ...mockMatch,
+        matchId: 2,
+        volunteer: { ...volunteerWithCoordinator, volunteerId: 2 },
+      },
+    ] as Match[];
+
+    const otherMatches = [
+      { ...mockMatch, matchId: 3, status: MatchStatus.WITHDRAWN },
+      { ...mockMatch, matchId: 4, status: MatchStatus.DENIED },
+      { ...mockMatch, matchId: 5, status: MatchStatus.ACTIVE },
+      { ...mockMatch, matchId: 6, status: MatchStatus.CANCELED },
+      { ...mockMatch, matchId: 7, chameleonAnimalId: 'A43' },
+    ] as Match[];
+
+    const expectedQuery = {
+      where: { chameleonAnimalId: 'A42', status: MatchStatus.PENDING },
+      relations: ['volunteer'],
+      order: { matchId: 'ASC' },
+    };
+
+    const mockMatchesTable = (rows: Match[]) =>
+      matchRepo.find.mockImplementation(async ({ where }) =>
+        rows.filter(
+          (row) =>
+            row.chameleonAnimalId === where.chameleonAnimalId &&
+            row.status === where.status,
+        ),
+      );
+
+    it('returns only the pending matches for the animal, each with its volunteer', async () => {
+      mockMatchesTable([...pendingMatches, ...otherMatches]);
+
+      const result = await service.findPendingByChameleonAnimalId('A42');
+
+      expect(result).toEqual(pendingMatches);
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns a single pending match among non-pending ones', async () => {
+      mockMatchesTable([pendingMatches[0], ...otherMatches]);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([pendingMatches[0]]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('returns an empty array when the animal has no pending matches', async () => {
+      mockMatchesTable(otherMatches);
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A42'),
+      ).resolves.toEqual([]);
+      expect(matchRepo.find).toHaveBeenCalledWith(expectedQuery);
+    });
+
+    it('throws when the animal does not exist', async () => {
+      animalsService.findByChameleonIdOrFail.mockRejectedValue(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+
+      await expect(
+        service.findPendingByChameleonAnimalId('A999'),
+      ).rejects.toThrow(
+        new NotFoundException('Animal with Chameleon ID A999 not found'),
+      );
+      expect(matchRepo.find).not.toHaveBeenCalled();
+    });
+  });
 });

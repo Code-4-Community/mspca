@@ -16,6 +16,7 @@ import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { UpdateSpeciesPreferencesDto } from './dtos/update-species-preferences.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { EmailsService } from '../aws/ses/email.service';
@@ -27,6 +28,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
 import { AnimalsService } from '../animals/animals.service';
+import { MatchStatus } from '../matches/matches.types';
 
 @Injectable()
 export class VolunteersService {
@@ -404,6 +406,65 @@ export class VolunteersService {
   }
 
   /**
+   * Updates an active Volunteer's foster type preferences.
+   * Validates all changes before mutating the Volunteer or saving.
+   * Removals are applied before additions.
+   *
+   * @param id - The Volunteer's ID.
+   * @param dto - The foster types to add and/or remove.
+   * @returns The Volunteer's updated list of foster type preferences.
+   * @throws {NotFoundException} If the Volunteer does not exist.
+   * @throws {BadRequestException} If the Volunteer is inactive or the update is invalid.
+   */
+  async updateFosterTypePreferences(
+    id: number,
+    dto: UpdateSpeciesPreferencesDto,
+  ): Promise<FosterType[]> {
+    const volunteer = await this.findActiveOrFail(id);
+    const added = dto.added ?? [];
+    const removed = dto.removed ?? [];
+    const currentPreferences = volunteer.fosterTypePreferences;
+
+    const overlapping = added.filter((type) => removed.includes(type));
+
+    if (overlapping.length > 0) {
+      throw new BadRequestException(
+        `Foster types cannot be both added and removed: ${overlapping.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    if (removed.length > 0 && currentPreferences.length === 0) {
+      throw new BadRequestException(
+        `Volunteer with ID ${id} has no foster type preferences to remove`,
+      );
+    }
+
+    const invalidRemovals = removed.filter(
+      (type) => !currentPreferences.includes(type),
+    );
+
+    if (invalidRemovals.length > 0) {
+      throw new BadRequestException(
+        `Foster types not in the volunteer's preferences: ${invalidRemovals.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    const preferences = currentPreferences.filter(
+      (type) => !removed.includes(type),
+    );
+
+    preferences.push(...added.filter((type) => !preferences.includes(type)));
+
+    volunteer.fosterTypePreferences = preferences;
+    const saved = await this.repo.save(volunteer);
+    return saved.fosterTypePreferences;
+  }
+
+  /**
    * Approves a pending Volunteer, setting their status to Active and emailing
    * them that they can now log in.
    *
@@ -478,13 +539,20 @@ export class VolunteersService {
 
   /**
    * Gets all foster volunteers.
-   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * Each volunteer includes only their matches with status ACTIVE, or an empty array if there are no volunteers.
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
-    const volunteers = await this.repo.find({
-      relations: ['assignedCoordinators'],
-    });
+    const volunteers = await this.repo
+      .createQueryBuilder('volunteer')
+      .leftJoinAndSelect('volunteer.assignedCoordinators', 'coordinator')
+      .leftJoinAndSelect(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      )
+      .getMany();
     return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
   /**

@@ -2,6 +2,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  OneToMany,
   ManyToMany,
   JoinTable,
   Unique,
@@ -13,6 +14,7 @@ import {
   VolunteerStatus,
 } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
 @Unique('UQ_foster_volunteers_email', ['email'])
@@ -87,6 +89,16 @@ export class FosterVolunteer {
   })
   status!: VolunteerStatus;
 
+  @Column({
+    name: 'foster_type_preferences',
+    type: 'enum',
+    enum: FosterType,
+    enumName: 'foster_type_enum',
+    array: true,
+    default: () => "'{}'",
+  })
+  fosterTypePreferences!: FosterType[];
+
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
 
@@ -112,4 +124,7 @@ export class FosterVolunteer {
     },
   })
   assignedCoordinators!: FosterCoordinator[];
+
+  @OneToMany(() => Match, (match) => match.volunteer)
+  matches?: Match[];
 }

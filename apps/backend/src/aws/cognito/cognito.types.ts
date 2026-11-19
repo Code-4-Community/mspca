@@ -2,7 +2,7 @@
 export enum CognitoRole {
   FosterVolunteer = 'FosterVolunteer',
   FosterCoordinator = 'FosterCoordinator',
-  Admin = 'Admin',
+  Owner = 'Owner',
 }
 
 // Resolved Cognito configuration derived from environment variables.

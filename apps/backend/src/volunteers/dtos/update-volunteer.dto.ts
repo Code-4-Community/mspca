@@ -12,7 +12,22 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
+import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 
+@AtLeastOneValue<UpdateVolunteerDto>([
+  'firstName',
+  'lastName',
+  'phone',
+  'secondaryPhone',
+  'email',
+  'address',
+  'city',
+  'zipcode',
+  'residentAnimals',
+  'notes',
+  'fosterType',
+  'animalUpdates',
+])
 export class UpdateVolunteerDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsNonEmptyString()
