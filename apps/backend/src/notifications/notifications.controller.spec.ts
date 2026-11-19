@@ -1,11 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { FosterType } from '../volunteers/volunteers.types';
+import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
   let service: { createBulkNotification: jest.Mock; sendNow: jest.Mock };
+
+  const validationPipe = new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  });
 
   const body = {
     subject: 'Fosters needed',
@@ -46,6 +53,28 @@ describe('NotificationsController', () => {
       await expect(controller.createBulkNotification(body)).rejects.toThrow(
         'boom',
       );
+    });
+
+    it.each([{ filters: null }, { sendAt: null }])(
+      'rejects %j',
+      async (extra) => {
+        await expect(
+          validationPipe.transform(
+            { subject: 'Fosters needed', body: 'Please help.', ...extra },
+            { type: 'body', metatype: CreateBulkNotificationDto },
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it('accepts omitted filters and sendAt', async () => {
+      const result = await validationPipe.transform(
+        { subject: 'Fosters needed', body: 'Please help.' },
+        { type: 'body', metatype: CreateBulkNotificationDto },
+      );
+
+      expect(result.filters).toBeUndefined();
+      expect(result.sendAt).toBeUndefined();
     });
   });
 
