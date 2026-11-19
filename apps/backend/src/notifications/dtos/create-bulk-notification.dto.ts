@@ -3,10 +3,10 @@ import {
   IsArray,
   IsDate,
   IsEnum,
-  IsOptional,
   Matches,
   MaxLength,
   MinDate,
+  ValidateIf,
 } from 'class-validator';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { FosterType } from '../../volunteers/volunteers.types';
@@ -28,12 +28,12 @@ export class CreateBulkNotificationDto {
   body!: string;
 
   // Omitted/empty = every active Volunteer regardless of foster type.
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
   @IsEnum(FosterType, { each: true })
   filters?: FosterType[];
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @Type(() => Date)
   @IsDate()
   @MinDate(() => new Date(), { message: 'sendAt must be in the future' })
