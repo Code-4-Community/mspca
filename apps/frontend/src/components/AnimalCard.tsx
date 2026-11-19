@@ -12,6 +12,7 @@ export const PLACEHOLDER_IMAGE = catImage;
 interface AnimalCardProps {
   animal: Animal;
   onSeeMore: (animal: Animal) => void;
+  onHoverChange: (hovering: boolean) => void;
 }
 
 /**
@@ -20,11 +21,19 @@ interface AnimalCardProps {
  *
  * Shows the animal's photo, name, breed, age, restriction tags and the address
  * of the homebase it's at, with a "See More" button that calls `onSeeMore` so
- * the page can open the animal's detail modal. The card holds no state of its
- * own: everything it displays comes from the `animal` prop.
+ * the page can open the animal's detail modal. Calls `onHoverChange` when the
+ * mouse enters or leaves the card, so the page can highlight the animal's
+ * homebase on the map. The card holds no state of its own: everything it
+ * displays comes from the `animal` prop.
  */
-const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
+const AnimalCard: React.FC<AnimalCardProps> = ({
+  animal,
+  onSeeMore,
+  onHoverChange,
+}) => (
   <Flex
+    onMouseEnter={() => onHoverChange(true)}
+    onMouseLeave={() => onHoverChange(false)}
     alignSelf="stretch"
     direction="column"
     justify="flex-end"
