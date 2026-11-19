@@ -311,5 +311,13 @@ describe('NotificationsService', () => {
 
       expect(scheduler.send).not.toHaveBeenCalled();
     });
+
+    it('fails when the scheduler rejects the schedule', async () => {
+      scheduler.send.mockRejectedValueOnce(new Error('AccessDenied'));
+
+      await expect(
+        service.createBulkNotification({ ...dto, sendAt }),
+      ).rejects.toThrow('Failed to schedule bulk notification');
+    });
   });
 });

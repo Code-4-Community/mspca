@@ -57,7 +57,8 @@ export class NotificationsService {
    *
    * @param content - The subject, HTML body, and foster type filters.
    * @param sendAt - When the notification should go out.
-   * @throws {InternalServerErrorException} If the Scheduler target or role is not configured.
+   * @throws {InternalServerErrorException} If the Scheduler target or role is not configured,
+   *   or if EventBridge Scheduler fails to create the schedule.
    */
   private async schedule(
     content: CreateBulkNotificationDto,
@@ -72,32 +73,42 @@ export class NotificationsService {
       );
     }
 
-    await this.scheduler.send(
-      new CreateScheduleCommand({
-        Name: `notification-${randomUUID()}`,
-        // at() rejects the trailing Z and the milliseconds that toISOString() emits.
-        ScheduleExpression: `at(${sendAt.toISOString().slice(0, 19)})`,
-        ScheduleExpressionTimezone: 'UTC',
-        FlexibleTimeWindow: { Mode: FlexibleTimeWindowMode.OFF },
-        ActionAfterCompletion: ActionAfterCompletion.DELETE,
-        Target: {
-          Arn: targetArn,
-          RoleArn: roleArn,
-          // Scheduler's default retries run up to 185 times over 24 hours. Three
-          // attempts in ten minutes rides out a blip without hammering the dispatch
-          // route all day when the configuration is simply wrong.
-          RetryPolicy: {
-            MaximumRetryAttempts: 2,
-            MaximumEventAgeInSeconds: 600,
+    try {
+      await this.scheduler.send(
+        new CreateScheduleCommand({
+          Name: `notification-${randomUUID()}`,
+          // at() rejects the trailing Z and the milliseconds that toISOString() emits.
+          ScheduleExpression: `at(${sendAt.toISOString().slice(0, 19)})`,
+          ScheduleExpressionTimezone: 'UTC',
+          FlexibleTimeWindow: { Mode: FlexibleTimeWindowMode.OFF },
+          ActionAfterCompletion: ActionAfterCompletion.DELETE,
+          Target: {
+            Arn: targetArn,
+            RoleArn: roleArn,
+            // Scheduler's default retries run up to 185 times over 24 hours. Three
+            // attempts in ten minutes rides out a blip without hammering the dispatch
+            // route all day when the configuration is simply wrong.
+            RetryPolicy: {
+              MaximumRetryAttempts: 2,
+              MaximumEventAgeInSeconds: 600,
+            },
+            Input: JSON.stringify({
+              subject: content.subject,
+              body: content.body,
+              filters: content.filters ?? [],
+            }),
           },
-          Input: JSON.stringify({
-            subject: content.subject,
-            body: content.body,
-            filters: content.filters ?? [],
-          }),
-        },
-      }),
-    );
+        }),
+      );
+    } catch (err) {
+      this.logger.error(
+        'Failed to schedule bulk notification',
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(
+        'Failed to schedule bulk notification',
+      );
+    }
   }
 
   /**
