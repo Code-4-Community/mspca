@@ -1,7 +1,7 @@
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { AmazonSchedulerClientFactory } from './awsScheduler.factory';
+import { AmazonSchedulerClientFactory } from '../aws/scheduler/awsSchedulerClient.factory';
 import { VolunteersModule } from '../volunteers/volunteers.module';
 import { AWSSESModule } from '../aws/ses/email.module';
 import { getMissingEnvVars } from '../utils/env';

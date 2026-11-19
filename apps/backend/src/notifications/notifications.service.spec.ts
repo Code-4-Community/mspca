@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InternalServerErrorException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { AMAZON_SCHEDULER_CLIENT } from './awsScheduler.factory';
+import { AMAZON_SCHEDULER_CLIENT } from '../aws/scheduler/awsSchedulerClient.factory';
 import { EmailsService } from '../aws/ses/email.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';

@@ -15,7 +15,7 @@ import {
 import { EmailsService } from '../aws/ses/email.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
-import { AMAZON_SCHEDULER_CLIENT } from './awsScheduler.factory';
+import { AMAZON_SCHEDULER_CLIENT } from '../aws/scheduler/awsSchedulerClient.factory';
 
 // Mirrors SendEmailDTO's @Length(1, 255) on each Bcc address.
 const MAX_EMAIL_LENGTH = 255;
