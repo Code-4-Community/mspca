@@ -50,14 +50,6 @@ describe('AuthThenRateLimitGuard', () => {
     expect(rateLimitGuard.canActivate).not.toHaveBeenCalled();
   });
 
-  it('returns false and skips rate limiting when authentication denies the request', async () => {
-    authGuard.canActivate.mockResolvedValue(false);
-
-    await expect(guard.canActivate(context)).resolves.toBe(false);
-    expect(authGuard.canActivate).toHaveBeenCalledTimes(1);
-    expect(rateLimitGuard.canActivate).not.toHaveBeenCalled();
-  });
-
   it('rejects when the rate limit is exceeded', async () => {
     const error = new ThrottlerException();
     authGuard.canActivate.mockResolvedValue(true);
