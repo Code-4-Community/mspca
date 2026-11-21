@@ -606,6 +606,26 @@ export class VolunteersService {
     });
     return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
+
+  /**
+   * Ages every child of every volunteer who has children by one year.
+   *
+   * @returns The number of volunteers updated.
+   */
+  async incrementAllChildrenAges(): Promise<number> {
+    const volunteers = await this.repo.find({ where: { hasChildren: true } });
+    if (volunteers.length === 0) {
+      return 0;
+    }
+
+    for (const volunteer of volunteers) {
+      volunteer.childrenAges = volunteer.childrenAges.map((age) => age + 1);
+    }
+
+    await this.repo.save(volunteers);
+    return volunteers.length;
+  }
+
   /**
    * Updates a Volunteer's animal preferences by adding and removing Chameleon animal IDs.
    *
