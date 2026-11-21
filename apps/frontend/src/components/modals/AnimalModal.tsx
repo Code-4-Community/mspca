@@ -118,13 +118,11 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                     boxSize="72"
                     direction="column"
                     justify="flex-end"
-                    align="flex-start"
                     gap="2.5"
                     borderRadius="2xl"
                     overflow="hidden"
                   >
                     <Flex
-                      alignSelf="stretch"
                       px="3"
                       py="2"
                       bg="rgba(41, 37, 36, 0.75)"
