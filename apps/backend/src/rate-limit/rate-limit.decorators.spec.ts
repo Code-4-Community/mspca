@@ -2,24 +2,22 @@ import { minutes } from '@nestjs/throttler';
 import { RateLimit } from './rate-limit.decorators';
 
 describe('@RateLimit()', () => {
-  it('accepts a positive integer limit and ttl', () => {
-    expect(() => RateLimit({ limit: 3, ttl: minutes(10) })).not.toThrow();
+  it('accepts a positive integer limit and a positive ttl', () => {
+    expect(() => RateLimit({ limit: 3, ttl: 1500.5 })).not.toThrow();
   });
 
-  it.each([1.5, 0])('throws when limit is %p', (limit) => {
-    expect(() => RateLimit({ limit, ttl: minutes(1) })).toThrow(
+  it('throws when limit is invalid', () => {
+    expect(() => RateLimit({ limit: 1.5, ttl: minutes(1) })).toThrow(
       new Error(
-        `@RateLimit(): limit must be a positive integer, received ${String(
-          limit,
-        )}`,
+        'Invalid rate limit: limit must be a positive integer, received 1.5',
       ),
     );
   });
 
-  it.each([1.5, 0])('throws when ttl is %p', (ttl) => {
-    expect(() => RateLimit({ limit: 1, ttl })).toThrow(
+  it('throws when ttl is invalid', () => {
+    expect(() => RateLimit({ limit: 1, ttl: 0 })).toThrow(
       new Error(
-        `@RateLimit(): ttl must be a positive integer, received ${String(ttl)}`,
+        'Invalid rate limit: ttl must be a positive number, received 0',
       ),
     );
   });
@@ -34,7 +32,9 @@ describe('@RateLimit()', () => {
       }
       return InvalidController;
     }).toThrow(
-      new Error('@RateLimit(): limit must be a positive integer, received 2.5'),
+      new Error(
+        'Invalid rate limit: limit must be a positive integer, received 2.5',
+      ),
     );
   });
 });

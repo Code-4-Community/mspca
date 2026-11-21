@@ -5,6 +5,7 @@ import {
   Get,
   INestApplication,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -241,6 +242,42 @@ describe('RateLimitGuard', () => {
       const statuses = await sendRequests('/protected/skipped', count);
 
       expect(statuses).toEqual(Array(count).fill(200));
+    });
+  });
+  describe('requests without an IP address', () => {
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+      warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    it('counts the request under a shared key and logs a warning', async () => {
+      const guard = app.get(RateLimitGuard);
+
+      const tracker = await guard['getTracker']({
+        ip: undefined,
+      } as unknown as Request);
+
+      expect(tracker).toBe('ip:unknown');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        'Request has no IP address, so it is rate limited under the shared key "ip:unknown"',
+      );
+    });
+
+    it('does not log a warning when the request has an IP address', async () => {
+      const guard = app.get(RateLimitGuard);
+
+      const tracker = await guard['getTracker']({
+        ip: '203.0.113.7',
+      } as unknown as Request);
+
+      expect(tracker).toBe('ip:203.0.113.7');
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 });

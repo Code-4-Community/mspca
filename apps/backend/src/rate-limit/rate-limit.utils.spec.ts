@@ -1,6 +1,10 @@
 import { Controller, ExecutionContext, Get } from '@nestjs/common';
 import { Public } from '../aws/cognito/cognito.decorator';
-import { isPublicRoute } from './rate-limit.utils';
+import {
+  assertPositiveInteger,
+  assertPositiveNumber,
+  isPublicRoute,
+} from './rate-limit.utils';
 
 @Public()
 @Controller()
@@ -65,5 +69,37 @@ describe('isPublicRoute', () => {
     );
 
     expect(isPublicRoute(context)).toBe(false);
+  });
+});
+
+describe('assertPositiveInteger', () => {
+  it('accepts a positive integer', () => {
+    expect(() => assertPositiveInteger('limit', 3)).not.toThrow();
+  });
+
+  it.each([1.5, 0])('throws for %p', (value) => {
+    expect(() => assertPositiveInteger('limit', value)).toThrow(
+      new Error(
+        `Invalid rate limit: limit must be a positive integer, received ${String(
+          value,
+        )}`,
+      ),
+    );
+  });
+});
+
+describe('assertPositiveNumber', () => {
+  it('accepts a positive non-integer', () => {
+    expect(() => assertPositiveNumber('ttl', 1.5)).not.toThrow();
+  });
+
+  it.each([0, Infinity])('throws for %p', (value) => {
+    expect(() => assertPositiveNumber('ttl', value)).toThrow(
+      new Error(
+        `Invalid rate limit: ttl must be a positive number, received ${String(
+          value,
+        )}`,
+      ),
+    );
   });
 });

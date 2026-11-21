@@ -50,3 +50,37 @@ export const DEFAULT_THROTTLERS: ThrottlerOptions[] = [
     skipIf: (context) => isPublicRoute(context),
   },
 ];
+
+/**
+ * Checks that a rate limit option is a positive integer.
+ *
+ * @param name - The option being checked, used in the error message.
+ * @param value - The value to check.
+ * @throws {Error} If `value` is not a positive integer.
+ */
+export function assertPositiveInteger(name: string, value: number): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `Invalid rate limit: ${name} must be a positive integer, received ${String(
+        value,
+      )}`,
+    );
+  }
+}
+
+/**
+ * Checks that a rate limit option is a positive, finite number.
+ *
+ * @param name - The option being checked, used in the error message.
+ * @param value - The value to check.
+ * @throws {Error} If `value` is not a positive, finite number.
+ */
+export function assertPositiveNumber(name: string, value: number): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(
+      `Invalid rate limit: ${name} must be a positive number, received ${String(
+        value,
+      )}`,
+    );
+  }
+}
