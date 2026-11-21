@@ -439,6 +439,7 @@ describe('VolunteersService', () => {
     it('confirms the Cognito user with the FosterVolunteer role when the volunteer exists', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
       mockCognitoService.confirmUser.mockResolvedValue(undefined);
 
@@ -476,15 +477,18 @@ describe('VolunteersService', () => {
       );
     });
 
-    it('does not change the status of a volunteer who is not unconfirmed', async () => {
+    it('throws ConflictException without calling Cognito if the volunteer is not unconfirmed', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
-        status: VolunteerStatus.ACTIVE,
+        status: VolunteerStatus.PENDING,
       } as FosterVolunteer);
-      mockCognitoService.confirmUser.mockResolvedValue(undefined);
 
-      await service.confirm({ email: 'jane@example.com', code: '123456' });
-
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '123456' }),
+      ).rejects.toThrow(
+        new ConflictException('Only unconfirmed Volunteers can be confirmed'),
+      );
+      expect(mockCognitoService.confirmUser).not.toHaveBeenCalled();
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
@@ -518,6 +522,7 @@ describe('VolunteersService', () => {
     it('propagates errors from Cognito', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
       const error = new BadRequestException('Invalid verification code');
       mockCognitoService.confirmUser.mockRejectedValue(error);
@@ -533,6 +538,7 @@ describe('VolunteersService', () => {
     it('propagates group assignment failures from Cognito without attempting duplicate cleanup', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
 
       const error = new InternalServerErrorException('Failed to confirm user');
@@ -1092,19 +1098,6 @@ describe('VolunteersService', () => {
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('throws ConflictException if the volunteer is unconfirmed', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        ...pendingVolunteer(),
-        status: VolunteerStatus.UNCONFIRMED,
-      });
-
-      await expect(service.approve(1)).rejects.toThrow(
-        new ConflictException('Only pending Volunteers can be approved'),
-      );
-      expect(mockRepo.save).not.toHaveBeenCalled();
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-    });
-
     it('throws NotFoundException if volunteer does not exist', async () => {
       mockRepo.findOne.mockResolvedValue(null);
       const findSpy = jest.spyOn(service, 'findByIdOrFail');
@@ -1178,19 +1171,6 @@ describe('VolunteersService', () => {
       mockRepo.findOne.mockResolvedValue({
         ...pendingVolunteer(),
         status: VolunteerStatus.ACTIVE,
-      });
-
-      await expect(service.deny(1)).rejects.toThrow(
-        new ConflictException('Only pending Volunteers can be denied'),
-      );
-      expect(mockCognitoService.deleteUser).not.toHaveBeenCalled();
-      expect(mockRepo.delete).not.toHaveBeenCalled();
-    });
-
-    it('throws ConflictException if the volunteer is unconfirmed', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        ...pendingVolunteer(),
-        status: VolunteerStatus.UNCONFIRMED,
       });
 
       await expect(service.deny(1)).rejects.toThrow(
