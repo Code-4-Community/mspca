@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router-dom';
+
 import { colors } from '../theme';
 
 // Avatars reuse the Trello label colors, so changing those in theme.ts
@@ -18,4 +20,13 @@ export const parseVolunteerId = (raw: string | null): number | null => {
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const id = Number(raw);
   return id > 0 && Number.isSafeInteger(id) ? id : null;
+};
+
+/**
+ * The current volunteer's ID, read from the `?volunteerId=` query param.
+ * TEMPORARY: replace with the signed-in volunteer once sign-in is implemented.
+ */
+export const useVolunteerId = (): number | null => {
+  const [searchParams] = useSearchParams();
+  return parseVolunteerId(searchParams.get('volunteerId'));
 };

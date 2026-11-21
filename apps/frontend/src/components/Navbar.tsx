@@ -3,8 +3,7 @@ import { Button, Flex, Image, Text } from '@chakra-ui/react';
 
 import apiClient from '@api/apiClient';
 import type { Volunteer } from '../types';
-import { useVolunteerId } from '@utils/useVolunteerId';
-import { getAvatarColor, getInitials } from '@utils/volunteer';
+import { getAvatarColor, getInitials, useVolunteerId } from '@utils/volunteer';
 import logo from '../assets/mspca-logo.png';
 
 /** Site-wide header: MSPCA logo and the current volunteer's profile button. */

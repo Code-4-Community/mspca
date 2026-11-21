@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import { useVolunteerId } from './useVolunteerId';
+import { useVolunteerId } from './volunteer';
 
 const Probe: React.FC = () => <span>{String(useVolunteerId())}</span>;
 

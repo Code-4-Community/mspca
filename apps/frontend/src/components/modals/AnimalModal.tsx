@@ -14,7 +14,7 @@ import { ExternalLink, House } from 'lucide-react';
 import apiClient from '@api/apiClient';
 import type { Animal } from '../../types';
 import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
-import { useVolunteerId } from '@utils/useVolunteerId';
+import { useVolunteerId } from '@utils/volunteer';
 import { PLACEHOLDER_IMAGE } from '../AnimalCard';
 import RestrictionTag from '../RestrictionTag';
 
@@ -38,8 +38,14 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // TEMPORARY: comes from the URL until sign-in is implemented.
+  // TODO: remove after login implemented.
   const volunteerId = useVolunteerId();
+
+  const handleClose = () => {
+    setComments('');
+    setError(null);
+    onClose();
+  };
 
   const handleApply = async (selectedAnimal: Animal) => {
     if (volunteerId === null) return;
@@ -51,7 +57,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
         chameleonAnimalId: selectedAnimal.chameleonAnimalId,
         additionalComments: comments.trim() || undefined,
       });
-      onClose();
+      handleClose();
     } catch {
       setError('Could not submit your request. Please try again.');
     } finally {
@@ -63,7 +69,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
     <Dialog.Root
       open={animal !== null}
       onOpenChange={(e) => {
-        if (!e.open) onClose();
+        if (!e.open) handleClose();
       }}
       placement="center"
       scrollBehavior="inside"
@@ -86,8 +92,6 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
               boxShadow="card"
               display="flex"
               flexDirection="column"
-              justifyContent="flex-start"
-              alignItems="flex-start"
               gap="4"
               overflow="hidden"
             >
@@ -96,21 +100,13 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                 flex="1"
                 minH="0"
                 direction="column"
-                justify="flex-start"
-                align="flex-start"
                 gap="2"
               >
-                <Flex
-                  alignSelf="stretch"
-                  justify="flex-start"
-                  align="flex-start"
-                  gap="4"
-                >
+                <Flex gap="4">
                   <Image
                     flex="1"
                     src={PLACEHOLDER_IMAGE}
                     alt={animal.name}
-                    position="relative"
                     h="72"
                     minW="0"
                     borderRadius="2xl"
@@ -151,35 +147,15 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                 </Flex>
 
                 <Flex
-                  alignSelf="stretch"
                   flex="1"
                   minH="0"
                   direction="column"
-                  justify="flex-start"
-                  align="flex-start"
                   gap="4"
                   overflowY="auto"
                 >
-                  <Flex
-                    alignSelf="stretch"
-                    direction="column"
-                    justify="flex-start"
-                    align="flex-start"
-                    gap="2"
-                  >
-                    <Flex
-                      alignSelf="stretch"
-                      direction="column"
-                      justify="flex-start"
-                      align="flex-start"
-                      gap="1"
-                    >
-                      <Flex
-                        alignSelf="stretch"
-                        direction="column"
-                        justify="flex-start"
-                        align="flex-start"
-                      >
+                  <Flex direction="column" gap="2">
+                    <Flex direction="column" gap="1">
+                      <Flex direction="column">
                         <Dialog.Title
                           color="neutrals.black"
                           fontSize="30px"
@@ -189,7 +165,6 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                           {animal.name}
                         </Dialog.Title>
                         <Text
-                          alignSelf="stretch"
                           color="neutrals.black85"
                           textStyle="body-small"
                           fontWeight="medium"
@@ -209,14 +184,7 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                       </Flex>
                     </Flex>
                     {animal.restrictions && animal.restrictions.length > 0 && (
-                      <Flex
-                        alignSelf="stretch"
-                        wrap="wrap"
-                        justify="flex-start"
-                        align="flex-start"
-                        alignContent="flex-start"
-                        gap="2"
-                      >
+                      <Flex wrap="wrap" gap="2">
                         {animal.restrictions.map((label) => (
                           <RestrictionTag key={label} label={label} />
                         ))}
@@ -224,10 +192,8 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                     )}
                   </Flex>
                   <Text
-                    alignSelf="stretch"
                     color="neutrals.black"
                     fontSize="16px"
-                    fontWeight="normal"
                     lineHeight="24px"
                     whiteSpace="pre-wrap"
                   >
@@ -238,7 +204,6 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
 
               <Flex alignSelf="stretch" direction="column" gap="4">
                 <Textarea
-                  alignSelf="stretch"
                   h="11"
                   minH="11"
                   px="2.5"
@@ -253,51 +218,37 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                   outlineColor="border.emphasized"
                   outlineOffset="-1px"
                   fontSize="14px"
-                  fontWeight="normal"
                   lineHeight="20px"
                   resize="vertical"
                   _placeholder={{ color: 'fg.muted' }}
                 />
                 {error && <Text color="fg.error">{error}</Text>}
-                <Flex
-                  alignSelf="stretch"
-                  justify="flex-start"
-                  align="flex-start"
-                  gap="4"
-                >
+                <Flex gap="4">
                   <Button
                     variant="outline"
                     flex="1"
                     h="11"
-                    minW="11"
                     px="5"
-                    py="0.5"
-                    gap="3"
                     border="none"
                     borderRadius="12px"
                     outline="1px solid"
                     outlineColor="neutral.muted"
                     outlineOffset="-1px"
-                    overflow="hidden"
                     color="neutral.fg"
                     fontSize="16px"
                     fontWeight="semibold"
                     lineHeight="24px"
-                    onClick={onClose}
+                    onClick={handleClose}
                   >
                     Back
                   </Button>
                   <Button
                     flex="1"
                     h="11"
-                    minW="11"
                     px="5"
-                    py="0.5"
-                    gap="3"
                     bg="neutral.solid"
                     color="neutral.contrast"
                     borderRadius="12px"
-                    overflow="hidden"
                     fontSize="16px"
                     fontWeight="semibold"
                     lineHeight="24px"
