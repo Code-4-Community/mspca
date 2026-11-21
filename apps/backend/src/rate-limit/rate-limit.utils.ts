@@ -3,13 +3,11 @@ import { Reflector } from '@nestjs/core';
 import { ThrottlerOptions, minutes } from '@nestjs/throttler';
 import { IS_PUBLIC_KEY } from '../aws/cognito/cognito.decorator';
 
-/**
- * Names of the two throttlers in DEFAULT_THROTTLERS. Import these instead of
- * typing the strings: @nestjs/throttler matches decorators to throttlers by
- * name, so a misspelled name matches nothing and the limit quietly won't apply.
- */
-export const PUBLIC_THROTTLER = 'public';
-export const PROTECTED_THROTTLER = 'protected';
+/** Default requests per minute for @Public() routes, counted per IP address. */
+export const PUBLIC_DEFAULT_LIMIT = 10;
+
+/** Default requests per minute for protected routes, counted per Cognito user. */
+export const PROTECTED_DEFAULT_LIMIT = 100;
 
 const reflector = new Reflector();
 
@@ -29,25 +27,18 @@ export function isPublicRoute(context: ExecutionContext): boolean {
 }
 
 /**
- * Default rate limits, passed to ThrottlerModule.forRoot() in CognitoModule.
- * Each route uses exactly one throttler, chosen by route type:
- * - public routes (@Public()): 10 requests per minute, counted per IP
- * - protected routes: 100 requests per minute, counted per Cognito user
+ * Default rate limit, passed to ThrottlerModule.forRoot() in CognitoModule.
  *
- * Override these with @RateLimit(), or opt a route out with @SkipRateLimit().
+ * A single throttler whose limit depends on the route type: PUBLIC_DEFAULT_LIMIT
+ * per minute for @Public() routes, and PROTECTED_DEFAULT_LIMIT per minute for
+ * protected routes. Override per route with @RateLimit(), or opt out with
+ * @SkipRateLimit().
  */
 export const DEFAULT_THROTTLERS: ThrottlerOptions[] = [
   {
-    name: PUBLIC_THROTTLER,
     ttl: minutes(1),
-    limit: 10,
-    skipIf: (context) => !isPublicRoute(context),
-  },
-  {
-    name: PROTECTED_THROTTLER,
-    ttl: minutes(1),
-    limit: 100,
-    skipIf: (context) => isPublicRoute(context),
+    limit: (context) =>
+      isPublicRoute(context) ? PUBLIC_DEFAULT_LIMIT : PROTECTED_DEFAULT_LIMIT,
   },
 ];
 

@@ -20,8 +20,8 @@ import { RateLimit, SkipRateLimit } from './rate-limit.decorators';
 import { RateLimitGuard } from './rate-limit.guard';
 import {
   DEFAULT_THROTTLERS,
-  PROTECTED_THROTTLER,
-  PUBLIC_THROTTLER,
+  PROTECTED_DEFAULT_LIMIT,
+  PUBLIC_DEFAULT_LIMIT,
   isPublicRoute,
 } from './rate-limit.utils';
 
@@ -31,24 +31,6 @@ jest.mock('jwks-rsa', () => ({
   default: jest.fn(),
 }));
 
-/**
- * Reads a default limit from the real config, so the tests check the actual
- * defaults rather than copies that could drift.
- *
- * @param throttlerName - The throttler to read.
- * @returns That throttler's default limit.
- * @throws {Error} If the throttler doesn't exist or its limit isn't a number.
- */
-function defaultLimit(throttlerName: string): number {
-  const throttler = DEFAULT_THROTTLERS.find((t) => t.name === throttlerName);
-  if (typeof throttler?.limit !== 'number') {
-    throw new Error(`No numeric default limit for ${throttlerName}`);
-  }
-  return throttler.limit;
-}
-
-const PUBLIC_DEFAULT = defaultLimit(PUBLIC_THROTTLER);
-const PROTECTED_DEFAULT = defaultLimit(PROTECTED_THROTTLER);
 const CUSTOM_LIMIT = 3;
 const USER_HEADER = 'x-test-user';
 
@@ -171,10 +153,10 @@ describe('RateLimitGuard', () => {
     it('allows requests up to the public default, then returns 429', async () => {
       const statuses = await sendRequests(
         '/public/default',
-        PUBLIC_DEFAULT + 1,
+        PUBLIC_DEFAULT_LIMIT + 1,
       );
 
-      expect(statuses).toEqual([...Array(PUBLIC_DEFAULT).fill(200), 429]);
+      expect(statuses).toEqual([...Array(PUBLIC_DEFAULT_LIMIT).fill(200), 429]);
     });
 
     it('allows requests under a custom limit', async () => {
@@ -204,7 +186,7 @@ describe('RateLimitGuard', () => {
     });
 
     it('never limits a route marked @SkipRateLimit()', async () => {
-      const count = PUBLIC_DEFAULT + 5;
+      const count = PUBLIC_DEFAULT_LIMIT + 5;
       const statuses = await sendRequests('/public/skipped', count);
 
       expect(statuses).toEqual(Array(count).fill(200));
@@ -215,10 +197,13 @@ describe('RateLimitGuard', () => {
     it('allows requests up to the protected default, then returns 429', async () => {
       const statuses = await sendRequests(
         '/protected/default',
-        PROTECTED_DEFAULT + 1,
+        PROTECTED_DEFAULT_LIMIT + 1,
       );
 
-      expect(statuses).toEqual([...Array(PROTECTED_DEFAULT).fill(200), 429]);
+      expect(statuses).toEqual([
+        ...Array(PROTECTED_DEFAULT_LIMIT).fill(200),
+        429,
+      ]);
     });
 
     it('counts each logged-in user separately', async () => {
@@ -238,7 +223,7 @@ describe('RateLimitGuard', () => {
     });
 
     it('never limits a route marked @SkipRateLimit()', async () => {
-      const count = PROTECTED_DEFAULT + 5;
+      const count = PROTECTED_DEFAULT_LIMIT + 5;
       const statuses = await sendRequests('/protected/skipped', count);
 
       expect(statuses).toEqual(Array(count).fill(200));
