@@ -2,7 +2,6 @@ import { Center, Spinner } from '@chakra-ui/react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { ROUTES } from '../routes';
-import { isAuthEnabled } from './auth.config';
 import { useCurrentUser } from './userContext';
 
 /**
@@ -12,11 +11,6 @@ import { useCurrentUser } from './userContext';
 const RequireAuth: React.FC = () => {
   const { currentUser, loading } = useCurrentUser();
   const location = useLocation();
-
-  // Without the VITE_ Cognito variables no one can sign in, so don't block.
-  if (!isAuthEnabled()) {
-    return <Outlet />;
-  }
 
   if (loading) {
     return (
