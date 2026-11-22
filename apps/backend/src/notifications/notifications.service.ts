@@ -4,7 +4,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { isEmail } from 'class-validator';
 import { EmailsService } from '../aws/ses/email.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
@@ -106,27 +105,12 @@ export class NotificationsService {
    * @throws {InternalServerErrorException} If every batch fails to send.
    */
   async sendNow(content: CreateBulkNotificationDto): Promise<void> {
-    // NotificationsModule requires AWS_SES_SENDER_EMAIL at boot
-    const sender = process.env.AWS_SES_SENDER_EMAIL ?? '';
-
-    // TODO: adjust once notification filters are confirmed with the client; they will
-    // likely be more complex than foster type alone
+    // TODO: adjust once notification filters are confirmed with client - will likely be more complex
     const volunteers = await this.volunteersService.findActiveByFosterTypes(
       content.filters ?? [],
     );
-    // SendEmailDTO validates every Bcc address, so a duplicate (@ArrayUnique) or a
-    // malformed address (@IsEmail) would fail its whole batch. Drop them up front.
-    const unique = [
-      ...new Set(volunteers.map((v) => v.email.trim().toLowerCase())),
-    ];
-    const recipients = unique.filter((email) => isEmail(email));
-    if (recipients.length < unique.length) {
-      this.logger.warn(
-        `Skipped ${
-          unique.length - recipients.length
-        } Volunteer(s) with an invalid email address`,
-      );
-    }
+    // Volunteer emails are unique and validated on write, so they pass SendEmailDTO as-is
+    const recipients = volunteers.map((v) => v.email);
 
     if (recipients.length === 0) {
       this.logger.warn(
@@ -143,7 +127,8 @@ export class NotificationsService {
 
       try {
         await this.emailsService.sendEmail({
-          toEmail: sender,
+          // NotificationsModule requires this at boot; the fallback only satisfies TypeScript
+          toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
           subject: content.subject,
           bodyHtml: content.body,
           bccEmails: batch,

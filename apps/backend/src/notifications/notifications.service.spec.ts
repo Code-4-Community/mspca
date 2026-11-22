@@ -141,49 +141,6 @@ describe('NotificationsService', () => {
       expect(sentBatches().flat()).toEqual(volunteers(60).map((v) => v.email));
     });
 
-    it('deduplicates volunteers sharing an email address', async () => {
-      volunteersService.findActiveByFosterTypes.mockResolvedValue([
-        { email: 'shared@example.com' },
-        { email: 'shared@example.com' },
-      ] as FosterVolunteer[]);
-
-      await service.sendNow(dto);
-
-      expect(sentBatches()).toEqual([['shared@example.com']]);
-    });
-
-    it('sends nothing when every address is unusable', async () => {
-      volunteersService.findActiveByFosterTypes.mockResolvedValue([
-        { email: 'not-an-email' },
-      ] as FosterVolunteer[]);
-
-      await service.sendNow(dto);
-
-      expect(emailsService.sendEmail).not.toHaveBeenCalled();
-    });
-
-    it('treats emails differing only in case as duplicates', async () => {
-      volunteersService.findActiveByFosterTypes.mockResolvedValue([
-        { email: 'dup@example.com' },
-        { email: 'DUP@example.com' },
-      ] as FosterVolunteer[]);
-
-      await service.sendNow(dto);
-
-      expect(sentBatches()).toEqual([['dup@example.com']]);
-    });
-
-    it('skips invalid addresses instead of failing their batch', async () => {
-      volunteersService.findActiveByFosterTypes.mockResolvedValue([
-        { email: 'good@example.com' },
-        { email: 'not-an-email' },
-      ] as FosterVolunteer[]);
-
-      await service.sendNow(dto);
-
-      expect(sentBatches()).toEqual([['good@example.com']]);
-    });
-
     it('sends the later batches when an earlier one fails', async () => {
       volunteersService.findActiveByFosterTypes.mockResolvedValue(
         volunteers(98),
