@@ -81,29 +81,30 @@ export class AuthController {
       );
     }
 
-    if (groups.includes(CognitoRole.FosterVolunteer)) {
-      return {
-        role: CognitoRole.FosterVolunteer,
-        user: await this.volunteersService.findByCognitoSubOrFail(payload.sub),
-      };
+    // CognitoRole lists roles from least to most privileged, so the first
+    // match is the user's least privileged role.
+    switch (appRoles[0]) {
+      case CognitoRole.FosterVolunteer:
+        return {
+          role: CognitoRole.FosterVolunteer,
+          user: await this.volunteersService.findByCognitoSubOrFail(
+            payload.sub,
+          ),
+        };
+      case CognitoRole.FosterCoordinator:
+        return {
+          role: CognitoRole.FosterCoordinator,
+          user: await this.coordinatorsService.findByCognitoSubOrFail(
+            payload.sub,
+          ),
+        };
+      case CognitoRole.Owner:
+        return {
+          role: CognitoRole.Owner,
+          user: await this.ownersService.findByCognitoSubOrFail(payload.sub),
+        };
+      default:
+        throw new ForbiddenException('User does not have an application role');
     }
-
-    if (groups.includes(CognitoRole.FosterCoordinator)) {
-      return {
-        role: CognitoRole.FosterCoordinator,
-        user: await this.coordinatorsService.findByCognitoSubOrFail(
-          payload.sub,
-        ),
-      };
-    }
-
-    if (groups.includes(CognitoRole.Owner)) {
-      return {
-        role: CognitoRole.Owner,
-        user: await this.ownersService.findByCognitoSubOrFail(payload.sub),
-      };
-    }
-
-    throw new ForbiddenException('User does not have an application role');
   }
 }

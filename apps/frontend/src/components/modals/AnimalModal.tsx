@@ -224,6 +224,11 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                   _placeholder={{ color: 'fg.muted' }}
                 />
                 {error && <Text color="fg.error">{error}</Text>}
+                {volunteerId === null && (
+                  <Text color="fg.muted" textStyle="body-small">
+                    Only foster volunteers can apply.
+                  </Text>
+                )}
                 <Flex gap="4">
                   <Button
                     variant="outline"

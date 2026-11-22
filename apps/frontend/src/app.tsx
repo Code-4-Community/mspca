@@ -17,12 +17,14 @@ export const routes: RouteObject[] = [
   {
     path: ROUTES.SIGN_IN,
     element: <SignIn />,
+    // Catches errors on the sign-in page.
     errorElement: <NotFound />,
   },
 
   // Public: no sign-in needed, with the navbar (e.g. future landing pages).
   {
     element: <Layout />,
+    // Catches errors in the navbar or a public page, replacing the whole screen.
     errorElement: <NotFound />,
     children: [
       // Add public pages here.
@@ -32,14 +34,17 @@ export const routes: RouteObject[] = [
   // Signed in: any role.
   {
     element: <RequireAuth />,
+    // Catches errors in RequireAuth itself, while checking who is signed in.
     errorElement: <NotFound />,
     children: [
       {
         element: <Layout />,
+        // Catches errors in the layout itself (e.g. the navbar), replacing the
+        // whole screen.
         errorElement: <NotFound />,
         children: [
           {
-            // Catches page errors below the navbar, so the navbar stays put.
+            // Catches errors in a page, shown below the navbar.
             errorElement: <NotFound />,
             children: [
               { path: '/', element: <Root /> },
