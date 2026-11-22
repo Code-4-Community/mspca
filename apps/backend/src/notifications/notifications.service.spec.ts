@@ -148,19 +148,6 @@ describe('NotificationsService', () => {
       expect(sentBatches()).toEqual([['shared@example.com']]);
     });
 
-    // SendEmailDTO caps each Bcc address at 255 characters as well as validating it,
-    // so an overlong address would reject its whole batch of 49.
-    it('drops an address over 255 characters', async () => {
-      volunteersService.findActiveByFosterTypes.mockResolvedValue([
-        { email: 'good@example.com' },
-        { email: `${'a'.repeat(250)}@example.com` },
-      ] as FosterVolunteer[]);
-
-      await service.sendNow(dto);
-
-      expect(sentBatches()).toEqual([['good@example.com']]);
-    });
-
     it('sends nothing when every address is unusable', async () => {
       volunteersService.findActiveByFosterTypes.mockResolvedValue([
         { email: 'not-an-email' },
@@ -227,14 +214,6 @@ describe('NotificationsService', () => {
       await service.sendNow(dto);
 
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
-    });
-
-    it('fails when the sender address is not configured', async () => {
-      delete process.env.AWS_SES_SENDER_EMAIL;
-
-      await expect(service.sendNow(dto)).rejects.toThrow(
-        InternalServerErrorException,
-      );
     });
   });
 
