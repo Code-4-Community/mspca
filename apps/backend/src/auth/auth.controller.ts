@@ -12,6 +12,7 @@ import { Request } from 'express';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { StaffService } from '../staff/staff.service';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { OwnersService } from '../owners/owners.service';
 import { AuthenticatedUser } from './auth.types';
@@ -24,6 +25,7 @@ export class AuthController {
   constructor(
     private readonly cognitoService: CognitoService,
     private readonly volunteersService: VolunteersService,
+    private readonly staffService: StaffService,
     private readonly coordinatorsService: CoordinatorsService,
     private readonly ownersService: OwnersService,
   ) {}
@@ -90,6 +92,11 @@ export class AuthController {
           user: await this.volunteersService.findByCognitoSubOrFail(
             payload.sub,
           ),
+        };
+      case CognitoRole.Staff:
+        return {
+          role: CognitoRole.Staff,
+          user: await this.staffService.findByCognitoSubOrFail(payload.sub),
         };
       case CognitoRole.FosterCoordinator:
         return {

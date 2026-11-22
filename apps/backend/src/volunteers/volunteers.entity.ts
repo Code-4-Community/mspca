@@ -5,7 +5,6 @@ import {
   OneToMany,
   ManyToMany,
   JoinTable,
-  Unique,
   Check,
 } from 'typeorm';
 import { Homebase } from '../types';
@@ -19,7 +18,6 @@ import { Pet } from '../pets/pets.entity';
 import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
-@Unique('UQ_foster_volunteers_email', ['email'])
 @Check(
   'CHK_foster_volunteers_children_ages',
   '("has_children" AND cardinality("children_ages") > 0) OR (NOT "has_children" AND cardinality("children_ages") = 0)',

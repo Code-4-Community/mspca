@@ -13,6 +13,7 @@ import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteerStatus } from '../volunteers/volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { StaffService } from '../staff/staff.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
@@ -71,6 +72,7 @@ describe('MatchesService', () => {
     getRepository: jest.Mock;
   };
   let volunteersService: { findActiveOrFail: jest.Mock };
+  let staffService: { findActiveOrFail: jest.Mock };
   let animalsService: { findByChameleonIdOrFail: jest.Mock };
   let emailsService: { sendEmail: jest.Mock };
 
@@ -124,6 +126,7 @@ describe('MatchesService', () => {
     };
 
     volunteersService = { findActiveOrFail: jest.fn() };
+    staffService = { findActiveOrFail: jest.fn() };
     animalsService = { findByChameleonIdOrFail: jest.fn() };
     emailsService = { sendEmail: jest.fn() };
 
@@ -132,6 +135,7 @@ describe('MatchesService', () => {
         MatchesService,
         { provide: getRepositoryToken(Match), useValue: matchRepo },
         { provide: VolunteersService, useValue: volunteersService },
+        { provide: StaffService, useValue: staffService },
         { provide: AnimalsService, useValue: animalsService },
         { provide: EmailsService, useValue: emailsService },
       ],
@@ -162,6 +166,7 @@ describe('MatchesService', () => {
 
     beforeEach(() => {
       process.env.AWS_SES_SENDER_EMAIL = 'sender@example.com';
+      matchRepo.findOneBy.mockResolvedValue(null);
     });
 
     afterEach(() => {
@@ -193,6 +198,7 @@ describe('MatchesService', () => {
       );
       expect(matchRepo.create).toHaveBeenCalledWith({
         volunteerId: 1,
+        staffId: null,
         chameleonAnimalId: 'A42',
         status: MatchStatus.PENDING,
         additionalComments: null,
@@ -254,6 +260,27 @@ describe('MatchesService', () => {
         status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
       });
       expect(matchRepo.save).toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when a staff member already has a PENDING or ACTIVE match for the animal', async () => {
+      staffService.findActiveOrFail.mockResolvedValue({ staffId: 2 });
+      matchRepo.findOneBy.mockResolvedValue({
+        matchId: 5,
+        staffId: 2,
+        chameleonAnimalId: 'A42',
+        status: MatchStatus.ACTIVE,
+      });
+
+      await expect(
+        service.create({ staffId: 2, chameleonAnimalId: 'A42' }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(matchRepo.findOneBy).toHaveBeenCalledWith({
+        staffId: 2,
+        chameleonAnimalId: 'A42',
+        status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+      });
+      expect(matchRepo.save).not.toHaveBeenCalled();
     });
 
     it('saves additional comments when provided', async () => {
@@ -454,15 +481,14 @@ describe('MatchesService', () => {
         service.create({ volunteerId: 999, chameleonAnimalId: 'A42' }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(animalsService.findByChameleonIdOrFail).not.toHaveBeenCalled();
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('throws when the animal does not exist, after checking the volunteer', async () => {
-      volunteersService.findActiveOrFail.mockResolvedValue(
-        volunteerWithCoordinator,
-      );
+    it('throws when the animal does not exist, before checking the volunteer', async () => {
       animalsService.findByChameleonIdOrFail.mockRejectedValue(
         new NotFoundException('Animal with Chameleon ID A999 not found'),
       );
@@ -473,10 +499,10 @@ describe('MatchesService', () => {
         new NotFoundException('Animal with Chameleon ID A999 not found'),
       );
 
-      expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(1);
       expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
         'A999',
       );
+      expect(volunteersService.findActiveOrFail).not.toHaveBeenCalled();
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
@@ -619,7 +645,7 @@ describe('MatchesService', () => {
             _value: 1,
           }),
         },
-        relations: ['volunteer'],
+        relations: ['volunteer', 'staff'],
       });
     });
 

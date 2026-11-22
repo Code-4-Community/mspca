@@ -10,9 +10,11 @@ import { AuthController } from './auth.controller';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { AccessTokenPayload, CognitoRole } from '../aws/cognito/cognito.types';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { StaffService } from '../staff/staff.service';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { OwnersService } from '../owners/owners.service';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
+import { FosterStaff } from '../staff/staff.entity';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Owner } from '../owners/owners.entity';
 
@@ -20,12 +22,14 @@ describe('AuthController', () => {
   let controller: AuthController;
   let cognitoService: { getUser: jest.Mock };
   let volunteersService: { findByCognitoSubOrFail: jest.Mock };
+  let staffService: { findByCognitoSubOrFail: jest.Mock };
   let coordinatorsService: { findByCognitoSubOrFail: jest.Mock };
   let ownersService: { findByCognitoSubOrFail: jest.Mock };
   let warnSpy: jest.SpyInstance;
 
   const request = {} as Request;
   const volunteer = { volunteerId: 1, firstName: 'Jane' } as FosterVolunteer;
+  const staffMember = { staffId: 4, firstName: 'Sam' } as FosterStaff;
   const coordinator = {
     coordinatorId: 2,
     firstName: 'Cora',
@@ -47,6 +51,7 @@ describe('AuthController', () => {
   beforeEach(async () => {
     cognitoService = { getUser: jest.fn() };
     volunteersService = { findByCognitoSubOrFail: jest.fn() };
+    staffService = { findByCognitoSubOrFail: jest.fn() };
     coordinatorsService = { findByCognitoSubOrFail: jest.fn() };
     ownersService = { findByCognitoSubOrFail: jest.fn() };
 
@@ -55,6 +60,7 @@ describe('AuthController', () => {
       providers: [
         { provide: CognitoService, useValue: cognitoService },
         { provide: VolunteersService, useValue: volunteersService },
+        { provide: StaffService, useValue: staffService },
         { provide: CoordinatorsService, useValue: coordinatorsService },
         { provide: OwnersService, useValue: ownersService },
       ],
@@ -86,6 +92,23 @@ describe('AuthController', () => {
         user: volunteer,
       });
       expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns the staff member for a Staff user', async () => {
+      cognitoService.getUser.mockReturnValue(
+        payloadWithGroups([CognitoRole.Staff]),
+      );
+      staffService.findByCognitoSubOrFail.mockResolvedValue(staffMember);
+
+      const result = await controller.getMe(request);
+
+      expect(staffService.findByCognitoSubOrFail).toHaveBeenCalledWith(
+        'cognito-sub-123',
+      );
+      expect(result).toEqual({
+        role: CognitoRole.Staff,
+        user: staffMember,
+      });
     });
 
     it('returns the coordinator for a FosterCoordinator', async () => {
@@ -124,6 +147,7 @@ describe('AuthController', () => {
         payloadWithGroups([
           CognitoRole.Owner,
           CognitoRole.FosterCoordinator,
+          CognitoRole.Staff,
           CognitoRole.FosterVolunteer,
         ]),
       );
@@ -132,10 +156,11 @@ describe('AuthController', () => {
       const result = await controller.getMe(request);
 
       expect(result.role).toBe(CognitoRole.FosterVolunteer);
+      expect(staffService.findByCognitoSubOrFail).not.toHaveBeenCalled();
       expect(coordinatorsService.findByCognitoSubOrFail).not.toHaveBeenCalled();
       expect(ownersService.findByCognitoSubOrFail).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        'User cognito-sub-123 is in multiple groups (FosterVolunteer, FosterCoordinator, Owner); using the least privileged role',
+        'User cognito-sub-123 is in multiple groups (FosterVolunteer, Staff, FosterCoordinator, Owner); using the least privileged role',
       );
     });
 
@@ -146,6 +171,7 @@ describe('AuthController', () => {
         new UnauthorizedException('No user attached to the request'),
       );
       expect(volunteersService.findByCognitoSubOrFail).not.toHaveBeenCalled();
+      expect(staffService.findByCognitoSubOrFail).not.toHaveBeenCalled();
       expect(coordinatorsService.findByCognitoSubOrFail).not.toHaveBeenCalled();
       expect(ownersService.findByCognitoSubOrFail).not.toHaveBeenCalled();
     });
