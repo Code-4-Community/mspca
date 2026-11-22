@@ -116,8 +116,8 @@ export class VolunteersService {
    * @throws {BadRequestException} If childrenAges doesn't match hasChildren (checked before Cognito is called).
    * @throws {ConflictException} If a Volunteer or Cognito user with the email already exists.
    * @throws {BadRequestException} If Cognito rejects the password.
-   * @throws {InternalServerErrorException} If the Cognito user could not be registered.
-   * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
+   * @throws {InternalServerErrorException} If the Cognito user could not be registered,
+   * or the Volunteer could not be saved (the Cognito user is then deleted).
    */
   async create(
     dto: CreateVolunteerDto,

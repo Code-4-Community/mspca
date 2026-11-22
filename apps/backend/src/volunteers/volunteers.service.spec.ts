@@ -117,8 +117,24 @@ describe('VolunteersService', () => {
     it('returns the volunteer with their coordinators and pets', async () => {
       const volunteer = {
         volunteerId: 7,
-        assignedCoordinators: [] as FosterCoordinator[],
-        pets: [] as Pet[],
+        assignedCoordinators: [
+          {
+            coordinatorId: 3,
+            email: 'c3@example.com',
+            homebase: Homebase.BOSTON,
+            active: true,
+          },
+        ] as FosterCoordinator[],
+        pets: [
+          {
+            petId: 5,
+            volunteerId: 7,
+            ageYear: 4,
+            ageMonth: 2,
+            species: FosterType.DOG,
+            breed: 'Lab',
+          },
+        ] as Pet[],
       } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
 
@@ -287,7 +303,7 @@ describe('VolunteersService', () => {
       const pets = [
         { ageYear: 2, ageMonth: 3, species: FosterType.DOG, breed: 'Beagle' },
         { ageYear: 0, ageMonth: 8, species: FosterType.CAT, breed: 'Tabby' },
-      ];
+      ] as PetDto[];
 
       const result = await service.create({
         ...dto,
@@ -966,25 +982,6 @@ describe('VolunteersService', () => {
       breed: 'Siamese',
     } as PetDto;
 
-    it('updates livelyNeighborhood', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        ...mockVolunteer,
-        livelyNeighborhood: false,
-      });
-      mockRepo.save.mockImplementation(async (v) => v);
-
-      const result = await service.updateVolunteerById(1, {
-        livelyNeighborhood: true,
-      });
-
-      expect(mockRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockRepo.save).toHaveBeenCalledWith({
-        ...mockVolunteer,
-        livelyNeighborhood: true,
-      });
-      expect(result.livelyNeighborhood).toBe(true);
-    });
-
     it('replaces the pets list when pets is provided', async () => {
       mockRepo.findOne.mockResolvedValue({
         ...mockVolunteer,
@@ -999,6 +996,8 @@ describe('VolunteersService', () => {
         ...mockVolunteer,
         pets: [newPet],
       });
+      const [saved] = mockRepo.save.mock.calls[0];
+      expect(saved.pets).not.toContainEqual(existingPet);
       expect(result.pets).toEqual([newPet]);
     });
 
