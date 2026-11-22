@@ -17,4 +17,8 @@ export class CreateMatchDto {
   @IsNonEmptyString()
   @MaxLength(255)
   chameleonAnimalId!: string;
+
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNonEmptyString()
+  additionalComments?: string;
 }

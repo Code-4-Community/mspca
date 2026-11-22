@@ -1,9 +1,9 @@
 // Cognito user pool group names that map to application roles.
 export enum CognitoRole {
   FosterVolunteer = 'FosterVolunteer',
+  Staff = 'Staff',
   FosterCoordinator = 'FosterCoordinator',
   Owner = 'Owner',
-  Staff = 'Staff',
 }
 
 // Resolved Cognito configuration derived from environment variables.

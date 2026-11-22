@@ -13,6 +13,8 @@ import { AddFarmAnimalsToFosterType1793476100199 } from '../migrations/179347610
 import { RenameAdminUsersToOwners1793485161630 } from '../migrations/1793485161630-RenameAdminUsersToOwners';
 import { AddFosterTypePreferences1793600000000 } from '../migrations/1793600000000-AddFosterTypePreferences';
 import { AddStaffAndUpdateMatches1795372304908 } from '../migrations/1795372304908-AddStaffAndUpdateMatches';
+import { AddPetsAndHouseholdDetails1794408338094 } from '../migrations/1794408338094-AddPetsAndHouseholdDetails';
+import { AddMatchAdditionalComments1794784721012 } from '../migrations/1794784721012-AddMatchAdditionalComments';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -29,6 +31,8 @@ const schemaMigrations = [
   AddFarmAnimalsToFosterType1793476100199,
   RenameAdminUsersToOwners1793485161630,
   AddFosterTypePreferences1793600000000,
+  AddPetsAndHouseholdDetails1794408338094,
+  AddMatchAdditionalComments1794784721012,
   AddStaffAndUpdateMatches1795372304908,
 ];
 

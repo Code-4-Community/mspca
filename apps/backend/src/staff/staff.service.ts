@@ -137,6 +137,31 @@ export class StaffService {
   }
 
   /**
+   * Fetches a staff member by their Cognito sub, including their assigned
+   * coordinators. Used to look up the signed-in user from their token.
+   *
+   * @param cognitoSub - The `sub` claim from the user's Cognito access token.
+   * @returns The staff member.
+   * @throws {NotFoundException} If no staff member has this Cognito sub.
+   */
+  async findByCognitoSubOrFail(cognitoSub: string): Promise<FosterStaff> {
+    if (!cognitoSub) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    const staff = await this.repo.findOne({
+      where: { cognitoSub },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    return staff;
+  }
+
+  /**
    * Deactivates an active staff member.
    *
    * @param id - The ID of the staff member to deactivate.

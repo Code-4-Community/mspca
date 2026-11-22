@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -7,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
@@ -43,8 +44,9 @@ export class MatchesService {
    *
    * @param dto the volunteer/staff and Chameleon animal to match
    * @returns the created match
-   * @throws NotFoundException if the volunteer/staff or animal does not exist
-   * @throws BadRequestException if the volunteer/staff is not active
+   * @throws NotFoundException if the volunteer or animal does not exist
+   * @throws BadRequestException if the volunteer is not active
+   * @throws ConflictException if the volunteer already has a PENDING or ACTIVE match for the animal
    */
   async create(dto: CreateMatchDto): Promise<Match> {
     await this.animalsService.findByChameleonIdOrFail(dto.chameleonAnimalId);
@@ -54,12 +56,29 @@ export class MatchesService {
         dto.volunteerId,
       );
 
+      const existing = await this.repo.findOneBy({
+        volunteerId: dto.volunteerId,
+        chameleonAnimalId: dto.chameleonAnimalId,
+        status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+      });
+
+      if (existing) {
+        throw new ConflictException(
+          `Volunteer ${
+            dto.volunteerId
+          } already has a ${existing.status.toLowerCase()} match for animal ${
+            dto.chameleonAnimalId
+          }`,
+        );
+      }
+
       const match = await this.repo.save(
         this.repo.create({
           volunteerId: dto.volunteerId,
           staffId: null,
           chameleonAnimalId: dto.chameleonAnimalId,
           status: MatchStatus.PENDING,
+          additionalComments: dto.additionalComments ?? null,
           deniedReason: null,
         }),
       );
@@ -72,12 +91,29 @@ export class MatchesService {
     if (dto.staffId) {
       await this.staffService.findActiveOrFail(dto.staffId);
 
+      const existing = await this.repo.findOneBy({
+        staffId: dto.staffId,
+        chameleonAnimalId: dto.chameleonAnimalId,
+        status: In([MatchStatus.PENDING, MatchStatus.ACTIVE]),
+      });
+
+      if (existing) {
+        throw new ConflictException(
+          `Staff member ${
+            dto.staffId
+          } already has a ${existing.status.toLowerCase()} match for animal ${
+            dto.chameleonAnimalId
+          }`,
+        );
+      }
+
       return this.repo.save(
         this.repo.create({
           volunteerId: null,
           staffId: dto.staffId,
           chameleonAnimalId: dto.chameleonAnimalId,
           status: MatchStatus.PENDING,
+          additionalComments: dto.additionalComments ?? null,
           deniedReason: null,
         }),
       );

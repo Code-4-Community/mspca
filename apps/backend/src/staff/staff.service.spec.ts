@@ -252,6 +252,36 @@ describe('StaffService', () => {
     });
   });
 
+  describe('findByCognitoSubOrFail', () => {
+    it('returns the staff member with the matching Cognito sub', async () => {
+      repo.findOne.mockResolvedValue(staff);
+
+      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { cognitoSub: 'cognito-sub-123' },
+        relations: ['assignedCoordinators'],
+      });
+      expect(result).toBe(staff);
+    });
+
+    it('throws NotFoundException when no staff member has the Cognito sub', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findByCognitoSubOrFail('unknown-sub'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException without querying when the sub is empty', async () => {
+      await expect(service.findByCognitoSubOrFail('')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deactivate', () => {
     it('deactivates an active staff member', async () => {
       repo.findOne.mockResolvedValue({ ...staff });

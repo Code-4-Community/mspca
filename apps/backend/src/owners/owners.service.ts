@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -65,5 +66,28 @@ export class OwnersService {
 
       throw new InternalServerErrorException('Failed to save the owner');
     }
+  }
+
+  /**
+   * Fetches the owner who owns a Cognito account. Used to look up the
+   * signed-in user from their token.
+   *
+   * @param cognitoSub - The `sub` claim from the user's Cognito access token.
+   * @returns The owner.
+   * @throws {NotFoundException} If no owner has this Cognito sub.
+   */
+  async findByCognitoSubOrFail(cognitoSub: string): Promise<Owner> {
+    // Older rows default to an empty sub, so never match on ''.
+    if (!cognitoSub) {
+      throw new NotFoundException('Owner not found');
+    }
+
+    const owner = await this.repo.findOneBy({ cognitoSub });
+
+    if (!owner) {
+      throw new NotFoundException('Owner not found');
+    }
+
+    return owner;
   }
 }
