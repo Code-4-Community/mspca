@@ -34,7 +34,7 @@ export const handler = async (event, context) => {
     throw new Error(
       `Dispatch failed (request ${context.awsRequestId}): ${
         response.status
-      } ${await response.text()}`,
+      } ${(await response.text()).slice(0, 500)}`,
     );
   }
 };
