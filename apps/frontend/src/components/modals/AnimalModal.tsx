@@ -12,11 +12,11 @@ import {
 import { ExternalLink, House } from 'lucide-react';
 
 import apiClient from '@api/apiClient';
-import type { Animal } from '../../types';
+import { UserRole, type Animal } from '../../types';
 import { HOMEBASE_ADDRESSES, formatAge } from '@utils/animals';
-import { useVolunteerId } from '@utils/volunteer';
 import { PLACEHOLDER_IMAGE } from '../AnimalCard';
 import RestrictionTag from '../RestrictionTag';
+import { useCurrentUser } from '../../auth/userContext';
 
 interface AnimalModalProps {
   animal: Animal | null;
@@ -38,8 +38,11 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // TODO: remove after login implemented.
-  const volunteerId = useVolunteerId();
+  const { currentUser } = useCurrentUser();
+  const volunteerId =
+    currentUser?.role === UserRole.FOSTER_VOLUNTEER
+      ? currentUser.user.volunteerId
+      : null;
 
   const handleClose = () => {
     setComments('');
@@ -221,6 +224,11 @@ const AnimalModal: React.FC<AnimalModalProps> = ({ animal, onClose }) => {
                   _placeholder={{ color: 'fg.muted' }}
                 />
                 {error && <Text color="fg.error">{error}</Text>}
+                {volunteerId === null && (
+                  <Text color="fg.muted" textStyle="body-small">
+                    Only foster volunteers can apply.
+                  </Text>
+                )}
                 <Flex gap="4">
                   <Button
                     variant="outline"
