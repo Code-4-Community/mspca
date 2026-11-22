@@ -17,7 +17,8 @@ scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --
 | Resource    | Name                           | Purpose                                                                            |
 | ----------- | ------------------------------ | ---------------------------------------------------------------------------------- |
 | Lambda      | `mspca-notif-dispatch`         | Node 22, 30s timeout, 2 async retries. Forwards the schedule to `/send-scheduled`. |
-| IAM role    | `mspca-notif-lambda-role`      | Runs the Lambda (CloudWatch logs only)                                             |
+| Lambda      | `mspca-notif-dispatch-failed`  | On-failure destination of the above. Logs `Dispatch gave up` with the attempt count. |
+| IAM role    | `mspca-notif-lambda-role`      | Runs both Lambdas (CloudWatch logs, dispatch invokes the failure logger)          |
 | IAM role    | `mspca-notif-scheduler-role`   | Lets Scheduler invoke only this Lambda                                             |
 | User policy | `mspca-notif-create-schedules` | Lets the backend's IAM user create schedules and pass the scheduler role           |
 
@@ -45,10 +46,10 @@ Run `yarn serve:backend` with `AUTH_DISABLED=true`. In another tab, set `AWS_REG
 | T3  | Send now                   | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                     | 202, only Dog volunteers get it                     | ✅      |
 | T4  | Lambda --> backend (owner) | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json` | `StatusCode 200`, `null`                            | ✅      |
 | T5  | Full chain (owner)         | T3 with `"filters":[]` and `"sendAt":"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)"`                                                                                                                          | 202, all active volunteers get it about 2 min later | ✅      |
-| T6  | Retries (owner)            | Stop the backend, run T4 with `--invocation-type Event`, then `aws logs tail /aws/lambda/mspca-notif-dispatch --since 10m`                                                                            | 3 `Dispatch failed` lines, no email                 | ✅      |
+| T6  | Retries (owner)            | Stop the backend, run T4 with `--invocation-type Event`, then `aws logs tail /aws/lambda/mspca-notif-dispatch --since 10m` and `aws logs tail /aws/lambda/mspca-notif-dispatch-failed --since 10m`                                                                            | 3 `Dispatch failed` lines, then 1 `Dispatch gave up ... after 3 attempts` in the `-failed` log, no email | ✅      |
 | T7  | Validation                 | past `sendAt`, `filters:["Horse"]`, missing field, line break in subject                                                                                                                              | 400                                                 | ✅      |
 
-The dev run was 2026-10-26/27. Unit tests: `npx jest apps/backend/src/notifications`.
+The dev run was 2026-10-26/27 (T6 rerun 2026-11-19). Unit tests: `npx jest apps/backend/src/notifications`.
 
 ## Create from scratch (prod / rebuild)
 
@@ -79,6 +80,21 @@ aws lambda create-function --region ${AWS_REGION} --function-name mspca-notif-di
   --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
 aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
   --function-name mspca-notif-dispatch --maximum-retry-attempts 2
+
+# 2b. failure logger: gets a record when dispatch runs out of retries, logs "Dispatch gave up"
+zip -j /tmp/notif-failed.zip apps/backend/src/aws/scheduler/lambda/notif/failed.mjs
+aws lambda create-function --region ${AWS_REGION} --function-name mspca-notif-dispatch-failed \
+  --runtime nodejs22.x --handler failed.handler --timeout 10 \
+  --zip-file fileb:///tmp/notif-failed.zip \
+  --role arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-lambda-role
+aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
+  --function-name mspca-notif-dispatch-failed --maximum-retry-attempts 0
+aws iam put-role-policy --role-name mspca-notif-lambda-role --policy-name invoke-notif-dispatch-failed \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch-failed\"}]}"
+sleep 10
+aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
+  --function-name mspca-notif-dispatch --maximum-retry-attempts 2 \
+  --destination-config "{\"OnFailure\":{\"Destination\":\"arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch-failed\"}}"
 
 # 3. scheduler role
 aws iam create-role --role-name mspca-notif-scheduler-role \
@@ -121,6 +137,8 @@ To change the Lambda's URL or secret later, run `aws lambda update-function-conf
 
 ```bash
 aws lambda delete-function --region ${AWS_REGION} --function-name mspca-notif-dispatch
+aws lambda delete-function --region ${AWS_REGION} --function-name mspca-notif-dispatch-failed
+aws iam delete-role-policy --role-name mspca-notif-lambda-role --policy-name invoke-notif-dispatch-failed
 aws iam detach-role-policy --role-name mspca-notif-lambda-role --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 aws iam delete-role --role-name mspca-notif-lambda-role
 aws iam delete-role-policy --role-name mspca-notif-scheduler-role --policy-name invoke-notif-dispatch
