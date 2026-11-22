@@ -41,21 +41,38 @@ describe('AuthThenRateLimitGuard', () => {
     );
   });
 
-  it('rejects and skips rate limiting when authentication fails', async () => {
+  it('counts a failed authentication against the rate limit, then rethrows the authentication error', async () => {
     const error = new UnauthorizedException('No bearer token provided');
     authGuard.canActivate.mockRejectedValue(error);
+    rateLimitGuard.canActivate.mockResolvedValue(true);
 
     await expect(guard.canActivate(context)).rejects.toBe(error);
+
     expect(authGuard.canActivate).toHaveBeenCalledTimes(1);
-    expect(rateLimitGuard.canActivate).not.toHaveBeenCalled();
+    expect(rateLimitGuard.canActivate).toHaveBeenCalledTimes(1);
+    expect(rateLimitGuard.canActivate).toHaveBeenCalledWith(context);
   });
 
-  it('rejects when the rate limit is exceeded', async () => {
+  it('rejects with 429 when a failed authentication is over the rate limit', async () => {
+    const throttlerError = new ThrottlerException();
+    authGuard.canActivate.mockRejectedValue(
+      new UnauthorizedException('No bearer token provided'),
+    );
+    rateLimitGuard.canActivate.mockRejectedValue(throttlerError);
+
+    await expect(guard.canActivate(context)).rejects.toBe(throttlerError);
+
+    expect(authGuard.canActivate).toHaveBeenCalledTimes(1);
+    expect(rateLimitGuard.canActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects when an authenticated request is over the rate limit', async () => {
     const error = new ThrottlerException();
     authGuard.canActivate.mockResolvedValue(true);
     rateLimitGuard.canActivate.mockRejectedValue(error);
 
     await expect(guard.canActivate(context)).rejects.toBe(error);
+
     expect(authGuard.canActivate).toHaveBeenCalledTimes(1);
     expect(rateLimitGuard.canActivate).toHaveBeenCalledTimes(1);
   });

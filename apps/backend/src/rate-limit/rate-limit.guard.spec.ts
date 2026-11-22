@@ -6,6 +6,7 @@ import {
   INestApplication,
   Injectable,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -33,14 +34,16 @@ jest.mock('jwks-rsa', () => ({
 
 const CUSTOM_LIMIT = 3;
 const USER_HEADER = 'x-test-user';
+const AUTH_FAIL_HEADER = 'x-test-auth-fail';
 
 /**
  * Stands in for CognitoJWTGuard, which needs real Cognito tokens.
  *
- * Like the real guard, it never sets request.user on public routes. On
- * protected routes it sets request.user from a test header, so tests can act
- * as different logged-in users. No header means "not logged in", like running
- * locally with AUTH_DISABLED=true.
+ * Like the real guard, it lets public routes through without setting
+ * request.user. On protected routes it throws 401 when the auth-fail test
+ * header is sent, and otherwise sets request.user from the user test header, so
+ * tests can act as different logged-in users. Neither header means "not logged
+ * in", like running locally with AUTH_DISABLED=true.
  */
 @Injectable()
 class FakeAuthGuard implements CanActivate {
@@ -51,6 +54,9 @@ class FakeAuthGuard implements CanActivate {
     const req = context
       .switchToHttp()
       .getRequest<Request & { user?: AccessTokenPayload }>();
+    if (req.headers[AUTH_FAIL_HEADER]) {
+      throw new UnauthorizedException();
+    }
     const userId = req.headers[USER_HEADER];
     if (typeof userId === 'string') {
       req.user = { sub: userId } as AccessTokenPayload;
@@ -129,21 +135,19 @@ describe('RateLimitGuard', () => {
    *
    * @param path - The route to call.
    * @param count - How many requests to send.
-   * @param userId - If set, sends the requests as this logged-in user.
+   * @param headers - Headers to send with every request, such as the user test header.
    * @returns The status code of each response, in order.
    */
   async function sendRequests(
     path: string,
     count: number,
-    userId?: string,
+    headers: Record<string, string> = {},
   ): Promise<number[]> {
     const statuses: number[] = [];
     for (let i = 0; i < count; i++) {
-      const req = request(app.getHttpServer()).get(path);
-      if (userId) {
-        req.set(USER_HEADER, userId);
-      }
-      const response = await req;
+      const response = await request(app.getHttpServer())
+        .get(path)
+        .set(headers);
       statuses.push(response.status);
     }
     return statuses;
@@ -178,9 +182,13 @@ describe('RateLimitGuard', () => {
     });
 
     it('counts requests by IP, even if they claim different users', async () => {
-      await sendRequests('/public/custom', CUSTOM_LIMIT, 'user-a');
+      await sendRequests('/public/custom', CUSTOM_LIMIT, {
+        [USER_HEADER]: 'user-a',
+      });
 
-      const statuses = await sendRequests('/public/custom', 1, 'user-b');
+      const statuses = await sendRequests('/public/custom', 1, {
+        [USER_HEADER]: 'user-b',
+      });
 
       expect(statuses).toEqual([429]);
     });
@@ -207,19 +215,27 @@ describe('RateLimitGuard', () => {
     });
 
     it('counts each logged-in user separately', async () => {
-      const userA = await sendRequests(
-        '/protected/custom',
-        CUSTOM_LIMIT + 1,
-        'user-a',
-      );
-      const userB = await sendRequests(
-        '/protected/custom',
-        CUSTOM_LIMIT,
-        'user-b',
-      );
+      const userA = await sendRequests('/protected/custom', CUSTOM_LIMIT + 1, {
+        [USER_HEADER]: 'user-a',
+      });
+      const userB = await sendRequests('/protected/custom', CUSTOM_LIMIT, {
+        [USER_HEADER]: 'user-b',
+      });
 
       expect(userA).toEqual([...Array(CUSTOM_LIMIT).fill(200), 429]);
       expect(userB).toEqual(Array(CUSTOM_LIMIT).fill(200));
+    });
+
+    it('counts failed authentications by IP, returning 401 until the limit, then 429', async () => {
+      const statuses = await sendRequests(
+        '/protected/custom',
+        CUSTOM_LIMIT + 1,
+        {
+          [AUTH_FAIL_HEADER]: 'true',
+        },
+      );
+
+      expect(statuses).toEqual([...Array(CUSTOM_LIMIT).fill(401), 429]);
     });
 
     it('never limits a route marked @SkipRateLimit()', async () => {
@@ -229,6 +245,7 @@ describe('RateLimitGuard', () => {
       expect(statuses).toEqual(Array(count).fill(200));
     });
   });
+
   describe('requests without an IP address', () => {
     let warn: jest.SpyInstance;
 

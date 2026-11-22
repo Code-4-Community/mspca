@@ -5,10 +5,10 @@ import { RateLimitGuard } from './rate-limit.guard';
 /**
  * The app's single global guard: runs CognitoJWTGuard, then RateLimitGuard.
  *
- * The order matters. RateLimitGuard counts logged-in users by request.user,
- * which only exists after CognitoJWTGuard has verified the token. Registering
- * the two as separate global guards did not keep that order in practice (rate
- * limiting ran first), so this guard calls them explicitly, one after the other.
+ * Authentication runs first because RateLimitGuard counts logged-in users by
+ * request.user, which only exists after CognitoJWTGuard has verified the token.
+ * Registering the two as separate global guards did not keep that order in
+ * practice (rate limiting ran first), so this guard calls them explicitly.
  */
 @Injectable()
 export class AuthThenRateLimitGuard implements CanActivate {
@@ -18,16 +18,25 @@ export class AuthThenRateLimitGuard implements CanActivate {
   ) {}
 
   /**
-   * Runs authentication, then rate limiting. A request that fails
-   * authentication never counts against anyone's limit.
+   * Runs authentication, then rate limiting.
+   *
+   * A request that fails authentication is still counted against the rate
+   * limit, by IP address, before the authentication error is rethrown. So
+   * unauthenticated spam gets 429 once it's over the limit, while logged-in
+   * users keep their own per-user counter.
    *
    * @param context - The execution context of the current request.
    * @returns `true` when the request passes both guards.
-   * @throws {UnauthorizedException} If authentication fails; rate limiting is skipped.
-   * @throws {ThrottlerException} If the request is over its rate limit (429).
+   * @throws {UnauthorizedException} If authentication fails and the IP address is still under its limit.
+   * @throws {ThrottlerException} If the request is over its rate limit (429), including failed authentication attempts.
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    await this.authGuard.canActivate(context);
+    try {
+      await this.authGuard.canActivate(context);
+    } catch (error) {
+      await this.rateLimitGuard.canActivate(context);
+      throw error;
+    }
     return await this.rateLimitGuard.canActivate(context);
   }
 }
