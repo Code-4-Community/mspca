@@ -1,7 +1,7 @@
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { AmazonSchedulerClientFactory } from '../aws/scheduler/awsSchedulerClient.factory';
+import { AWSSchedulerModule } from '../aws/scheduler/scheduler.module';
 import { VolunteersModule } from '../volunteers/volunteers.module';
 import { AWSSESModule } from '../aws/ses/email.module';
 import { getMissingEnvVars } from '../utils/env';
@@ -19,9 +19,9 @@ const REQUIRED_ENV_VARS = [
 ] as const;
 
 @Module({
-  imports: [VolunteersModule, AWSSESModule],
+  imports: [VolunteersModule, AWSSESModule, AWSSchedulerModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService, AmazonSchedulerClientFactory],
+  providers: [NotificationsService],
 })
 export class NotificationsModule implements OnModuleInit {
   private readonly logger = new Logger(NotificationsModule.name);

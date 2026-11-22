@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InternalServerErrorException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { AMAZON_SCHEDULER_CLIENT } from '../aws/scheduler/awsSchedulerClient.factory';
+import { SchedulerService } from '../aws/scheduler/scheduler.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
@@ -54,6 +55,9 @@ describe('NotificationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
+        // Real SchedulerService over the mocked client, so these tests pin the
+        // exact CreateScheduleCommand Scheduler receives.
+        SchedulerService,
         { provide: EmailsService, useValue: emailsService },
         { provide: VolunteersService, useValue: volunteersService },
         { provide: AMAZON_SCHEDULER_CLIENT, useValue: scheduler },
@@ -214,6 +218,14 @@ describe('NotificationsService', () => {
       await service.sendNow(dto);
 
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('fails when the sender address is not configured', async () => {
+      delete process.env.AWS_SES_SENDER_EMAIL;
+
+      await expect(service.sendNow(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 

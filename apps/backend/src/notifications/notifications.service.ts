@@ -1,21 +1,14 @@
 import {
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { isEmail } from 'class-validator';
-import {
-  ActionAfterCompletion,
-  CreateScheduleCommand,
-  FlexibleTimeWindowMode,
-  SchedulerClient,
-} from '@aws-sdk/client-scheduler';
 import { EmailsService } from '../aws/ses/email.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
-import { AMAZON_SCHEDULER_CLIENT } from '../aws/scheduler/awsSchedulerClient.factory';
+import { SchedulerService } from '../aws/scheduler/scheduler.service';
 
 @Injectable()
 export class NotificationsService {
@@ -24,8 +17,7 @@ export class NotificationsService {
   constructor(
     private volunteersService: VolunteersService,
     private emailsService: EmailsService,
-    @Inject(AMAZON_SCHEDULER_CLIENT)
-    private readonly scheduler: SchedulerClient,
+    private schedulerService: SchedulerService,
   ) {}
 
   /**
@@ -71,32 +63,25 @@ export class NotificationsService {
     }
 
     try {
-      await this.scheduler.send(
-        new CreateScheduleCommand({
-          Name: `notification-${randomUUID()}`,
-          // at() rejects the trailing Z and the milliseconds that toISOString() emits.
-          ScheduleExpression: `at(${sendAt.toISOString().slice(0, 19)})`,
-          ScheduleExpressionTimezone: 'UTC',
-          FlexibleTimeWindow: { Mode: FlexibleTimeWindowMode.OFF },
-          ActionAfterCompletion: ActionAfterCompletion.DELETE,
-          Target: {
-            Arn: targetArn,
-            RoleArn: roleArn,
-            // Scheduler's default retries run up to 185 times over 24 hours. Three
-            // attempts in ten minutes rides out a blip without hammering the dispatch
-            // route all day when the configuration is simply wrong.
-            RetryPolicy: {
-              MaximumRetryAttempts: 2,
-              MaximumEventAgeInSeconds: 600,
-            },
-            Input: JSON.stringify({
-              subject: content.subject,
-              body: content.body,
-              filters: content.filters ?? [],
-            }),
-          },
-        }),
-      );
+      await this.schedulerService.scheduleOnce({
+        // The backend's IAM policy only allows creating schedules named notification-*
+        name: `notification-${randomUUID()}`,
+        at: sendAt,
+        targetArn,
+        roleArn,
+        input: {
+          subject: content.subject,
+          body: content.body,
+          filters: content.filters ?? [],
+        },
+        // Scheduler's default retries run up to 185 times over 24 hours. Three
+        // attempts in ten minutes rides out a blip without hammering the dispatch
+        // route all day when the configuration is simply wrong.
+        retryPolicy: {
+          MaximumRetryAttempts: 2,
+          MaximumEventAgeInSeconds: 600,
+        },
+      });
     } catch (err) {
       this.logger.error(
         'Failed to schedule bulk notification',
@@ -118,11 +103,16 @@ export class NotificationsService {
    * rest of the send.
    *
    * @param content - The subject, HTML body, and foster type filters.
-   * @throws {InternalServerErrorException} If every batch fails to send.
+   * @throws {InternalServerErrorException} If AWS_SES_SENDER_EMAIL is not configured,
+   *   or if every batch fails to send.
    */
   async sendNow(content: CreateBulkNotificationDto): Promise<void> {
-    // NotificationsModule requires AWS_SES_SENDER_EMAIL at boot
-    const sender = process.env.AWS_SES_SENDER_EMAIL ?? '';
+    const sender = process.env.AWS_SES_SENDER_EMAIL;
+    if (!sender) {
+      throw new InternalServerErrorException(
+        'AWS_SES_SENDER_EMAIL is not configured',
+      );
+    }
 
     // TODO: adjust once notification filters are confirmed with the client; they will
     // likely be more complex than foster type alone
