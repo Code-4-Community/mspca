@@ -28,6 +28,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
 import { AnimalsService } from '../animals/animals.service';
+import { MatchStatus } from '../matches/matches.types';
 
 @Injectable()
 export class VolunteersService {
@@ -596,14 +597,22 @@ export class VolunteersService {
   }
 
   /**
-   * Gets all foster volunteers.
-   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * Gets all foster volunteers, with their assigned coordinators and pets.
+   * Each volunteer includes only their matches with status ACTIVE, or an empty array if there are no volunteers.
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
-    const volunteers = await this.repo.find({
-      relations: ['assignedCoordinators', 'pets'],
-    });
+    const volunteers = await this.repo
+      .createQueryBuilder('volunteer')
+      .leftJoinAndSelect('volunteer.assignedCoordinators', 'coordinator')
+      .leftJoinAndSelect('volunteer.pets', 'pet')
+      .leftJoinAndSelect(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      )
+      .getMany();
     return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
   /**

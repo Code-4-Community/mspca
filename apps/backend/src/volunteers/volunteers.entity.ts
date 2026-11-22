@@ -2,8 +2,8 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToMany,
   OneToMany,
+  ManyToMany,
   JoinTable,
   Unique,
   Check,
@@ -16,6 +16,7 @@ import {
 } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Pet } from '../pets/pets.entity';
+import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
 @Unique('UQ_foster_volunteers_email', ['email'])
@@ -150,4 +151,7 @@ export class FosterVolunteer {
     },
   })
   assignedCoordinators!: FosterCoordinator[];
+
+  @OneToMany(() => Match, (match) => match.volunteer)
+  matches?: Match[];
 }
