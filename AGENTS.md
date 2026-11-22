@@ -50,8 +50,7 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 
 ## Comments
 
-- Don't add comments other than docstrings and `TODO(MSPCA-<n>)` notes.
-- The one exception is a single-line comment explaining _why_ for a workaround or a deliberately unusual choice. Never write comments that narrate what the code does.
+- Don't add any comments other than docstrings and `TODO(MSPCA-<n>)` notes. If something needs explaining, put it in the function's docstring.
 - When unsure, leave the comment out.
 
 ## Controllers
@@ -69,7 +68,7 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 
 - Every public service and util function gets a JSDoc docstring: a one-line summary, then any business rules or edge cases the signature can't show; `@param name - description` per parameter; `@returns` (for `void`, "A promise that resolves when … is complete"); and one `@throws {ExceptionClass} If …` per error case, noting side effects such as cleanup on failure.
 - Update the docstring whenever the behavior, params, or thrown errors change.
-- Don't write inline comments in services. Put the explanation in the docstring instead (see Comments for the one exception).
+- Don't write inline comments in services. Put the explanation in the docstring instead.
 - Give every function an explicit return type, e.g. `Promise<FosterVolunteer>`.
 - Reuse the existing lookup helpers (`findByIdOrFail`, `findActiveOrFail`, etc.) instead of writing new lookup-and-throw code.
 - Throw `NotFoundException` for a missing entity looked up by ID (`Volunteer with id 5 not found`) and `ConflictException` for state conflicts (e.g. approving a match that isn't pending).
