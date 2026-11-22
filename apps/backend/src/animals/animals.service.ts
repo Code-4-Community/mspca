@@ -11,6 +11,18 @@ export class AnimalsService {
   ) {}
 
   /**
+   * Fetches every available Animal.
+   *
+   * There is no availability tracking yet, so every Animal in the database is
+   * treated as available.
+   *
+   * @returns All Animals, or an empty array when there are none.
+   */
+  async findAll(): Promise<Animal[]> {
+    return this.repo.find();
+  }
+
+  /**
    * Fetches an Animal by its Chameleon animal ID.
    *
    * @param chameleonAnimalId - The Animal's Chameleon ID.

@@ -12,6 +12,7 @@ import { AddAnimalUpdatesAndFosterTypeArray1793163582751 } from '../migrations/1
 import { AddFarmAnimalsToFosterType1793476100199 } from '../migrations/1793476100199-AddFarmAnimalsToFosterType';
 import { RenameAdminUsersToOwners1793485161630 } from '../migrations/1793485161630-RenameAdminUsersToOwners';
 import { AddFosterTypePreferences1793600000000 } from '../migrations/1793600000000-AddFosterTypePreferences';
+import { AddMatchAdditionalComments1794784721012 } from '../migrations/1794784721012-AddMatchAdditionalComments';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -28,6 +29,7 @@ const schemaMigrations = [
   AddFarmAnimalsToFosterType1793476100199,
   RenameAdminUsersToOwners1793485161630,
   AddFosterTypePreferences1793600000000,
+  AddMatchAdditionalComments1794784721012,
 ];
 
 export default schemaMigrations;
