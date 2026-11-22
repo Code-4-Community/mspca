@@ -103,16 +103,11 @@ export class NotificationsService {
    * rest of the send.
    *
    * @param content - The subject, HTML body, and foster type filters.
-   * @throws {InternalServerErrorException} If AWS_SES_SENDER_EMAIL is not configured,
-   *   or if every batch fails to send.
+   * @throws {InternalServerErrorException} If every batch fails to send.
    */
   async sendNow(content: CreateBulkNotificationDto): Promise<void> {
-    const sender = process.env.AWS_SES_SENDER_EMAIL;
-    if (!sender) {
-      throw new InternalServerErrorException(
-        'AWS_SES_SENDER_EMAIL is not configured',
-      );
-    }
+    // NotificationsModule requires AWS_SES_SENDER_EMAIL at boot
+    const sender = process.env.AWS_SES_SENDER_EMAIL ?? '';
 
     // TODO: adjust once notification filters are confirmed with the client; they will
     // likely be more complex than foster type alone

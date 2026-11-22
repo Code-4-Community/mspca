@@ -219,14 +219,6 @@ describe('NotificationsService', () => {
 
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
-
-    it('fails when the sender address is not configured', async () => {
-      delete process.env.AWS_SES_SENDER_EMAIL;
-
-      await expect(service.sendNow(dto)).rejects.toThrow(
-        InternalServerErrorException,
-      );
-    });
   });
 
   describe('createBulkNotification', () => {
