@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
+import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants';
 import { AgeJobsService } from './age-jobs.service';
 import { PetsService } from '../pets/pets.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
@@ -64,6 +65,28 @@ describe('AgeJobsService', () => {
 
       await expect(service.incrementChildrenAges()).resolves.toBeUndefined();
       expect(errorSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('schedules', () => {
+    const cronOptions = (method: keyof AgeJobsService) =>
+      Reflect.getMetadata(
+        SCHEDULE_CRON_OPTIONS,
+        AgeJobsService.prototype[method],
+      );
+
+    it('runs incrementPetAges at midnight on the first of each month, Eastern', () => {
+      expect(cronOptions('incrementPetAges')).toMatchObject({
+        cronTime: '0 0 1 * *',
+        timeZone: 'America/New_York',
+      });
+    });
+
+    it('runs incrementChildrenAges at midnight on January 1, Eastern', () => {
+      expect(cronOptions('incrementChildrenAges')).toMatchObject({
+        cronTime: '0 0 1 1 *',
+        timeZone: 'America/New_York',
+      });
     });
   });
 });
