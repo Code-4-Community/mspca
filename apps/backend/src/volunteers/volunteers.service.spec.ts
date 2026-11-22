@@ -1979,6 +1979,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.find).toHaveBeenCalledWith({
         where: { hasChildren: true },
       });
+      expect(mockRepo.find).toHaveBeenCalledTimes(1);
     });
 
     it('adds one year to every child', async () => {
@@ -1989,6 +1990,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({ volunteerId: 1, childrenAges: [1, 8, 16] }),
       ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('updates each volunteer independently', async () => {
@@ -2003,6 +2005,7 @@ describe('VolunteersService', () => {
         expect.objectContaining({ volunteerId: 1, childrenAges: [3] }),
         expect.objectContaining({ volunteerId: 2, childrenAges: [6, 10] }),
       ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('returns the number of volunteers updated', async () => {

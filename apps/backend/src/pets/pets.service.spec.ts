@@ -32,6 +32,7 @@ describe('PetsService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({ ageYear: 1, ageMonth: 6 }),
       ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('rolls 11 months into the next year', async () => {
@@ -42,6 +43,7 @@ describe('PetsService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({ ageYear: 3, ageMonth: 0 }),
       ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('increments every pet independently', async () => {
@@ -54,6 +56,7 @@ describe('PetsService', () => {
         expect.objectContaining({ ageYear: 1, ageMonth: 0 }),
         expect.objectContaining({ ageYear: 4, ageMonth: 4 }),
       ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('returns the number of pets updated', async () => {

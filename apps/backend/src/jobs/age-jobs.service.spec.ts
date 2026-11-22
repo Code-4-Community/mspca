@@ -12,10 +12,8 @@ describe('AgeJobsService', () => {
   let errorSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    mockPetsService = { incrementAllAges: jest.fn().mockResolvedValue(0) };
-    mockVolunteersService = {
-      incrementAllChildrenAges: jest.fn().mockResolvedValue(0),
-    };
+    mockPetsService = { incrementAllAges: jest.fn() };
+    mockVolunteersService = { incrementAllChildrenAges: jest.fn() };
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
@@ -36,6 +34,7 @@ describe('AgeJobsService', () => {
 
   describe('incrementPetAges', () => {
     it('calls PetsService.incrementAllAges once', async () => {
+      mockPetsService.incrementAllAges.mockResolvedValue(3);
       await service.incrementPetAges();
 
       expect(mockPetsService.incrementAllAges).toHaveBeenCalledTimes(1);
@@ -51,6 +50,7 @@ describe('AgeJobsService', () => {
 
   describe('incrementChildrenAges', () => {
     it('calls VolunteersService.incrementAllChildrenAges once', async () => {
+      mockVolunteersService.incrementAllChildrenAges.mockResolvedValue(2);
       await service.incrementChildrenAges();
 
       expect(
