@@ -84,6 +84,8 @@ export interface Coordinator {
   homebase: Homebase;
   active: boolean;
   cognitoSub: string;
+  // Only included when a coordinator is loaded with their volunteers (e.g. /api/auth/me).
+  assignedVolunteers?: Volunteer[];
 }
 
 export interface Volunteer {
