@@ -131,11 +131,11 @@ export class CoordinatorsService {
   }
 
   /**
-   * Fetches the coordinator who owns a Cognito account. Used to look up the
-   * signed-in user from their token.
+   * Fetches the coordinator who owns a Cognito account, with their assigned
+   * volunteers. Used to look up the signed-in user from their token.
    *
    * @param cognitoSub - The `sub` claim from the user's Cognito access token.
-   * @returns The coordinator.
+   * @returns The coordinator with their assigned volunteers.
    * @throws {NotFoundException} If no coordinator has this Cognito sub.
    */
   async findByCognitoSubOrFail(cognitoSub: string): Promise<FosterCoordinator> {
@@ -144,7 +144,10 @@ export class CoordinatorsService {
       throw new NotFoundException('Coordinator not found');
     }
 
-    const coordinator = await this.repo.findOneBy({ cognitoSub });
+    const coordinator = await this.repo.findOne({
+      where: { cognitoSub },
+      relations: ['assignedVolunteers'],
+    });
 
     if (!coordinator) {
       throw new NotFoundException('Coordinator not found');

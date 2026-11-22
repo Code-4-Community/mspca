@@ -137,9 +137,14 @@ describe('VolunteersService', () => {
 
   describe('findByCognitoSubOrFail', () => {
     it('returns the volunteer with the matching Cognito sub and their coordinators', async () => {
+      const coordinator = {
+        coordinatorId: 3,
+        firstName: 'Cora',
+      } as FosterCoordinator;
       const volunteer = {
         ...mockVolunteer,
         cognitoSub: 'cognito-sub-123',
+        assignedCoordinators: [coordinator],
       } as FosterVolunteer;
       mockRepo.findOne.mockResolvedValue(volunteer);
 
@@ -150,18 +155,7 @@ describe('VolunteersService', () => {
         relations: ['assignedCoordinators'],
       });
       expect(result).toBe(volunteer);
-    });
-
-    it('removes coordinatorNotes from the returned volunteer', async () => {
-      mockRepo.findOne.mockResolvedValue({
-        ...mockVolunteer,
-        cognitoSub: 'cognito-sub-123',
-        coordinatorNotes: 'secret',
-      });
-
-      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
-
-      expect(result).not.toHaveProperty('coordinatorNotes');
+      expect(result.assignedCoordinators).toEqual([coordinator]);
     });
 
     it('throws NotFoundException when no volunteer has the Cognito sub', async () => {

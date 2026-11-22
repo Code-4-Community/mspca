@@ -2,9 +2,12 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpStatus,
+  Logger,
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
@@ -13,8 +16,11 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { OwnersService } from '../owners/owners.service';
 import { AuthenticatedUser } from './auth.types';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly cognitoService: CognitoService,
     private readonly volunteersService: VolunteersService,
@@ -25,9 +31,10 @@ export class AuthController {
   /**
    * Returns the signed-in user, looked up by the Cognito sub in their token.
    *
-   * The user's Cognito groups decide which table they're looked up in. A user
-   * in several groups gets their highest role: Owner, then FosterCoordinator,
-   * then FosterVolunteer.
+   * The user's Cognito group decides which table they're looked up in. A user
+   * should only be in one group. If they're in several, a warning is logged
+   * and they get their least privileged role: FosterVolunteer, then
+   * FosterCoordinator, then Owner.
    *
    * @param req - The request, after CognitoJWTGuard has verified its token.
    * @returns The user's role and their record.
@@ -36,18 +43,48 @@ export class AuthController {
    * @throws {NotFoundException} If no record matches the user's Cognito sub.
    */
   @Get('me')
+  @ApiOperation({
+    summary: 'Get the signed-in user and their role',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The signed-in user and their role',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No valid access token was provided',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: "The user is not in any of the app's groups",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "No user record matches the token's Cognito sub",
+  })
   async getMe(@Req() req: Request): Promise<AuthenticatedUser> {
     const payload = this.cognitoService.getUser(req);
     if (!payload) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('No user attached to the request');
     }
 
     const groups = payload['cognito:groups'] ?? [];
 
-    if (groups.includes(CognitoRole.Owner)) {
+    const appRoles = Object.values(CognitoRole).filter((role) =>
+      groups.includes(role),
+    );
+    if (appRoles.length > 1) {
+      this.logger.warn(
+        `User ${payload.sub} is in multiple groups (${appRoles.join(
+          ', ',
+        )}); using the least privileged role`,
+      );
+    }
+
+    if (groups.includes(CognitoRole.FosterVolunteer)) {
       return {
-        role: CognitoRole.Owner,
-        user: await this.ownersService.findByCognitoSubOrFail(payload.sub),
+        role: CognitoRole.FosterVolunteer,
+        user: await this.volunteersService.findByCognitoSubOrFail(payload.sub),
       };
     }
 
@@ -60,10 +97,10 @@ export class AuthController {
       };
     }
 
-    if (groups.includes(CognitoRole.FosterVolunteer)) {
+    if (groups.includes(CognitoRole.Owner)) {
       return {
-        role: CognitoRole.FosterVolunteer,
-        user: await this.volunteersService.findByCognitoSubOrFail(payload.sub),
+        role: CognitoRole.Owner,
+        user: await this.ownersService.findByCognitoSubOrFail(payload.sub),
       };
     }
 
