@@ -535,7 +535,7 @@ describe('MatchesService', () => {
             _value: 1,
           }),
         },
-        relations: ['volunteer'],
+        relations: ['volunteer', 'staff'],
       });
     });
 
