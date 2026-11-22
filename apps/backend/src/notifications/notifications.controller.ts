@@ -52,7 +52,7 @@ export class NotificationsController {
    *
    * Called only by the scheduled-notification Lambda
    * TODO: implement auth: lambdas don't use cognito, so it can't call our own endpoints (which will have cognito auth on them)
-   * recipients are resolved at call time & not at schedule time, so Volunteers who went inactive in the meantime are left out
+   * recipients are resolved at call time & not at schedule time, so Volunteers who went inactive in the meantime can be left out
    *
    * Retry after a partial send repeats earlier batches, sends at least once
    */

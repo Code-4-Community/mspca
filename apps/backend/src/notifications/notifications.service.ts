@@ -161,8 +161,8 @@ export class NotificationsService {
     }
 
     let failed = 0;
-    // SES caps a message at 50 recipients across To, Cc and Bcc combined, and the
-    // sender always occupies the To slot, so only 49 are left for Bcc.
+    // SES caps a message at 50 recipients across To, Cc and Bcc combined. To is the
+    // sender's own address (keeps volunteers hidden in Bcc), so 49 Bcc per batch.
     for (let i = 0; i < recipients.length; i += 49) {
       const batch = recipients.slice(i, i + 49);
 
