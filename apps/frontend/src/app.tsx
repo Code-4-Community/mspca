@@ -12,16 +12,24 @@ import SignIn from '@pages/SignIn';
 import RequireAuth from './auth/RequireAuth';
 import { ROUTES } from './routes';
 
-// The sign-in page sits outside Layout, so it has no navbar. Every other page
-// is a child of Layout, behind RequireAuth, so only signed-in users see it.
-// Page errors are caught by the inner errorElement so the navbar stays put;
-// the outer one only catches errors from the layout itself.
 export const routes: RouteObject[] = [
+  // Public: no sign-in needed, no navbar.
   {
     path: ROUTES.SIGN_IN,
     element: <SignIn />,
     errorElement: <NotFound />,
   },
+
+  // Public: no sign-in needed, with the navbar (e.g. future landing pages).
+  {
+    element: <Layout />,
+    errorElement: <NotFound />,
+    children: [
+      // Add public pages here.
+    ],
+  },
+
+  // Signed in: any role.
   {
     element: <RequireAuth />,
     errorElement: <NotFound />,
@@ -31,6 +39,7 @@ export const routes: RouteObject[] = [
         errorElement: <NotFound />,
         children: [
           {
+            // Catches page errors below the navbar, so the navbar stays put.
             errorElement: <NotFound />,
             children: [
               { path: '/', element: <Root /> },

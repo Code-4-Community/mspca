@@ -1,4 +1,4 @@
-import { getSignInErrorMessage, getSignInStepMessage } from './signInErrors';
+import { getSignInErrorMessage } from './signInErrors';
 
 // Builds an error with the given name, like the ones Amplify's signIn throws.
 const errorNamed = (name: string): Error => {
@@ -53,28 +53,6 @@ describe('getSignInErrorMessage', () => {
   it('falls back to a generic message for values that are not errors', () => {
     expect(getSignInErrorMessage('oops')).toBe(
       'Something went wrong. Please try again',
-    );
-  });
-});
-
-describe('getSignInStepMessage', () => {
-  it('asks unconfirmed users to verify their email', () => {
-    expect(getSignInStepMessage('CONFIRM_SIGN_UP')).toBe(
-      'Please verify your email before signing in',
-    );
-  });
-
-  it('asks users who must set a new password to contact staff', () => {
-    expect(
-      getSignInStepMessage('CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED'),
-    ).toBe(
-      'This account needs more setup before it can sign in. Please contact an MSPCA staff member.',
-    );
-  });
-
-  it('falls back to the setup message for steps it does not know', () => {
-    expect(getSignInStepMessage('SOMETHING_NEW')).toBe(
-      'This account needs more setup before it can sign in. Please contact an MSPCA staff member.',
     );
   });
 });

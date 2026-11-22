@@ -16,10 +16,7 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import { signIn, signOut } from 'aws-amplify/auth';
 
 import { useCurrentUser } from '../auth/userContext';
-import {
-  getSignInErrorMessage,
-  getSignInStepMessage,
-} from '../auth/signInErrors';
+import { getSignInErrorMessage } from '../auth/signInErrors';
 
 /**
  * Email and password sign-in, built from the Lo-Fi. Remember me, forgot
@@ -54,11 +51,8 @@ const SignIn: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const { nextStep } = await signIn({ username: email.trim(), password });
-      // Cognito accepted the credentials but needs another step first.
-      if (nextStep.signInStep !== 'DONE') {
-        setError(getSignInStepMessage(nextStep.signInStep));
-      }
+      // TODO: handle signIn's nextStep (e.g. email verification) in a future ticket.
+      await signIn({ username: email.trim(), password });
     } catch (err) {
       setError(getSignInErrorMessage(err));
     } finally {
@@ -70,6 +64,7 @@ const SignIn: React.FC = () => {
     try {
       await signOut();
     } catch (err) {
+      // TODO: replace with an error toast once we have one.
       console.error('Failed to sign out', err);
     }
   };
@@ -83,7 +78,6 @@ const SignIn: React.FC = () => {
       justify={{ base: 'center', lg: 'flex-start' }}
       align={{ base: 'center', lg: 'stretch' }}
     >
-      {/* Sizes and spacing are from the Lo-Fi's Desktop - 1 and iPhone 17 frames. */}
       <Box
         alignSelf="center"
         w={{ base: 'full', lg: '517px' }}
@@ -108,8 +102,8 @@ const SignIn: React.FC = () => {
           {accountMissing ? (
             <Stack gap="4">
               <Text role="alert" color="fg.error">
-                You signed in, but we couldn&apos;t load your account. Please
-                contact an MSPCA staff member.
+                An error signing you in has occurred, please contact an MSPCA
+                staff member.
               </Text>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign out
