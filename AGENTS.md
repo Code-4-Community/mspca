@@ -113,6 +113,7 @@ Run `yarn test`, `yarn lint:check`, and `yarn format:check` before considering a
 ## Frontend
 
 - Use Chakra theme tokens (`textStyle="body-small"`, `h7`, `xs`, colors from `theme.ts`) instead of raw values, and match Figma exactly.
+- Don't add styling noise: only set style props the design calls for, and rely on component and theme defaults for everything else. After creating a component, re-read it and remove any styling that's redundant, duplicates a default, or isn't in Figma.
 - Use `lucide-react` for icons and plain Chakra components (e.g. `Button`) over custom ones.
 - Shared TS interfaces go in `apps/frontend/src/types.ts` and must match the backend entities.
 - Modals go in `components/modals/`.
