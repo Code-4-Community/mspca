@@ -54,8 +54,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const [open, setOpen] = useState(false);
 
   return (
-    <Flex alignSelf="stretch" direction="column" align="flex-start" gap="4">
-      <Flex alignSelf="stretch" direction="column" align="flex-start" gap="2">
+    <Flex alignSelf="stretch" direction="column" gap="4">
+      <Flex alignSelf="stretch" direction="column" gap="2">
         <Flex
           as="button"
           alignSelf="stretch"
@@ -85,14 +85,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         />
       </Flex>
       {open && (
-        <Flex
-          alignSelf="stretch"
-          px="4"
-          direction="column"
-          justify="flex-start"
-          align="stretch"
-          gap="4"
-        >
+        <Flex alignSelf="stretch" px="4" direction="column" gap="4">
           {options.map((option) => {
             const checked = selected.includes(option.label);
             return (
@@ -231,13 +224,10 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
               aria-label="Filters"
               w="14"
               h="11"
-              minW="11"
               px="5"
-              py="0.5"
               gap="3"
               bg="blue.blue3"
               borderRadius="12px"
-              overflow="hidden"
             >
               <Icon asChild boxSize="5" color="neutral.contrast">
                 <ListFilter strokeWidth={1.5} aria-hidden />
@@ -250,24 +240,14 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
                 w="80"
                 h="96"
                 maxW="80"
-                p="0"
-                gap="0"
                 bg="bg.panel"
                 borderRadius="2xl"
-                borderWidth="0"
                 boxShadow="card"
                 flexDirection="column"
                 justifyContent="space-between"
                 alignItems="flex-start"
               >
-                <Flex
-                  w="80"
-                  flex="1"
-                  minH="0"
-                  direction="column"
-                  justify="flex-start"
-                  align="flex-start"
-                >
+                <Flex w="80" flex="1" minH="0" direction="column">
                   <Flex
                     alignSelf="stretch"
                     h="16"
@@ -294,8 +274,6 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
                     px="6"
                     py="2"
                     direction="column"
-                    justify="flex-start"
-                    align="flex-start"
                     gap="2.5"
                     overflowY="auto"
                   >
@@ -357,14 +335,12 @@ const AnimalFilters: React.FC<AnimalFiltersProps> = ({ value, onChange }) => {
           h="11"
           minW="11"
           px="5"
-          py="0.5"
           gap="3"
           border="none"
           borderRadius="12px"
           outline="1px solid"
           outlineColor="neutral.muted"
           outlineOffset="-1px"
-          overflow="hidden"
           color="neutral.fg"
           fontSize="16px"
           fontWeight="semibold"

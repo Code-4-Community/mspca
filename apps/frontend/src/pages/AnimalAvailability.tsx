@@ -51,7 +51,6 @@ const AnimalAvailability: React.FC = () => {
   };
 
   useEffect(() => {
-    // Fetching on mount; the state updates happen after the request resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAnimals();
   }, []);
@@ -63,13 +62,14 @@ const AnimalAvailability: React.FC = () => {
   );
 
   return (
-    <Box bg="bg.muted" flex="1">
-      <Flex gap="8" px="8" py="8" align="flex-start">
+    <Box bg="bg.muted" flex="1" minH="0">
+      <Flex gap="8" px="8" py="8" h="full" align="flex-start">
         <Flex
           direction="column"
           gap="4"
           flex="1"
           minW="0"
+          maxH="full"
           p="4"
           bg="bg.subtle"
           borderRadius="3xl"
@@ -118,7 +118,13 @@ const AnimalAvailability: React.FC = () => {
               </Button>
             </Flex>
           ) : (
-            <SimpleGrid columns={{ base: 1, md: 2 }} gap="4" p="1">
+            <SimpleGrid
+              columns={{ base: 1, md: 2 }}
+              gap="4"
+              p="1"
+              minH="0"
+              overflowY="auto"
+            >
               {visibleAnimals.map((animal) => (
                 <AnimalCard
                   key={animal.animalId}

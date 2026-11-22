@@ -8,7 +8,7 @@ import Navbar from '@components/Navbar';
  * viewport so pages can grow into the remaining height with `flex="1"`.
  */
 const Layout: React.FC = () => (
-  <Flex direction="column" minH="100vh">
+  <Flex direction="column" h="100vh">
     <Navbar />
     <Outlet />
   </Flex>

@@ -24,6 +24,15 @@ export enum VolunteerStatus {
   PENDING = 'Pending',
 }
 
+export enum MatchStatus {
+  PENDING = 'Pending',
+  ACTIVE = 'Active',
+  COMPLETE = 'Complete',
+  DENIED = 'Denied',
+  WITHDRAWN = 'Withdrawn',
+  CANCELED = 'Canceled',
+}
+
 export enum Restriction {
   NO_RESTRICTIONS = 'No Restrictions',
   DOG_FREE_HOME = 'Dog-Free Home',
@@ -60,9 +69,9 @@ export interface Match {
   matchId: number;
   volunteerId: number;
   chameleonAnimalId: string;
-  status: string;
-  additionalComments?: string | null;
-  deniedReason?: string | null;
+  status: MatchStatus;
+  additionalComments: string | null;
+  deniedReason: string | null;
 }
 
 export interface Coordinator {
@@ -95,6 +104,7 @@ export interface Volunteer {
   completedTrainings: FosterTraining[];
   mostRecentWaiverSigned: boolean;
   status: VolunteerStatus;
+  fosterTypePreferences: FosterType[];
   cognitoSub: string;
   animalPreferences: string[];
   assignedCoordinators: Coordinator[];
