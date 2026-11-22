@@ -12,6 +12,7 @@ import { Match } from './matches.entity';
 import { MatchStatus } from './matches.types';
 import { CreateMatchDto } from './dtos/create-match.dto';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { StaffService } from '../staff/staff.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { matchCreatedEmail } from './emails/matchCreated';
@@ -27,41 +28,58 @@ export class MatchesService {
     private repo: Repository<Match>,
     @Inject(forwardRef(() => VolunteersService))
     private volunteersService: VolunteersService,
+    private staffService: StaffService,
     private animalsService: AnimalsService,
     private emailsService: EmailsService,
   ) {}
 
   /**
-   * Creates a PENDING match between a volunteer and a Chameleon animal, then
-   * notifies the volunteer's assigned foster coordinators by email.
+   * Creates a PENDING match between a volunteer or staff member and a Chameleon
+   * animal, then notifies the applicant's assigned foster coordinators by email.
    *
    * The email is best-effort: the match is already committed when it is sent,
-   * so a send failure is logged rather than surfaced to the caller. Volunteers
+   * so a send failure is logged rather than surfaced to the caller. Applicants
    * with no assigned coordinators still get a match; no email goes out.
    *
-   * @param dto the volunteer and Chameleon animal to match
+   * @param dto the volunteer/staff and Chameleon animal to match
    * @returns the created match
-   * @throws NotFoundException if the volunteer or animal does not exist
-   * @throws BadRequestException if the volunteer is not active
+   * @throws NotFoundException if the volunteer/staff or animal does not exist
+   * @throws BadRequestException if the volunteer/staff is not active
    */
   async create(dto: CreateMatchDto): Promise<Match> {
-    const volunteer = await this.volunteersService.findActiveOrFail(
-      dto.volunteerId,
-    );
     await this.animalsService.findByChameleonIdOrFail(dto.chameleonAnimalId);
 
-    const match = await this.repo.save(
+    if (dto.volunteerId) {
+      const volunteer = await this.volunteersService.findActiveOrFail(
+        dto.volunteerId,
+      );
+
+      const match = await this.repo.save(
+        this.repo.create({
+          volunteerId: dto.volunteerId,
+          staffId: null,
+          chameleonAnimalId: dto.chameleonAnimalId,
+          status: MatchStatus.PENDING,
+          deniedReason: null,
+        }),
+      );
+
+      await this.notifyCoordinators(match, volunteer);
+
+      return match;
+    }
+
+    await this.staffService.findActiveOrFail(dto.staffId!);
+
+    return this.repo.save(
       this.repo.create({
-        volunteerId: dto.volunteerId,
+        volunteerId: null,
+        staffId: dto.staffId!,
         chameleonAnimalId: dto.chameleonAnimalId,
         status: MatchStatus.PENDING,
         deniedReason: null,
       }),
     );
-
-    await this.notifyCoordinators(match, volunteer);
-
-    return match;
   }
 
   /**
@@ -148,6 +166,20 @@ export class MatchesService {
    */
   findByVolunteerId(volunteerId: number): Promise<Match[]> {
     return this.repo.find({ where: { volunteerId } });
+  }
+
+  /**
+   * Fetches all Matches for a Staff member.
+   *
+   * Returns Matches of every status, not just active ones.
+   * Does not check that the Staff member exists, so an unknown ID yields an
+   * empty array; callers that need a 404 should check the Staff member first.
+   *
+   * @param staffId - The Staff member's ID.
+   * @returns The Staff member's Matches, or an empty array if they have none.
+   */
+  findByStaffId(staffId: number): Promise<Match[]> {
+    return this.repo.find({ where: { staffId } });
   }
 
   /**

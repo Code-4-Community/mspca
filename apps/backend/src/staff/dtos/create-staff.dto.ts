@@ -1,0 +1,96 @@
+import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsPhoneNumber,
+  IsString,
+  IsStrongPassword,
+  Matches,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
+import { Homebase } from '../../types';
+import { FosterTraining, FosterType } from '../../volunteers/volunteers.types';
+
+export class CreateStaffDto {
+  @IsNonEmptyString()
+  @MaxLength(255)
+  firstName!: string;
+
+  @IsNonEmptyString()
+  @MaxLength(255)
+  lastName!: string;
+
+  @IsNonEmptyString()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
+  phone!: string;
+
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNonEmptyString()
+  @IsPhoneNumber('US')
+  @MaxLength(20)
+  secondaryPhone?: string | null;
+
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsEmail()
+  @MaxLength(255)
+  @Matches(/^[^\s@]+@mspca\.org$/, {
+    message: 'Email must end in @mspca.org',
+  })
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsStrongPassword({
+    minLength: 8,
+    minLowercase: 1,
+    minUppercase: 1,
+    minNumbers: 1,
+    minSymbols: 1,
+  })
+  @MaxLength(256)
+  password!: string;
+
+  @IsNonEmptyString()
+  @MaxLength(255)
+  address!: string;
+
+  @IsNonEmptyString()
+  @MaxLength(255)
+  city!: string;
+
+  @IsNonEmptyString()
+  @MaxLength(10)
+  zipcode!: string;
+
+  @IsEnum(Homebase)
+  homebase!: Homebase;
+
+  @IsNonEmptyString()
+  residentAnimals!: string;
+
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNonEmptyString()
+  notes?: string | null;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterType, { each: true })
+  fosterType!: FosterType[];
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(FosterTraining, { each: true })
+  completedTrainings?: FosterTraining[];
+}

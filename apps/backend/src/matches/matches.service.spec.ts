@@ -8,6 +8,7 @@ import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { VolunteerStatus } from '../volunteers/volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { VolunteersService } from '../volunteers/volunteers.service';
+import { StaffService } from '../staff/staff.service';
 import { AnimalsService } from '../animals/animals.service';
 import { EmailsService } from '../aws/ses/email.service';
 import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
@@ -126,6 +127,7 @@ describe('MatchesService', () => {
         MatchesService,
         { provide: getRepositoryToken(Match), useValue: matchRepo },
         { provide: VolunteersService, useValue: volunteersService },
+        { provide: StaffService, useValue: { findActiveOrFail: jest.fn() } },
         { provide: AnimalsService, useValue: animalsService },
         { provide: EmailsService, useValue: emailsService },
       ],
@@ -187,6 +189,7 @@ describe('MatchesService', () => {
       );
       expect(matchRepo.create).toHaveBeenCalledWith({
         volunteerId: 1,
+        staffId: null,
         chameleonAnimalId: 'A42',
         status: MatchStatus.PENDING,
         deniedReason: null,
