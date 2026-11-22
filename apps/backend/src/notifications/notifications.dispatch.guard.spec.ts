@@ -41,11 +41,18 @@ describe('NotificationsDispatchGuard', () => {
       'a secret of matching length',
       { [DISPATCH_SECRET_HEADER]: 'b'.repeat(SECRET.length) },
     ],
+  ])('rejects %s as an invalid secret', (_label, headers) => {
+    expect(() => guard.canActivate(contextWith(headers))).toThrow(
+      new UnauthorizedException('Invalid dispatch secret'),
+    );
+  });
+
+  it.each([
     ['no header at all', {}],
     ['a non-string header', { [DISPATCH_SECRET_HEADER]: ['a', 'b'] }],
-  ])('rejects %s', (_label, headers) => {
+  ])('rejects %s as a missing header', (_label, headers) => {
     expect(() => guard.canActivate(contextWith(headers))).toThrow(
-      UnauthorizedException,
+      new UnauthorizedException(`Missing ${DISPATCH_SECRET_HEADER} header`),
     );
   });
 
@@ -54,6 +61,10 @@ describe('NotificationsDispatchGuard', () => {
 
     expect(() =>
       guard.canActivate(contextWith({ [DISPATCH_SECRET_HEADER]: SECRET })),
-    ).toThrow(UnauthorizedException);
+    ).toThrow(
+      new UnauthorizedException(
+        'Dispatch secret is not configured on the server',
+      ),
+    );
   });
 });

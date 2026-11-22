@@ -34,15 +34,25 @@ export class NotificationsDispatchGuard implements CanActivate {
       this.logger.error(
         'NOTIFICATIONS_DISPATCH_SECRET is not configured. Rejecting all dispatch requests.',
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException(
+        'Dispatch secret is not configured on the server',
+      );
     }
 
     const request = context.switchToHttp().getRequest<Request>();
     const provided = request.headers[DISPATCH_SECRET_HEADER];
 
-    if (typeof provided !== 'string' || !this.matches(provided, expected)) {
+    // Messages show up in the Lambda's "Dispatch failed" log. Never echo the value.
+    if (typeof provided !== 'string') {
+      this.logger.warn('Rejected a dispatch request with no secret header');
+      throw new UnauthorizedException(
+        `Missing ${DISPATCH_SECRET_HEADER} header`,
+      );
+    }
+
+    if (!this.matches(provided, expected)) {
       this.logger.warn('Rejected a dispatch request with an invalid secret');
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Invalid dispatch secret');
     }
 
     return true;
