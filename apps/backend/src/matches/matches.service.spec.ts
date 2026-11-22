@@ -371,15 +371,14 @@ describe('MatchesService', () => {
         service.create({ volunteerId: 999, chameleonAnimalId: 'A42' }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(animalsService.findByChameleonIdOrFail).not.toHaveBeenCalled();
+      expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
+        'A42',
+      );
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('throws when the animal does not exist, after checking the volunteer', async () => {
-      volunteersService.findActiveOrFail.mockResolvedValue(
-        volunteerWithCoordinator,
-      );
+    it('throws when the animal does not exist, before checking the volunteer', async () => {
       animalsService.findByChameleonIdOrFail.mockRejectedValue(
         new NotFoundException('Animal with Chameleon ID A999 not found'),
       );
@@ -390,10 +389,10 @@ describe('MatchesService', () => {
         new NotFoundException('Animal with Chameleon ID A999 not found'),
       );
 
-      expect(volunteersService.findActiveOrFail).toHaveBeenCalledWith(1);
       expect(animalsService.findByChameleonIdOrFail).toHaveBeenCalledWith(
         'A999',
       );
+      expect(volunteersService.findActiveOrFail).not.toHaveBeenCalled();
       expect(matchRepo.save).not.toHaveBeenCalled();
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });

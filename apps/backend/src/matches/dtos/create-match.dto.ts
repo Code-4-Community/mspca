@@ -1,9 +1,9 @@
 import {
   IsInt,
-  IsOptional,
   IsPositive,
   MaxLength,
   Validate,
+  ValidateIf,
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
@@ -14,9 +14,8 @@ import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.dec
 class ExactlyOneApplicantConstraint implements ValidatorConstraintInterface {
   validate(_: unknown, args: ValidationArguments): boolean {
     const obj = args.object as CreateMatchDto;
-    const hasVolunteer =
-      obj.volunteerId !== undefined && obj.volunteerId !== null;
-    const hasStaff = obj.staffId !== undefined && obj.staffId !== null;
+    const hasVolunteer = obj.volunteerId !== undefined;
+    const hasStaff = obj.staffId !== undefined;
     return (hasVolunteer && !hasStaff) || (!hasVolunteer && hasStaff);
   }
 
@@ -26,13 +25,13 @@ class ExactlyOneApplicantConstraint implements ValidatorConstraintInterface {
 }
 
 export class CreateMatchDto {
-  @IsOptional()
+  @ValidateIf((o) => o.volunteerId !== undefined)
   @IsInt()
   @IsPositive()
   @Validate(ExactlyOneApplicantConstraint)
   volunteerId?: number;
 
-  @IsOptional()
+  @ValidateIf((o) => o.staffId !== undefined)
   @IsInt()
   @IsPositive()
   staffId?: number;

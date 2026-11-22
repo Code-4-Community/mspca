@@ -69,16 +69,22 @@ export class MatchesService {
       return match;
     }
 
-    await this.staffService.findActiveOrFail(dto.staffId!);
+    if (dto.staffId) {
+      await this.staffService.findActiveOrFail(dto.staffId);
 
-    return this.repo.save(
-      this.repo.create({
-        volunteerId: null,
-        staffId: dto.staffId!,
-        chameleonAnimalId: dto.chameleonAnimalId,
-        status: MatchStatus.PENDING,
-        deniedReason: null,
-      }),
+      return this.repo.save(
+        this.repo.create({
+          volunteerId: null,
+          staffId: dto.staffId,
+          chameleonAnimalId: dto.chameleonAnimalId,
+          status: MatchStatus.PENDING,
+          deniedReason: null,
+        }),
+      );
+    }
+
+    throw new BadRequestException(
+      'Exactly one of volunteerId or staffId must be provided',
     );
   }
 
@@ -233,7 +239,7 @@ export class MatchesService {
             status: MatchStatus.PENDING,
             matchId: Not(id),
           },
-          relations: ['volunteer'],
+          relations: ['volunteer', 'staff'],
         });
 
         match.status = MatchStatus.ACTIVE;
@@ -251,7 +257,11 @@ export class MatchesService {
 
         const applicantEmails = [
           ...new Set(
-            otherMatches.map((otherMatch) => otherMatch.volunteer.email),
+            otherMatches.map((otherMatch) =>
+              otherMatch.volunteer
+                ? otherMatch.volunteer.email
+                : otherMatch.staff!.email,
+            ),
           ),
         ];
 
