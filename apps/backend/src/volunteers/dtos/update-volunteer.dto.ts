@@ -4,14 +4,19 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   MaxLength,
+  Min,
   IsPhoneNumber,
   IsEmail,
   ArrayUnique,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
+import { PetDto } from '../../pets/dtos/pet.dto';
 import { AtLeastOneValue } from './validators/at-least-one-value.validator';
 
 @AtLeastOneValue<UpdateVolunteerDto>([
@@ -23,7 +28,11 @@ import { AtLeastOneValue } from './validators/at-least-one-value.validator';
   'address',
   'city',
   'zipcode',
-  'residentAnimals',
+  'hasChildren',
+  'childrenAges',
+  'hasSeparateFosterRoom',
+  'livelyNeighborhood',
+  'pets',
   'notes',
   'fosterType',
   'animalUpdates',
@@ -71,8 +80,28 @@ export class UpdateVolunteerDto {
   zipcode?: string;
 
   @ValidateIf((_, value) => value !== undefined)
-  @IsNonEmptyString()
-  residentAnimals?: string;
+  @IsBoolean()
+  hasChildren?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  childrenAges?: number[];
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  hasSeparateFosterRoom?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  livelyNeighborhood?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PetDto)
+  pets?: PetDto[];
 
   @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
