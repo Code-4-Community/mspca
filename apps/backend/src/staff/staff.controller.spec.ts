@@ -28,7 +28,6 @@ describe('StaffController', () => {
     city: 'Boston',
     zipcode: '02101',
     homebase: Homebase.BOSTON,
-    residentAnimals: 'None',
     notes: null,
     staffType: StaffType.SHELTER,
   } as CreateStaffDto;
@@ -70,7 +69,6 @@ describe('StaffController', () => {
         city: dto.city,
         zipcode: dto.zipcode,
         homebase: dto.homebase,
-        residentAnimals: dto.residentAnimals,
         notes: dto.notes,
         staffType: dto.staffType,
       };

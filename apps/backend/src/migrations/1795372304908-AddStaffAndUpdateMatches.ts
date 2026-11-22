@@ -20,7 +20,6 @@ export class AddStaffAndUpdateMatches1795372304908
         "city" varchar(255) NOT NULL,
         "zipcode" varchar(10) NOT NULL,
         "homebase" "homebase_enum" NOT NULL,
-        "resident_animals" text NOT NULL,
         "notes" text,
         "most_recent_waiver_signed" boolean NOT NULL,
         "staff_type" "staff_type_enum" NOT NULL,

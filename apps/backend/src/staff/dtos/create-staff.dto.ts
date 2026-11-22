@@ -71,9 +71,6 @@ export class CreateStaffDto {
   @IsEnum(Homebase)
   homebase!: Homebase;
 
-  @IsNonEmptyString()
-  residentAnimals!: string;
-
   @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsNonEmptyString()
   notes?: string | null;

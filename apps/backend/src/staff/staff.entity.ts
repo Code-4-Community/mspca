@@ -48,9 +48,6 @@ export class FosterStaff {
   @Column({ type: 'enum', enum: Homebase })
   homebase!: Homebase;
 
-  @Column({ name: 'resident_animals', type: 'text' })
-  residentAnimals!: string;
-
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
