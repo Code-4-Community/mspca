@@ -5,7 +5,6 @@ import {
   OneToMany,
   ManyToMany,
   JoinTable,
-  Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
 import {
@@ -17,7 +16,6 @@ import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
-@Unique('UQ_foster_volunteers_email', ['email'])
 export class FosterVolunteer {
   @PrimaryGeneratedColumn({ name: 'volunteer_id' })
   volunteerId!: number;

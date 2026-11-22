@@ -4,7 +4,7 @@ import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
 import { FosterStaff } from './staff.entity';
 import { Homebase } from '../types';
-import { FosterType } from '../volunteers/volunteers.types';
+import { StaffType } from './staff.types';
 import { CreateStaffDto } from './dtos/create-staff.dto';
 import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
 
@@ -30,7 +30,7 @@ describe('StaffController', () => {
     homebase: Homebase.BOSTON,
     residentAnimals: 'None',
     notes: null,
-    fosterType: [FosterType.DOG],
+    staffType: StaffType.SHELTER,
   } as CreateStaffDto;
 
   const confirmDto = {
@@ -72,7 +72,7 @@ describe('StaffController', () => {
         homebase: dto.homebase,
         residentAnimals: dto.residentAnimals,
         notes: dto.notes,
-        fosterType: dto.fosterType,
+        staffType: dto.staffType,
       };
 
       const created = {

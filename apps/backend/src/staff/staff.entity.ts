@@ -5,15 +5,13 @@ import {
   OneToMany,
   ManyToMany,
   JoinTable,
-  Unique,
 } from 'typeorm';
 import { Homebase } from '../types';
-import { FosterTraining, FosterType } from '../volunteers/volunteers.types';
+import { StaffType } from './staff.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Match } from '../matches/matches.entity';
 
 @Entity('foster_staff')
-@Unique('UQ_foster_staff_email', ['email'])
 export class FosterStaff {
   @PrimaryGeneratedColumn({ name: 'staff_id' })
   staffId!: number;
@@ -56,31 +54,11 @@ export class FosterStaff {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ name: 'foster_type', type: 'enum', enum: FosterType, array: true })
-  fosterType!: FosterType[];
-
-  @Column({
-    name: 'completed_trainings',
-    type: 'enum',
-    enum: FosterTraining,
-    enumName: 'foster_training_enum',
-    array: true,
-    default: () => "'{}'",
-  })
-  completedTrainings!: FosterTraining[];
-
   @Column({ name: 'most_recent_waiver_signed', type: 'boolean' })
   mostRecentWaiverSigned!: boolean;
 
-  @Column({
-    name: 'foster_type_preferences',
-    type: 'enum',
-    enum: FosterType,
-    enumName: 'foster_type_enum',
-    array: true,
-    default: () => "'{}'",
-  })
-  fosterTypePreferences!: FosterType[];
+  @Column({ name: 'staff_type', type: 'enum', enum: StaffType })
+  staffType!: StaffType;
 
   @Column({ type: 'boolean' })
   active!: boolean;

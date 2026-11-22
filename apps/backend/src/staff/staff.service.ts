@@ -58,6 +58,7 @@ export class StaffService {
       return await this.repo.save({
         ...profile,
         active: true,
+        mostRecentWaiverSigned: true,
         cognitoSub,
         assignedCoordinators: [],
       });

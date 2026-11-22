@@ -1,7 +1,4 @@
 import {
-  ArrayNotEmpty,
-  ArrayUnique,
-  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -15,7 +12,7 @@ import {
 import { Transform } from 'class-transformer';
 import { IsNonEmptyString } from '../../utils/decorators/is-non-empty-string.decorator';
 import { Homebase } from '../../types';
-import { FosterTraining, FosterType } from '../../volunteers/volunteers.types';
+import { StaffType } from '../staff.types';
 
 export class CreateStaffDto {
   @IsNonEmptyString()
@@ -81,16 +78,6 @@ export class CreateStaffDto {
   @IsNonEmptyString()
   notes?: string | null;
 
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique()
-  @IsEnum(FosterType, { each: true })
-  fosterType!: FosterType[];
-
-  @ValidateIf((_, value) => value !== undefined)
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique()
-  @IsEnum(FosterTraining, { each: true })
-  completedTrainings?: FosterTraining[];
+  @IsEnum(StaffType)
+  staffType!: StaffType;
 }

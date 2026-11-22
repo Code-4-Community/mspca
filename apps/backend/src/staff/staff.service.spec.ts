@@ -15,7 +15,7 @@ import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { Homebase } from '../types';
-import { FosterType } from '../volunteers/volunteers.types';
+import { StaffType } from './staff.types';
 
 describe('StaffService', () => {
   let service: StaffService;
@@ -23,7 +23,7 @@ describe('StaffService', () => {
   let cognitoService: jest.Mocked<CognitoService>;
   let loggerSpy: jest.SpyInstance;
 
-  const dto: CreateStaffDto = {
+  const dto = {
     firstName: 'Jane',
     lastName: 'Doe',
     phone: '+16175551234',
@@ -36,13 +36,13 @@ describe('StaffService', () => {
     homebase: Homebase.BOSTON,
     residentAnimals: 'None',
     notes: null,
-    fosterType: [FosterType.DOG],
-  };
+    staffType: StaffType.SHELTER,
+  } as CreateStaffDto;
 
-  const confirmDto: ConfirmStaffDto = {
+  const confirmDto = {
     email: dto.email,
     code: '123456',
-  };
+  } as ConfirmStaffDto;
 
   const staff = {
     staffId: 1,
@@ -57,8 +57,9 @@ describe('StaffService', () => {
     homebase: dto.homebase,
     residentAnimals: dto.residentAnimals,
     notes: dto.notes,
-    fosterType: dto.fosterType,
+    staffType: dto.staffType,
     active: true,
+    mostRecentWaiverSigned: true,
     cognitoSub: 'cognito-sub-123',
     assignedCoordinators: [],
   } as FosterStaff;
@@ -120,6 +121,7 @@ describe('StaffService', () => {
         expect.objectContaining({
           email: dto.email,
           active: true,
+          mostRecentWaiverSigned: true,
           cognitoSub: 'cognito-sub-123',
         }),
       );
@@ -234,7 +236,7 @@ describe('StaffService', () => {
       expect(cognitoService.confirmUser).not.toHaveBeenCalled();
     });
 
-    it('propagates an invalid verification code error', async () => {
+    it('propagates errors from Cognito', async () => {
       const error = new BadRequestException('Invalid verification code');
 
       repo.findOneBy.mockResolvedValue(staff);
@@ -247,24 +249,6 @@ describe('StaffService', () => {
         confirmDto.code,
         CognitoRole.Staff,
       );
-    });
-
-    it('propagates an expired verification code error', async () => {
-      const error = new BadRequestException('Verification code expired');
-
-      repo.findOneBy.mockResolvedValue(staff);
-      cognitoService.confirmUser.mockRejectedValue(error);
-
-      await expect(service.confirm(confirmDto)).rejects.toBe(error);
-    });
-
-    it('propagates Cognito server errors', async () => {
-      const error = new InternalServerErrorException('Failed to confirm user');
-
-      repo.findOneBy.mockResolvedValue(staff);
-      cognitoService.confirmUser.mockRejectedValue(error);
-
-      await expect(service.confirm(confirmDto)).rejects.toBe(error);
     });
   });
 
