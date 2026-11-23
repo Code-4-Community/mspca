@@ -14,22 +14,16 @@ export class AddUnconfirmedVolunteerStatus1795298132520
       `CREATE TYPE "volunteer_status_enum" AS ENUM ('Active', 'Inactive', 'Unconfirmed', 'Pending')`,
     );
     await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" DROP DEFAULT`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" TYPE "volunteer_status_enum" USING "status"::text::"volunteer_status_enum"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" SET DEFAULT 'Unconfirmed'`,
+      `ALTER TABLE "foster_volunteers"
+        ALTER COLUMN "status" DROP DEFAULT,
+        ALTER COLUMN "status" TYPE "volunteer_status_enum" USING "status"::text::"volunteer_status_enum",
+        ALTER COLUMN "status" SET DEFAULT 'Unconfirmed'`,
     );
     await queryRunner.query(`DROP TYPE "volunteer_status_enum_old"`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Unconfirmed volunteers fall back to Pending, the status they had before this migration.
-    await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" DROP DEFAULT`,
-    );
     await queryRunner.query(
       `UPDATE "foster_volunteers" SET "status" = 'Pending' WHERE "status" = 'Unconfirmed'`,
     );
@@ -40,10 +34,10 @@ export class AddUnconfirmedVolunteerStatus1795298132520
       `CREATE TYPE "volunteer_status_enum" AS ENUM ('Active', 'Inactive', 'Pending')`,
     );
     await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" TYPE "volunteer_status_enum" USING "status"::text::"volunteer_status_enum"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "foster_volunteers" ALTER COLUMN "status" SET DEFAULT 'Pending'`,
+      `ALTER TABLE "foster_volunteers"
+        ALTER COLUMN "status" DROP DEFAULT,
+        ALTER COLUMN "status" TYPE "volunteer_status_enum" USING "status"::text::"volunteer_status_enum",
+        ALTER COLUMN "status" SET DEFAULT 'Pending'`,
     );
     await queryRunner.query(`DROP TYPE "volunteer_status_enum_old"`);
   }
