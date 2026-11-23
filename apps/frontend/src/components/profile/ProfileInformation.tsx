@@ -2,8 +2,10 @@ import { useState } from 'react';
 import {
   Box,
   Button,
+  type ButtonProps,
   Checkbox,
   Flex,
+  type FlexProps,
   Icon,
   IconButton,
   Input,
@@ -185,18 +187,18 @@ const toUpdateBody = (
   return body;
 };
 
-const getSaveErrorMessage = (err: unknown): string => {
+export const getSaveErrorMessage = (err: unknown): string => {
   const message = isAxiosError(err) ? err.response?.data?.message : undefined;
   if (Array.isArray(message)) return message.join(' ');
   if (typeof message === 'string') return message;
   return 'Could not save your changes. Please try again.';
 };
 
-const fieldStyles = {
+export const fieldStyles = {
   bg: 'gray.0',
   borderColor: 'gray.300',
   borderRadius: '5px',
-  fontSize: '14px',
+  fontSize: { base: '12px', lg: '14px' },
   lineHeight: '20px',
   px: '2.5',
 } as const;
@@ -207,9 +209,21 @@ const unavailableStyles = {
   _disabled: { opacity: 1, cursor: 'not-allowed' },
 } as const;
 
-const ErrorText: React.FC<{ children?: string }> = ({ children }) =>
+// A row of fields. On mobile the fields wrap onto as many lines as they need.
+const rowProps: FlexProps = {
+  align: 'flex-start',
+  wrap: { base: 'wrap', lg: 'nowrap' },
+  columnGap: { base: '10', lg: '7' },
+  rowGap: '4',
+};
+
+export const ErrorText: React.FC<{ children?: string }> = ({ children }) =>
   children ? (
-    <Text color="fg.error" fontSize="12px" lineHeight="16px">
+    <Text
+      color="fg.error"
+      fontSize={{ base: '9px', lg: '12px' }}
+      lineHeight="16px"
+    >
       {children}
     </Text>
   ) : null;
@@ -218,7 +232,12 @@ const RequiredLabel: React.FC<{ label: string; required?: boolean }> = ({
   label,
   required,
 }) => (
-  <Text color="black" fontSize="14px" fontWeight="semibold" lineHeight="20px">
+  <Text
+    color="black"
+    fontSize={{ base: '12px', lg: '14px' }}
+    fontWeight="semibold"
+    lineHeight="20px"
+  >
     {label}
     {required && (
       <Text as="span" color="error.100">
@@ -230,7 +249,7 @@ const RequiredLabel: React.FC<{ label: string; required?: boolean }> = ({
 
 const Field: React.FC<{
   label: string;
-  w?: string;
+  w?: FlexProps['w'];
   required?: boolean;
   error?: string;
   // Shown after the label, e.g. a help icon.
@@ -297,14 +316,20 @@ const ChoicePair: React.FC<{
   disabled?: boolean;
   gap: string;
 }> = ({ label, options, value, onChange, disabled, gap }) => (
-  <Flex h="8" align="center" gap={gap} role="radiogroup" aria-label={label}>
+  <Flex
+    h={{ base: '6', lg: '8' }}
+    align="center"
+    gap={{ base: '2.5', lg: gap }}
+    role="radiogroup"
+    aria-label={label}
+  >
     {options.map((option, i) => {
       const optionValue = i === 0;
       const checked = value === optionValue;
       return (
         <Checkbox.Root
           key={option}
-          size="lg"
+          size={{ base: 'sm', lg: 'lg' }}
           checked={checked}
           onCheckedChange={() => onChange?.(optionValue)}
           readOnly={!onChange}
@@ -320,7 +345,7 @@ const ChoicePair: React.FC<{
           />
           <Checkbox.Label
             color={!onChange && !checked ? 'gray.300' : 'neutrals.black'}
-            fontSize="14px"
+            fontSize={{ base: '12px', lg: '14px' }}
             fontWeight="medium"
             lineHeight="20px"
           >
@@ -334,7 +359,8 @@ const ChoicePair: React.FC<{
 
 const NumberSelect: React.FC<{
   label: string;
-  w: string;
+  w: FlexProps['w'];
+  flex?: FlexProps['flex'];
   value: number | null;
   options: number[];
   format: (n: number) => string;
@@ -345,6 +371,7 @@ const NumberSelect: React.FC<{
 }> = ({
   label,
   w,
+  flex,
   value,
   options,
   format,
@@ -353,10 +380,10 @@ const NumberSelect: React.FC<{
   disabled,
   invalid,
 }) => (
-  <NativeSelect.Root w={w} size="sm" disabled={disabled}>
+  <NativeSelect.Root w={w} flex={flex} minW="0" size="sm" disabled={disabled}>
     <NativeSelect.Field
       {...fieldStyles}
-      h="8"
+      h={{ base: '6', lg: '8' }}
       color="fg.muted"
       aria-label={label}
       aria-invalid={invalid || undefined}
@@ -438,11 +465,43 @@ const AddButton: React.FC<{
   </Button>
 );
 
+// Mobile version of AddButton: one line, shown beside the Yes/No choice.
+// Callers hide it on desktop.
+const CompactAddButton: React.FC<{
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({ label, onClick, disabled }) => (
+  <Button
+    variant="outline"
+    flexShrink={0}
+    w="28"
+    h="8"
+    px="2"
+    gap="2"
+    bg="gray.100"
+    borderRadius="sm"
+    borderWidth="1.5px"
+    borderColor="neutral.muted"
+    color="neutral.fg"
+    fontSize="12px"
+    fontWeight="medium"
+    lineHeight="20px"
+    onClick={onClick}
+    disabled={disabled}
+  >
+    Add {label}
+    <Icon asChild boxSize="4">
+      <Plus strokeWidth={2} aria-hidden />
+    </Icon>
+  </Button>
+);
+
 // Bordered card around one child or pet. Without `onRemove` it's the
 // read-only version: no asterisk and no remove button.
 const ItemCard: React.FC<{
   title: string;
-  w: string;
+  w: FlexProps['w'];
   onRemove?: () => void;
   disabled?: boolean;
   children: React.ReactNode;
@@ -472,7 +531,12 @@ const ItemCard: React.FC<{
 
 // A saved value shown as text on a read-only child or pet card.
 const ReadOnlyValue: React.FC<{ children: string }> = ({ children }) => (
-  <Text h="8" color="fg.muted" fontSize="14px" lineHeight="20px">
+  <Text
+    h="8"
+    color="fg.muted"
+    fontSize={{ base: '12px', lg: '14px' }}
+    lineHeight="20px"
+  >
     {children}
   </Text>
 );
@@ -488,7 +552,7 @@ const ItemRow: React.FC<{
       flexShrink={0}
       w={labelW}
       color="black"
-      fontSize="14px"
+      fontSize={{ base: '12px', lg: '14px' }}
       fontWeight="medium"
       lineHeight="20px"
     >
@@ -498,11 +562,11 @@ const ItemRow: React.FC<{
   </Flex>
 );
 
-const HeaderButton: React.FC<{
+export const HeaderButton: React.FC<{
   label: string;
   icon: React.ReactNode;
   primary?: boolean;
-  w: string;
+  w: ButtonProps['w'];
   onClick: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -616,7 +680,7 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
 
   const inputProps = (key: 'address' | 'city' | 'zipcode') => ({
     ...fieldStyles,
-    h: '8',
+    h: { base: '6', lg: '8' },
     value: shown[key],
     readOnly: !editing,
     disabled: saving,
@@ -643,6 +707,11 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
       pets: hasPets && prev.pets.length === 0 ? [{ ...EMPTY_PET }] : prev.pets,
     }));
 
+  const addChild = () =>
+    update((prev) => ({ childrenAges: [...prev.childrenAges, null] }));
+  const addPet = () =>
+    update((prev) => ({ pets: [...prev.pets, { ...EMPTY_PET }] }));
+
   const setChildAge = (index: number, age: number | null) =>
     update((prev) => ({
       childrenAges: prev.childrenAges.map((a, i) => (i === index ? age : a)),
@@ -652,15 +721,36 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
       pets: prev.pets.map((p, i) => (i === index ? { ...p, ...patch } : p)),
     }));
 
+  // While editing on mobile, City and Zipcode share a line, half each.
+  const halfRow = 'calc(50% - 0.4375rem)';
   const addressRow = (
-    <Flex gap="7" align="flex-start">
-      <Field label="Address" w="52" required={editing} error={errors.address}>
+    <Flex
+      {...rowProps}
+      columnGap={editing ? { base: '3.5', lg: '7' } : rowProps.columnGap}
+    >
+      <Field
+        label="Address"
+        // Its own line on mobile.
+        w={{ base: 'full', lg: '52' }}
+        required={editing}
+        error={errors.address}
+      >
         <Input {...inputProps('address')} />
       </Field>
-      <Field label="City" w="36" required={editing} error={errors.city}>
+      <Field
+        label="City"
+        w={{ base: editing ? halfRow : '24', lg: '36' }}
+        required={editing}
+        error={errors.city}
+      >
         <Input {...inputProps('city')} />
       </Field>
-      <Field label="Zipcode" w="36" required={editing} error={errors.zipcode}>
+      <Field
+        label="Zipcode"
+        w={{ base: editing ? halfRow : '44', lg: '36' }}
+        required={editing}
+        error={errors.zipcode}
+      >
         <Input {...inputProps('zipcode')} />
       </Field>
     </Flex>
@@ -685,11 +775,11 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
   );
 
   return (
-    <Flex direction="column" gap="6">
-      <Flex justify="space-between" align="center">
+    <Flex direction="column" gap={{ base: '4', lg: '6' }}>
+      <Flex justify="space-between" align="center" wrap="wrap" gap="2">
         <Text
           color="black"
-          fontSize="24px"
+          fontSize={{ base: '20px', lg: '24px' }}
           fontWeight="semibold"
           lineHeight="36px"
         >
@@ -727,13 +817,22 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
         <Flex direction="column" gap="4">
           {addressRow}
 
-          <Flex gap="7" align="flex-start">
+          <Flex {...rowProps}>
             {/* TODO: wire up once the backend has a household type. */}
-            <Field label="Household Type" w="52" required>
+            {/* The mobile edit design shows the homebase here; it stays
+                read-only, since changing it reassigns coordinators. */}
+            <Box hideFrom="lg" w="full">
+              <Field label="MSPCA Homebase">
+                <Text color="fg.muted" fontSize="12px" lineHeight="20px">
+                  {HOMEBASE_LABELS[data.homebase]}
+                </Text>
+              </Field>
+            </Box>
+            <Field label="Household Type" w={{ base: '44', lg: '52' }} required>
               <NativeSelect.Root {...unavailableStyles} size="sm">
                 <NativeSelect.Field
                   {...fieldStyles}
-                  h="8"
+                  h={{ base: '6', lg: '8' }}
                   color="fg.subtle"
                   aria-label="Household Type"
                 >
@@ -744,7 +843,7 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
             </Field>
             <Field
               label="Neighborhood Type"
-              w="44"
+              w={{ base: 'auto', lg: '44' }}
               required
               labelExtra={<HelpTooltip text={NEIGHBORHOOD_HELP} />}
             >
@@ -761,7 +860,7 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
             </Field>
             <Field
               label="Do you have a separate room for fosters?"
-              w="80"
+              w={{ base: 'full', lg: '80' }}
               required
             >
               <ChoicePair
@@ -777,8 +876,13 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
             </Field>
           </Flex>
 
-          <Flex gap="7" align="flex-start">
-            <Field label="Children" w="36" required error={errors.children}>
+          <Flex {...rowProps}>
+            <Field
+              label="Children"
+              w={{ base: '32', lg: '36' }}
+              required
+              error={errors.children}
+            >
               <ChoicePair
                 label="Children"
                 options={['Yes', 'No']}
@@ -788,6 +892,17 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                 gap="4"
               />
             </Field>
+            {/* On mobile, Add Child / Add Pet sit beside their Yes/No,
+                which also puts Pets on its own line. */}
+            {shown.hasChildren && (
+              <Box alignSelf="flex-end" hideFrom="lg">
+                <CompactAddButton
+                  label="Child"
+                  disabled={saving}
+                  onClick={addChild}
+                />
+              </Box>
+            )}
             <Field label="Pets" w="32" required error={errors.pets}>
               <ChoicePair
                 label="Pets"
@@ -798,15 +913,25 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                 gap="4"
               />
             </Field>
+            {shown.hasPets && (
+              <Box alignSelf="flex-end" hideFrom="lg">
+                <CompactAddButton
+                  label="Pet"
+                  disabled={saving}
+                  onClick={addPet}
+                />
+              </Box>
+            )}
           </Flex>
 
           {shown.hasChildren && (
-            <Flex gap="5" align="center" wrap="wrap">
+            <Flex gap={{ base: '3', lg: '5' }} align="center" wrap="wrap">
               {shown.childrenAges.map((age, i) => (
                 <ItemCard
                   key={i}
                   title={`Child ${i + 1}`}
-                  w="40"
+                  // Two to a line on mobile.
+                  w={{ base: 'calc(50% - 0.375rem)', lg: '40' }}
                   disabled={saving}
                   onRemove={() =>
                     update((prev) => ({
@@ -817,7 +942,8 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                   <ItemRow label="Age" labelW="7" gap="2.5">
                     <NumberSelect
                       label={`Child ${i + 1} age`}
-                      w="28"
+                      w={{ base: 'auto', lg: '28' }}
+                      flex={{ base: '1', lg: 'none' }}
                       value={age}
                       options={CHILD_AGE_OPTIONS}
                       format={formatYears}
@@ -830,15 +956,9 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                   <ErrorText>{errors[`child.${i}`]}</ErrorText>
                 </ItemCard>
               ))}
-              <AddButton
-                label="Child"
-                disabled={saving}
-                onClick={() =>
-                  update((prev) => ({
-                    childrenAges: [...prev.childrenAges, null],
-                  }))
-                }
-              />
+              <Box hideBelow="lg">
+                <AddButton label="Child" disabled={saving} onClick={addChild} />
+              </Box>
             </Flex>
           )}
 
@@ -861,7 +981,7 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                       <NativeSelect.Root flex="1" size="sm" disabled={saving}>
                         <NativeSelect.Field
                           {...fieldStyles}
-                          h="8"
+                          h={{ base: '6', lg: '8' }}
                           color="fg.muted"
                           aria-label={`Pet ${i + 1} species`}
                           aria-invalid={
@@ -889,7 +1009,7 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                       <Input
                         {...fieldStyles}
                         flex="1"
-                        h="8"
+                        h={{ base: '6', lg: '8' }}
                         color="black"
                         aria-label={`Pet ${i + 1} breed`}
                         aria-invalid={!!errors[`pet.${i}.breed`] || undefined}
@@ -929,13 +1049,9 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                   </Flex>
                 </ItemCard>
               ))}
-              <AddButton
-                label="Pet"
-                disabled={saving}
-                onClick={() =>
-                  update((prev) => ({ pets: [...prev.pets, { ...EMPTY_PET }] }))
-                }
-              />
+              <Box hideBelow="lg">
+                <AddButton label="Pet" disabled={saving} onClick={addPet} />
+              </Box>
             </Flex>
           )}
 
@@ -945,13 +1061,17 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
         <Flex direction="column" gap="4">
           {addressRow}
 
-          <Flex gap="7" align="flex-start">
-            <Field label="MSPCA Homebase" w="52">
-              <Text color="fg.muted" fontSize="14px" lineHeight="20px">
+          <Flex {...rowProps}>
+            <Field label="MSPCA Homebase" w={{ base: '32', lg: '52' }}>
+              <Text
+                color="fg.muted"
+                fontSize={{ base: '12px', lg: '14px' }}
+                lineHeight="20px"
+              >
                 {HOMEBASE_LABELS[data.homebase]}
               </Text>
             </Field>
-            <Field label="Neighborhood Type" w="44">
+            <Field label="Neighborhood Type" w={{ base: 'auto', lg: '44' }}>
               <ChoicePair
                 label="Neighborhood Type"
                 options={['Quiet', 'Lively']}
@@ -959,7 +1079,10 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
                 gap="6"
               />
             </Field>
-            <Field label="Do you have a separate room for fosters?" w="96">
+            <Field
+              label="Do you have a separate room for fosters?"
+              w={{ base: 'full', lg: '96' }}
+            >
               <ChoicePair
                 label="Separate room for fosters"
                 options={['Yes', 'No']}
@@ -969,8 +1092,8 @@ const ProfileInformation: React.FC<ProfileInformationProps> = ({
             </Field>
           </Flex>
 
-          <Flex gap="7" align="flex-start">
-            <Field label="Children" w="36">
+          <Flex {...rowProps}>
+            <Field label="Children" w={{ base: '32', lg: '36' }}>
               <ChoicePair
                 label="Children"
                 options={['Yes', 'No']}

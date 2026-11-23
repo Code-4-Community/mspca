@@ -1,4 +1,12 @@
-import { Box, Button, Flex, Icon, Image, Text } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  Flex,
+  Icon,
+  Image,
+  Text,
+  type TextProps,
+} from '@chakra-ui/react';
 import { House } from 'lucide-react';
 
 import type { Animal } from '../../types';
@@ -10,20 +18,26 @@ interface MatchTileProps {
   onSeeMore: (animal: Animal) => void;
 }
 
+// Each tile passes its own mobile and desktop sizes.
+type ResponsiveSize = TextProps['fontSize'];
+
 const SeeMoreButton: React.FC<{
   onClick: () => void;
-  fontSize: string;
-  lineHeight: string;
-}> = ({ onClick, fontSize, lineHeight }) => (
+  fontSize: ResponsiveSize;
+  lineHeight: ResponsiveSize;
+  // Width on mobile; on desktop the button fills the tile's column.
+  mobileW: string;
+}> = ({ onClick, fontSize, lineHeight, mobileW }) => (
   <Button
-    alignSelf="stretch"
-    h="9"
-    minW="11"
-    px="5"
+    alignSelf={{ base: 'flex-start', lg: 'stretch' }}
+    w={{ base: mobileW, lg: 'auto' }}
+    h={{ base: '7', lg: '9' }}
+    minW={{ base: '8', lg: '11' }}
+    px={{ base: '3.5', lg: '5' }}
     py="0.5"
     bg="blue.blue3"
     color="neutral.contrast"
-    borderRadius="xl"
+    borderRadius={{ base: 'lg', lg: 'xl' }}
     fontSize={fontSize}
     fontWeight="semibold"
     lineHeight={lineHeight}
@@ -36,15 +50,20 @@ const SeeMoreButton: React.FC<{
 // TODO: Figma shows the foster length ("5 Month Foster") or foster dates here,
 // which the schema doesn't have yet. Showing the animal's age, like the
 // animal modal does.
-const AgeLine: React.FC<{ animal: Animal; fontSize: string }> = ({
+const AgeLine: React.FC<{ animal: Animal; desktopFontSize: string }> = ({
   animal,
-  fontSize,
+  desktopFontSize,
 }) => (
-  <Flex align="center" gap="1">
-    <Icon asChild boxSize="4" color="neutrals.black">
+  <Flex align="center" gap={{ base: '0.5', lg: '1' }}>
+    <Icon asChild boxSize={{ base: '3.5', lg: '4' }} color="neutrals.black">
       <House strokeWidth={1} aria-hidden />
     </Icon>
-    <Text color="neutrals.black" fontSize={fontSize} fontWeight="semibold">
+    <Text
+      color="neutrals.black"
+      fontSize={{ base: '12px', lg: desktopFontSize }}
+      lineHeight={{ base: '16px', lg: 'normal' }}
+      fontWeight="semibold"
+    >
       {formatAge(animal.ageYear, animal.ageMonth)}
     </Text>
   </Flex>
@@ -54,18 +73,18 @@ const NameAndBreed: React.FC<{ animal: Animal }> = ({ animal }) => (
   <Box minW="0">
     <Text
       color="neutrals.black"
-      fontSize="18px"
+      fontSize={{ base: '14px', lg: '18px' }}
       fontWeight="bold"
-      lineHeight="28px"
+      lineHeight={{ base: '20px', lg: '28px' }}
       truncate
     >
       {animal.name}
     </Text>
     <Text
       color="neutrals.black85"
-      fontSize="12px"
+      fontSize={{ base: '9px', lg: '12px' }}
       fontWeight="medium"
-      lineHeight="16px"
+      lineHeight={{ base: '12px', lg: '16px' }}
       truncate
     >
       {animal.breed.join(', ')}
@@ -81,37 +100,43 @@ export const PendingMatchTile: React.FC<MatchTileProps> = ({
   <Box
     position="relative"
     flexShrink={0}
-    w="96"
-    h="32"
-    p="2"
+    w={{ base: '72', lg: '96' }}
+    h={{ base: '24', lg: '32' }}
+    p={{ base: '1.5', lg: '2' }}
     bg="gray.0"
-    borderRadius="2xl"
+    borderRadius={{ base: 'xl', lg: '2xl' }}
     boxShadow="card"
   >
     <Flex
       position="absolute"
-      top="2"
-      right="2"
-      h="5"
-      px="3.5"
+      top={{ base: '1.5', lg: '2' }}
+      right={{ base: '1.5', lg: '2' }}
+      h={{ base: '3.5', lg: '5' }}
+      px={{ base: '3', lg: '3.5' }}
       align="center"
       bg="status.submitted"
-      borderRadius="md"
-      outline="1px solid"
+      borderRadius={{ base: 'sm', lg: 'md' }}
+      outline={{ lg: '1px solid' }}
       outlineColor="blue.blue3"
       outlineOffset="-1px"
     >
-      <Text color="white" fontSize="10px" fontWeight="medium" lineHeight="16px">
+      <Text
+        color="white"
+        fontSize={{ base: '7.5px', lg: '10px' }}
+        fontWeight="medium"
+        lineHeight={{ base: '12px', lg: '16px' }}
+      >
         Submitted
       </Text>
     </Flex>
-    <Flex h="full" align="center" gap="2">
+    <Flex h="full" align="center" gap={{ base: '1.5', lg: '2' }}>
       <Image
         src={PLACEHOLDER_IMAGE}
         alt={animal.name}
         flexShrink={0}
-        boxSize="24"
-        borderRadius="2xl"
+        w={{ base: '16', lg: '24' }}
+        h={{ base: '20', lg: '24' }}
+        borderRadius={{ base: 'xl', lg: '2xl' }}
         objectFit="cover"
       />
       <Flex
@@ -121,14 +146,15 @@ export const PendingMatchTile: React.FC<MatchTileProps> = ({
         direction="column"
         justify="space-between"
       >
-        <Box pr="20">
+        <Box pr={{ base: '16', lg: '20' }}>
           <NameAndBreed animal={animal} />
         </Box>
-        <AgeLine animal={animal} fontSize="14px" />
+        <AgeLine animal={animal} desktopFontSize="14px" />
         <SeeMoreButton
           onClick={() => onSeeMore(animal)}
-          fontSize="14px"
-          lineHeight="20px"
+          fontSize={{ base: '9px', lg: '14px' }}
+          lineHeight={{ base: '16px', lg: '20px' }}
+          mobileW="32"
         />
       </Flex>
     </Flex>
@@ -144,32 +170,33 @@ export const FosterMatchTile: React.FC<MatchTileProps> = ({
     flexShrink={0}
     direction="column"
     gap="2"
-    w="64"
-    h="80"
+    w={{ base: '48', lg: '64' }}
+    h={{ base: '60', lg: '80' }}
     p="2"
     bg="gray.0"
-    borderRadius="2xl"
+    borderRadius={{ base: 'xl', lg: '2xl' }}
     boxShadow="card"
   >
     <Image
       src={PLACEHOLDER_IMAGE}
       alt={animal.name}
-      w="60"
-      h="40"
-      borderRadius="2xl"
+      w={{ base: '44', lg: '60' }}
+      h={{ base: '28', lg: '40' }}
+      borderRadius={{ base: 'xl', lg: '2xl' }}
       objectFit="cover"
     />
-    <Box px="2">
+    <Box px={{ base: '0', lg: '2' }}>
       <NameAndBreed animal={animal} />
     </Box>
-    <Box px="2">
-      <AgeLine animal={animal} fontSize="16px" />
+    <Box px={{ base: '0', lg: '2' }}>
+      <AgeLine animal={animal} desktopFontSize="16px" />
     </Box>
-    <Box mt="auto" px="2">
+    <Box mt="auto" px={{ base: '0', lg: '2' }}>
       <SeeMoreButton
         onClick={() => onSeeMore(animal)}
-        fontSize="16px"
-        lineHeight="24px"
+        fontSize={{ base: '12px', lg: '16px' }}
+        lineHeight={{ base: '16px', lg: '24px' }}
+        mobileW="44"
       />
     </Box>
   </Flex>

@@ -7,7 +7,7 @@ import type { ApiData } from '@utils/useApiData';
 import AnimalModal from '../modals/AnimalModal';
 import { ErrorState, LoadingState } from './FetchStates';
 import { FosterMatchTile, PendingMatchTile } from './MatchTiles';
-import PagedRow from './PagedRow';
+import PagedRow, { TileRow } from './PagedRow';
 
 interface FosterDashboardProps {
   matches: ApiData<Match[]>;
@@ -23,18 +23,30 @@ const Section: React.FC<{
   paged?: boolean;
   renderItem: (item: MatchWithAnimal) => ReactNode;
 }> = ({ title, emptyText, items, pageSize, paged = true, renderItem }) => (
-  <Flex direction="column" align="flex-start" gap="6" alignSelf="stretch">
-    <Text color="black" fontSize="20px" fontWeight="semibold" lineHeight="32px">
+  <Flex
+    direction="column"
+    align="flex-start"
+    gap={{ base: '2.5', lg: '6' }}
+    alignSelf="stretch"
+  >
+    <Text
+      color="black"
+      fontSize={{ base: '14px', lg: '20px' }}
+      fontWeight="semibold"
+      lineHeight={{ base: '24px', lg: '32px' }}
+    >
       {title}
     </Text>
     {items.length === 0 ? (
-      <Text color="neutrals.grey">{emptyText}</Text>
+      <Text color="neutrals.grey" fontSize={{ base: '14px', lg: 'md' }}>
+        {emptyText}
+      </Text>
     ) : !paged ? (
-      <Flex gap="5" align="center">
+      <TileRow>
         {items.slice(0, pageSize).map((item) => (
           <Box key={item.match.matchId}>{renderItem(item)}</Box>
         ))}
-      </Flex>
+      </TileRow>
     ) : (
       <PagedRow
         items={items}
@@ -85,7 +97,12 @@ const FosterDashboard: React.FC<FosterDashboardProps> = ({
     );
   } else {
     body = (
-      <Flex direction="column" align="flex-start" gap="9" alignSelf="stretch">
+      <Flex
+        direction="column"
+        align="flex-start"
+        gap={{ base: '5', lg: '9' }}
+        alignSelf="stretch"
+      >
         <Section
           title="Pending Applications"
           emptyText="You have no pending applications."
@@ -119,12 +136,12 @@ const FosterDashboard: React.FC<FosterDashboardProps> = ({
   }
 
   return (
-    <Flex direction="column" align="flex-start" gap="6">
+    <Flex direction="column" align="flex-start" gap={{ base: '3', lg: '6' }}>
       <Text
         color="black"
-        fontSize="24px"
+        fontSize={{ base: '18px', lg: '24px' }}
         fontWeight="semibold"
-        lineHeight="36px"
+        lineHeight={{ base: '32px', lg: '36px' }}
       >
         Dashboard
       </Text>

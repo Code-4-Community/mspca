@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { Box, Flex, Icon, IconButton } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  Icon,
+  IconButton,
+  useBreakpointValue,
+} from '@chakra-ui/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PagedRowProps<T> {
@@ -35,8 +41,29 @@ const PageButton: React.FC<{
 );
 
 /**
- * A single row of tiles that shows `pageSize` at a time. When there are more,
- * a progress track and previous/next buttons appear under the row.
+ * One row of tiles. On mobile it scrolls sideways, snapping to each tile; the
+ * padding keeps the tiles' shadows from being clipped by the scroll area.
+ */
+export const TileRow: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <Flex
+    alignSelf="stretch"
+    gap={{ base: '3.5', lg: '5' }}
+    align="center"
+    overflowX={{ base: 'auto', lg: 'visible' }}
+    scrollSnapType={{ base: 'x mandatory', lg: 'none' }}
+    mx={{ base: '-1', lg: '0' }}
+    p={{ base: '1', lg: '0' }}
+    css={{ '& > *': { scrollSnapAlign: 'start', flexShrink: 0 } }}
+  >
+    {children}
+  </Flex>
+);
+
+/**
+ * A single row of tiles that shows `pageSize` at a time on desktop. When
+ * there are more, a progress track and previous/next buttons appear under
+ * the row. On mobile every tile is shown in a row that scrolls sideways
+ * instead.
  */
 const PagedRow = <T,>({
   items,
@@ -45,18 +72,30 @@ const PagedRow = <T,>({
   renderItem,
 }: PagedRowProps<T>) => {
   const [page, setPage] = useState(0);
+  // Read on the first render, so desktop doesn't flash the mobile row.
+  const paged = useBreakpointValue({ base: false, lg: true }, { ssr: false });
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   // Keeps the page in range if the list shrinks.
   const current = Math.min(page, pageCount - 1);
   const visible = items.slice(current * pageSize, (current + 1) * pageSize);
 
+  if (!paged) {
+    return (
+      <TileRow>
+        {items.map((item) => (
+          <Box key={getKey(item)}>{renderItem(item)}</Box>
+        ))}
+      </TileRow>
+    );
+  }
+
   return (
     <Flex direction="column" gap="6" alignSelf="stretch">
-      <Flex gap="5" align="center">
+      <TileRow>
         {visible.map((item) => (
           <Box key={getKey(item)}>{renderItem(item)}</Box>
         ))}
-      </Flex>
+      </TileRow>
       {pageCount > 1 && (
         <Flex align="center" gap="9">
           <Box
