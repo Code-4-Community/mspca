@@ -28,6 +28,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
 import { AnimalsService } from '../animals/animals.service';
+import { MatchStatus } from '../matches/matches.types';
 
 @Injectable()
 export class VolunteersService {
@@ -68,7 +69,7 @@ export class VolunteersService {
   async coordinatorFindByIdOrFail(id: number): Promise<FosterVolunteer> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinators'],
+      relations: ['assignedCoordinators', 'pets'],
     });
 
     if (!volunteer) {
@@ -79,7 +80,7 @@ export class VolunteersService {
   }
 
   /**
-   * Fetches a Volunteer by ID, with their assigned Foster Coordinator.
+   * Fetches a Volunteer by ID, with their assigned Foster Coordinator and pets.
    *
    * Returns the Volunteer so callers can reuse it instead of fetching again.
    *
@@ -90,7 +91,7 @@ export class VolunteersService {
   async findByIdOrFail(id: number): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.repo.findOne({
       where: { volunteerId: id },
-      relations: ['assignedCoordinators'],
+      relations: ['assignedCoordinators', 'pets'],
     });
 
     if (!volunteer) {
@@ -112,10 +113,11 @@ export class VolunteersService {
    *
    * @param dto - The Volunteer's profile fields and chosen password.
    * @returns The saved Volunteer.
+   * @throws {BadRequestException} If childrenAges doesn't match hasChildren (checked before Cognito is called).
    * @throws {ConflictException} If a Volunteer or Cognito user with the email already exists.
    * @throws {BadRequestException} If Cognito rejects the password.
-   * @throws {InternalServerErrorException} If the Cognito user could not be registered.
-   * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
+   * @throws {InternalServerErrorException} If the Cognito user could not be registered,
+   * or the Volunteer could not be saved (the Cognito user is then deleted).
    */
   async create(
     dto: CreateVolunteerDto,
@@ -123,6 +125,10 @@ export class VolunteersService {
     // The password only goes to Cognito; keep it out of the saved and returned Volunteer.
     const { password, ...profile } = dto;
     const email = profile.email.toLowerCase();
+    const childrenAges = profile.childrenAges ?? [];
+    const pets = profile.pets ?? [];
+
+    this.checkChildrenConsistent(profile.hasChildren, childrenAges);
 
     const existing = await this.repo.findOneBy({ email });
     if (existing) {
@@ -143,6 +149,8 @@ export class VolunteersService {
       const saved = await this.repo.save({
         ...profile,
         email,
+        childrenAges,
+        pets,
         status: VolunteerStatus.PENDING,
         mostRecentWaiverSigned: true,
         cognitoSub,
@@ -351,6 +359,35 @@ export class VolunteersService {
   }
 
   /**
+   * Fetches the Volunteer who owns a Cognito account, with their assigned
+   * Foster Coordinators. Used to look up the signed-in user from their token.
+   *
+   * @param cognitoSub - The `sub` claim from the user's Cognito access token.
+   * @returns The Volunteer, without coordinator-only fields.
+   * @throws {NotFoundException} If no Volunteer has this Cognito sub.
+   */
+
+  async findByCognitoSubOrFail(
+    cognitoSub: string,
+  ): Promise<VolunteerWithoutPrivateFields> {
+    // Older rows default to an empty sub, so never match on ''.
+    if (!cognitoSub) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    const volunteer = await this.repo.findOne({
+      where: { cognitoSub },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    return this.withoutPrivateFields(volunteer);
+  }
+
+  /**
    * Ensures a Volunteer's account is active.
    *
    * @param volunteer - The Volunteer to check.
@@ -367,19 +404,23 @@ export class VolunteersService {
   /**
    * Updates a foster volunteer by ID.
    * Only the fields included in the DTO are changed; all other fields keep their current values.
+   * Pets, when included, replace the whole list; pets left out are deleted.
+   * Setting hasChildren to false without sending childrenAges clears the saved ages.
    * The homebase is changed through changeHomebase instead, since changing it
    * also reassigns coordinators and emails them.
    * @param id - ID of the volunteer to update
    * @param dto - The fields to update
    * @returns The updated volunteer
    * @throws NotFoundException if no volunteer exists with the given ID
+   * @throws {BadRequestException} If the saved and updated fields together
+   * leave childrenAges not matching hasChildren.
    */
   async updateVolunteerById(
     id: number,
     dto: UpdateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
     const volunteer = await this.findByIdOrFail(id);
-    Object.assign(volunteer, dto);
+    this.applyProfileUpdate(volunteer, dto);
     return this.withoutPrivateFields(await this.repo.save(volunteer));
   }
 
@@ -388,20 +429,68 @@ export class VolunteersService {
    * Volunteer can edit themselves, plus coordinator-only fields
    * (coordinator notes and completed trainings).
    * Only the fields included in the DTO are changed; completed trainings
-   * are replaced as a whole list.
+   * and pets are replaced as whole lists. Setting hasChildren to false
+   * without sending childrenAges clears the saved ages.
    *
    * @param id - The Volunteer's ID.
    * @param dto - The fields to update.
    * @returns The updated Volunteer, including private fields.
    * @throws {NotFoundException} If no Volunteer with the ID exists.
+   * @throws {BadRequestException} If the saved and updated fields together
+   * leave childrenAges not matching hasChildren.
    */
   async coordinatorUpdateVolunteerById(
     id: number,
     dto: CoordinatorUpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     const volunteer = await this.coordinatorFindByIdOrFail(id);
-    Object.assign(volunteer, dto);
+    this.applyProfileUpdate(volunteer, dto);
     return this.repo.save(volunteer);
+  }
+
+  /**
+   * Copies an update onto a loaded Volunteer, after checking that the saved
+   * and updated fields together still satisfy the children rule.
+   *
+   * @param volunteer - The loaded Volunteer to update.
+   * @param dto - The fields to copy onto the Volunteer.
+   * @throws {BadRequestException} If childrenAges doesn't match hasChildren.
+   */
+  private applyProfileUpdate(
+    volunteer: VolunteerWithoutPrivateFields,
+    dto: UpdateVolunteerDto,
+  ): void {
+    const hasChildren = dto.hasChildren ?? volunteer.hasChildren;
+    const childrenAges =
+      dto.childrenAges ??
+      (dto.hasChildren === false ? [] : volunteer.childrenAges);
+    this.checkChildrenConsistent(hasChildren, childrenAges);
+    Object.assign(volunteer, dto, { childrenAges });
+  }
+
+  /**
+   * Ensures childrenAges lists at least one age when hasChildren is true,
+   * and none when it is false. Mirrors CHK_foster_volunteers_children_ages,
+   * so a bad request is a 400 instead of a database error.
+   *
+   * @param hasChildren - Whether the Volunteer has children.
+   * @param childrenAges - The children's ages.
+   * @throws {BadRequestException} If childrenAges doesn't match hasChildren.
+   */
+  private checkChildrenConsistent(
+    hasChildren: boolean,
+    childrenAges: number[],
+  ): void {
+    if (hasChildren && childrenAges.length === 0) {
+      throw new BadRequestException(
+        'childrenAges must not be empty when hasChildren is true',
+      );
+    }
+    if (!hasChildren && childrenAges.length > 0) {
+      throw new BadRequestException(
+        'childrenAges must be empty when hasChildren is false',
+      );
+    }
   }
 
   /**
@@ -537,14 +626,22 @@ export class VolunteersService {
   }
 
   /**
-   * Gets all foster volunteers.
-   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * Gets all foster volunteers, with their assigned coordinators and pets.
+   * Each volunteer includes only their matches with status ACTIVE, or an empty array if there are no volunteers.
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
-    const volunteers = await this.repo.find({
-      relations: ['assignedCoordinators'],
-    });
+    const volunteers = await this.repo
+      .createQueryBuilder('volunteer')
+      .leftJoinAndSelect('volunteer.assignedCoordinators', 'coordinator')
+      .leftJoinAndSelect('volunteer.pets', 'pet')
+      .leftJoinAndSelect(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      )
+      .getMany();
     return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
   /**

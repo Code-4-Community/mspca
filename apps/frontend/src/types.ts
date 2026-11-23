@@ -13,6 +13,26 @@ export enum FosterType {
   FARM_ANIMALS = 'Farm Animals',
 }
 
+export enum FosterTraining {
+  DOG = 'Dog',
+  CAT = 'Cat',
+}
+
+export enum VolunteerStatus {
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  PENDING = 'Pending',
+}
+
+export enum MatchStatus {
+  PENDING = 'Pending',
+  ACTIVE = 'Active',
+  COMPLETE = 'Complete',
+  DENIED = 'Denied',
+  WITHDRAWN = 'Withdrawn',
+  CANCELED = 'Canceled',
+}
+
 export enum Restriction {
   NO_RESTRICTIONS = 'No Restrictions',
   DOG_FREE_HOME = 'Dog-Free Home',
@@ -45,15 +65,6 @@ export interface CreateMatchBody {
   additionalComments?: string;
 }
 
-export enum MatchStatus {
-  PENDING = 'Pending',
-  ACTIVE = 'Active',
-  COMPLETE = 'Complete',
-  DENIED = 'Denied',
-  WITHDRAWN = 'Withdrawn',
-  CANCELED = 'Canceled',
-}
-
 export interface Match {
   matchId: number;
   volunteerId: number;
@@ -70,10 +81,19 @@ export interface Coordinator {
   phone: string;
   secondaryPhone: string | null;
   email: string;
-  // 'Boston' | 'Cape Cod' | 'Salem' | 'Nevins Farm'
-  homebase: string;
+  homebase: Homebase;
   active: boolean;
   cognitoSub: string;
+  // Only included when a coordinator is loaded with their volunteers (e.g. /api/auth/me).
+  assignedVolunteers?: Volunteer[];
+}
+
+// A pet that lives with a volunteer. Mirrors the backend's PetDto.
+export interface Pet {
+  species: FosterType;
+  breed: string;
+  ageYear: number;
+  ageMonth: number;
 }
 
 export interface Volunteer {
@@ -86,18 +106,19 @@ export interface Volunteer {
   address: string;
   city: string;
   zipcode: string;
-  // 'Boston' | 'Cape Cod' | 'Salem' | 'Nevins Farm'
-  homebase: string;
-  residentAnimals: string;
+  homebase: Homebase;
+  hasChildren: boolean;
+  childrenAges: number[];
+  hasSeparateFosterRoom: boolean;
+  livelyNeighborhood: boolean;
+  pets: Pet[];
   notes: string | null;
-  // Each is 'Dog' | 'Cat' | 'Small Animals' | 'Baby Bottle Animals' | 'Farm Animals'
-  fosterType: string[];
+  fosterType: FosterType[];
   animalUpdates: boolean;
-  // Each is 'Dog' | 'Cat'
-  completedTrainings: string[];
+  completedTrainings: FosterTraining[];
   mostRecentWaiverSigned: boolean;
-  // 'Active' | 'Inactive' | 'Pending'
-  status: string;
+  status: VolunteerStatus;
+  fosterTypePreferences: FosterType[];
   cognitoSub: string;
   animalPreferences: string[];
   assignedCoordinators: Coordinator[];
@@ -114,8 +135,39 @@ export interface UpdateVolunteerBody {
   address?: string;
   city?: string;
   zipcode?: string;
-  residentAnimals?: string;
+  hasChildren?: boolean;
+  childrenAges?: number[];
+  hasSeparateFosterRoom?: boolean;
+  livelyNeighborhood?: boolean;
+  // Replaces the whole list; pets left out are deleted.
+  pets?: Pet[];
   notes?: string | null;
   fosterType?: FosterType[];
   animalUpdates?: boolean;
 }
+
+// Must match the backend's CognitoRole values exactly, since /api/auth/me
+// returns these strings as the user's role.
+export enum UserRole {
+  FOSTER_VOLUNTEER = 'FosterVolunteer',
+  FOSTER_COORDINATOR = 'FosterCoordinator',
+  OWNER = 'Owner',
+}
+
+export interface Owner {
+  ownerId: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  secondaryPhone: string | null;
+  email: string;
+  active: boolean;
+  cognitoSub: string;
+}
+
+// The signed-in user returned by GET /api/auth/me: their role, plus their
+// record from the table that matches that role.
+export type AuthenticatedUser =
+  | { role: UserRole.FOSTER_VOLUNTEER; user: Volunteer }
+  | { role: UserRole.FOSTER_COORDINATOR; user: Coordinator }
+  | { role: UserRole.OWNER; user: Owner };

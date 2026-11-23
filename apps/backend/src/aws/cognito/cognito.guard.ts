@@ -85,9 +85,7 @@ export class CognitoJWTGuard implements CanActivate {
       return true;
     }
 
-    // TODO: Uncomment after easy sign-in is implemented in frontend.
     const request = context.switchToHttp().getRequest<Request>();
-    /*
     const token = extractBearerToken(request);
     if (!token) {
       throw new UnauthorizedException('No bearer token provided');
@@ -95,7 +93,6 @@ export class CognitoJWTGuard implements CanActivate {
 
     const payload: AccessTokenPayload = await this.verifyToken(token, config);
     (request as Request & { user: AccessTokenPayload }).user = payload;
-    */
     return true;
   }
 

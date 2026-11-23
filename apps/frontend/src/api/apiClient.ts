@@ -4,6 +4,7 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { isAuthEnabled } from '../auth/auth.config';
 import type {
   Animal,
+  AuthenticatedUser,
   CreateMatchBody,
   Match,
   UpdateVolunteerBody,
@@ -50,6 +51,10 @@ export class ApiClient {
 
       return config;
     });
+  }
+
+  public async getMe(): Promise<AuthenticatedUser> {
+    return this.get('/api/auth/me') as Promise<AuthenticatedUser>;
   }
 
   public async getAnimals(): Promise<Animal[]> {

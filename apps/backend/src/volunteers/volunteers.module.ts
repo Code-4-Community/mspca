@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FosterVolunteer } from './volunteers.entity';
+import { Pet } from '../pets/pets.entity';
 import { VolunteersController } from './volunteers.controller';
 import { VolunteersService } from './volunteers.service';
 import { CoordinatorsModule } from '../coordinators/coordinators.module';
@@ -10,7 +11,7 @@ import { AnimalsModule } from '../animals/animals.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FosterVolunteer]),
+    TypeOrmModule.forFeature([FosterVolunteer, Pet]),
     CoordinatorsModule,
     AWSSESModule,
     forwardRef(() => MatchesModule),

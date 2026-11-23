@@ -28,10 +28,9 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
     alignSelf="stretch"
     direction="column"
     justify="flex-end"
-    align="flex-start"
     gap="4"
     p="4"
-    bg="white"
+    bg="bg"
     borderRadius="3xl"
     boxShadow="card"
   >
@@ -39,60 +38,44 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
       alignSelf="stretch"
       src={PLACEHOLDER_IMAGE}
       alt={animal.name}
-      position="relative"
       h="72"
       borderRadius="2xl"
       objectFit="cover"
     />
-    <Flex
-      alignSelf="stretch"
-      direction="column"
-      justify="space-between"
-      align="flex-start"
-      h="60"
-    >
-      <Flex alignSelf="stretch" direction="column" align="flex-start" gap="2">
-        <Flex alignSelf="stretch" direction="column" align="flex-start" gap="2">
-          <Box alignSelf="stretch">
-            <Text
-              color="neutrals.black"
-              fontSize="30px"
-              fontWeight="bold"
-              lineHeight="40px"
-            >
-              {animal.name}
-            </Text>
-            <Text
-              color="neutrals.black85"
-              textStyle="body-small"
-              fontWeight="medium"
-            >
-              {animal.breed.join(', ')}
-            </Text>
-          </Box>
-          <Flex alignSelf="stretch" align="center" gap="1">
-            <Icon asChild boxSize="5" color="neutrals.black">
-              <House strokeWidth={1} aria-hidden />
-            </Icon>
-            <Text color="neutrals.black" textStyle="h7">
-              {formatAge(animal.ageYear, animal.ageMonth)}
-            </Text>
-          </Flex>
-          {animal.restrictions && animal.restrictions.length > 0 && (
-            <Flex
-              alignSelf="stretch"
-              wrap="wrap"
-              align="flex-start"
-              alignContent="flex-start"
-              justify="flex-start"
-              gap="2"
-            >
-              {animal.restrictions.map((label) => (
-                <RestrictionTag key={label} label={label} />
-              ))}
-            </Flex>
-          )}
+    <Flex alignSelf="stretch" direction="column" justify="space-between" h="60">
+      <Flex alignSelf="stretch" direction="column" gap="2">
+        <Box alignSelf="stretch">
+          <Text
+            color="neutrals.black"
+            fontSize="30px"
+            fontWeight="bold"
+            lineHeight="40px"
+          >
+            {animal.name}
+          </Text>
+          <Text
+            color="neutrals.black85"
+            textStyle="body-small"
+            fontWeight="medium"
+          >
+            {animal.breed.join(', ')}
+          </Text>
+        </Box>
+        <Flex alignSelf="stretch" align="center" gap="1">
+          <Icon asChild boxSize="5" color="neutrals.black">
+            <House strokeWidth={1} aria-hidden />
+          </Icon>
+          <Text color="neutrals.black" textStyle="h7">
+            {formatAge(animal.ageYear, animal.ageMonth)}
+          </Text>
         </Flex>
+        {animal.restrictions.length > 0 && (
+          <Flex alignSelf="stretch" wrap="wrap" gap="2">
+            {animal.restrictions.map((label) => (
+              <RestrictionTag key={label} label={label} />
+            ))}
+          </Flex>
+        )}
         <Text
           color="neutrals.black85"
           textStyle="body-small"
@@ -104,14 +87,10 @@ const AnimalCard: React.FC<AnimalCardProps> = ({ animal, onSeeMore }) => (
       <Button
         alignSelf="stretch"
         h="11"
-        minW="11"
         px="5"
-        py="0.5"
-        gap="3"
         bg="blue.blue3"
-        color="white"
+        color="neutral.contrast"
         borderRadius="12px"
-        overflow="hidden"
         fontSize="16px"
         fontWeight="semibold"
         lineHeight="24px"

@@ -14,28 +14,18 @@ interface RestrictionTagProps {
  * `RESTRICTIONS` in `utils/animals.ts`), so each restriction always renders in
  * the same color on the animal card, the modal and anywhere else it appears.
  */
-const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => {
-  const restriction = RESTRICTIONS[label];
-
-  return (
-    <Flex justify="flex-start" align="flex-start">
-      <Flex
-        h="5"
-        minH="4"
-        px="2"
-        py="2.5"
-        gap="1"
-        bg={restriction.color}
-        borderRadius="lg"
-        justify="center"
-        align="center"
-      >
-        <Text color="white" textStyle="xs" fontWeight="semibold">
-          {label}
-        </Text>
-      </Flex>
-    </Flex>
-  );
-};
+const RestrictionTag: React.FC<RestrictionTagProps> = ({ label }) => (
+  <Flex
+    h="5"
+    px="2"
+    bg={RESTRICTIONS[label].color}
+    borderRadius="lg"
+    align="center"
+  >
+    <Text color="gray.0" textStyle="xs" fontWeight="semibold">
+      {label}
+    </Text>
+  </Flex>
+);
 
 export default RestrictionTag;
