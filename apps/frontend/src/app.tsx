@@ -1,29 +1,68 @@
-import { useEffect } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  type RouteObject,
+} from 'react-router-dom';
 
-import apiClient from '@api/apiClient';
 import Root from '@containers/root';
+import Layout from '@containers/Layout';
 import NotFound from '@containers/404';
-import Test from '@containers/test';
+import AnimalAvailability from '@pages/AnimalAvailability';
+import SignIn from '@pages/SignIn';
+import RequireAuth from './auth/RequireAuth';
+import { ROUTES } from './routes';
 
-const router = createBrowserRouter([
+export const routes: RouteObject[] = [
+  // Public: no sign-in needed, no navbar.
   {
-    path: '/',
-    element: <Root />,
+    path: ROUTES.SIGN_IN,
+    element: <SignIn />,
+    // Catches errors on the sign-in page.
     errorElement: <NotFound />,
   },
+
+  // Public: no sign-in needed, with the navbar (e.g. future landing pages).
   {
-    path: '/test',
-    element: <Test />,
+    element: <Layout />,
+    // Catches errors in the navbar or a public page, replacing the whole screen.
+    errorElement: <NotFound />,
+    children: [
+      // Add public pages here.
+    ],
   },
-]);
 
-export const App: React.FC = () => {
-  useEffect(() => {
-    apiClient.getHello().then((res) => console.log(res));
-  }, []);
+  // Signed in: any role.
+  {
+    element: <RequireAuth />,
+    // Catches errors in RequireAuth itself, while checking who is signed in.
+    errorElement: <NotFound />,
+    children: [
+      {
+        element: <Layout />,
+        // Catches errors in the layout itself (e.g. the navbar), replacing the
+        // whole screen.
+        errorElement: <NotFound />,
+        children: [
+          {
+            // Catches errors in a page, shown below the navbar.
+            errorElement: <NotFound />,
+            children: [
+              { path: '/', element: <Root /> },
+              {
+                path: ROUTES.ANIMAL_AVAILABILITY,
+                element: <AnimalAvailability />,
+              },
+              { path: '*', element: <NotFound /> },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
 
-  return <RouterProvider router={router} />;
-};
+const router = createBrowserRouter(routes);
+
+export const App: React.FC = () => <RouterProvider router={router} />;
 
 export default App;

@@ -2,9 +2,10 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  OneToMany,
   ManyToMany,
   JoinTable,
-  Unique,
+  Check,
 } from 'typeorm';
 import { Homebase } from '../types';
 import {
@@ -13,9 +14,18 @@ import {
   VolunteerStatus,
 } from './volunteers.types';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
+import { Pet } from '../pets/pets.entity';
+import { Match } from '../matches/matches.entity';
 
 @Entity('foster_volunteers')
-@Unique('UQ_foster_volunteers_email', ['email'])
+@Check(
+  'CHK_foster_volunteers_children_ages',
+  '("has_children" AND cardinality("children_ages") > 0) OR (NOT "has_children" AND cardinality("children_ages") = 0)',
+)
+@Check(
+  'CHK_foster_volunteers_children_ages_nonnegative',
+  '0 <= ALL ("children_ages")',
+)
 export class FosterVolunteer {
   @PrimaryGeneratedColumn({ name: 'volunteer_id' })
   volunteerId!: number;
@@ -52,8 +62,25 @@ export class FosterVolunteer {
   @Column({ type: 'enum', enum: Homebase })
   homebase!: Homebase;
 
-  @Column({ name: 'resident_animals', type: 'text' })
-  residentAnimals!: string;
+  @Column({ name: 'has_children', type: 'boolean' })
+  hasChildren!: boolean;
+
+  @Column({
+    name: 'children_ages',
+    type: 'int',
+    array: true,
+    default: () => "'{}'",
+  })
+  childrenAges!: number[];
+
+  @Column({ name: 'has_separate_foster_room', type: 'boolean' })
+  hasSeparateFosterRoom!: boolean;
+
+  @Column({ name: 'lively_neighborhood', type: 'boolean' })
+  livelyNeighborhood!: boolean;
+
+  @OneToMany(() => Pet, (pet) => pet.volunteer, { cascade: true })
+  pets!: Pet[];
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
@@ -87,6 +114,16 @@ export class FosterVolunteer {
   })
   status!: VolunteerStatus;
 
+  @Column({
+    name: 'foster_type_preferences',
+    type: 'enum',
+    enum: FosterType,
+    enumName: 'foster_type_enum',
+    array: true,
+    default: () => "'{}'",
+  })
+  fosterTypePreferences!: FosterType[];
+
   @Column({ name: 'cognito_sub', type: 'varchar', length: 255, default: '' })
   cognitoSub!: string;
 
@@ -112,4 +149,7 @@ export class FosterVolunteer {
     },
   })
   assignedCoordinators!: FosterCoordinator[];
+
+  @OneToMany(() => Match, (match) => match.volunteer)
+  matches?: Match[];
 }

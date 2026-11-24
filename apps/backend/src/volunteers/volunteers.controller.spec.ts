@@ -20,10 +20,11 @@ import {
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
+import { UpdateSpeciesPreferencesDto } from './dtos/update-species-preferences.dto';
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
-import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { PetDto } from '../pets/dtos/pet.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -52,6 +53,7 @@ describe('VolunteersController', () => {
     getAllVolunteers: jest.Mock;
     changeHomebase: jest.Mock;
     updateAnimalPreferences: jest.Mock;
+    updateFosterTypePreferences: jest.Mock;
     coordinatorUpdateVolunteerById: jest.Mock;
   };
   let mockMatchesService: { findByVolunteerId: jest.Mock };
@@ -74,6 +76,7 @@ describe('VolunteersController', () => {
       getAllVolunteers: jest.fn(),
       changeHomebase: jest.fn(),
       updateAnimalPreferences: jest.fn(),
+      updateFosterTypePreferences: jest.fn(),
       coordinatorUpdateVolunteerById: jest.fn(),
     };
     mockMatchesService = { findByVolunteerId: jest.fn() };
@@ -113,16 +116,6 @@ describe('VolunteersController', () => {
       expect(
         mockVolunteersService.coordinatorUpdateVolunteerById,
       ).toHaveBeenCalledWith(1, dto);
-    });
-
-    it('throws BadRequestException when no fields are provided', async () => {
-      const dto: CoordinatorUpdateVolunteerDto = {};
-      await expect(
-        controller.coordinatorUpdateVolunteerById(1, dto),
-      ).rejects.toThrow(BadRequestException);
-      expect(
-        mockVolunteersService.coordinatorUpdateVolunteerById,
-      ).not.toHaveBeenCalled();
     });
 
     it('propagates errors from the service', async () => {
@@ -171,7 +164,9 @@ describe('VolunteersController', () => {
       city: 'Boston',
       zipcode: '02130',
       homebase: Homebase.BOSTON,
-      residentAnimals: 'One cat',
+      hasChildren: false,
+      hasSeparateFosterRoom: true,
+      livelyNeighborhood: false,
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
@@ -231,6 +226,24 @@ describe('VolunteersController', () => {
       });
 
       expect(result).not.toHaveProperty('completedTrainings');
+    });
+
+    const pet = {
+      ageYear: 3,
+      ageMonth: 11,
+      species: FosterType.CAT,
+      breed: 'Tabby',
+    } as PetDto;
+
+    it('accepts a volunteer with pets and children', async () => {
+      const result = await validationPipe.transform(
+        { ...dto, hasChildren: true, childrenAges: [4, 9], pets: [pet] },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.hasChildren).toBe(true);
+      expect(result.childrenAges).toEqual([4, 9]);
+      expect(result.pets).toEqual([pet]);
     });
   });
 
@@ -309,6 +322,7 @@ describe('VolunteersController', () => {
       const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
     });
 
@@ -379,13 +393,6 @@ describe('VolunteersController', () => {
     it('should throw BadRequestException when id is invalid', async () => {
       await expect(
         controller.updateVolunteerById(0, { notes: 'x' }),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException when no fields are provided', async () => {
-      await expect(
-        controller.updateVolunteerById(1, {} as UpdateVolunteerDto),
       ).rejects.toThrow(BadRequestException);
       expect(mockVolunteersService.updateVolunteerById).not.toHaveBeenCalled();
     });
@@ -564,25 +571,6 @@ describe('VolunteersController', () => {
       ).toHaveBeenCalledWith(1, dto);
     });
 
-    it.each([{}, { added: [] }, { removed: [] }, { added: [], removed: [] }])(
-      'throws BadRequestException when neither list has IDs: %j',
-      async (body) => {
-        await expect(
-          controller.updateAnimalPreferences(
-            1,
-            body as UpdateAnimalPreferencesDto,
-          ),
-        ).rejects.toThrow(
-          new BadRequestException(
-            'At least one of added or removed must be provided',
-          ),
-        );
-        expect(
-          mockVolunteersService.updateAnimalPreferences,
-        ).not.toHaveBeenCalled();
-      },
-    );
-
     it('propagates errors thrown by the service', async () => {
       mockVolunteersService.updateAnimalPreferences.mockRejectedValue(
         new NotFoundException('Volunteer with ID 999 not found'),
@@ -593,6 +581,44 @@ describe('VolunteersController', () => {
       ).rejects.toThrow(
         new NotFoundException('Volunteer with ID 999 not found'),
       );
+    });
+  });
+
+  describe('updateSpeciesPreferences', () => {
+    it('returns the updated preferences from the service', async () => {
+      const dto = {
+        added: [FosterType.CAT],
+        removed: [FosterType.DOG],
+      } as UpdateSpeciesPreferencesDto;
+
+      const updatedPreferences = [FosterType.CAT];
+
+      mockVolunteersService.updateFosterTypePreferences.mockResolvedValue(
+        updatedPreferences,
+      );
+
+      const result = await controller.updateSpeciesPreferences(1, dto);
+
+      expect(result).toEqual(updatedPreferences);
+      expect(
+        mockVolunteersService.updateFosterTypePreferences,
+      ).toHaveBeenCalledWith(1, dto);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      const dto = { added: [FosterType.CAT] };
+
+      mockVolunteersService.updateFosterTypePreferences.mockRejectedValue(
+        new NotFoundException('Volunteer with ID 999 not found'),
+      );
+
+      await expect(
+        controller.updateSpeciesPreferences(999, dto),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(
+        mockVolunteersService.updateFosterTypePreferences,
+      ).toHaveBeenCalledWith(999, dto);
     });
   });
 });

@@ -9,6 +9,8 @@ import { CoordinatorsModule } from './coordinators/coordinators.module';
 import { VolunteersModule } from './volunteers/volunteers.module';
 import { OwnersModule } from './owners/owners.module';
 import { AnimalsModule } from './animals/animals.module';
+import { StaffModule } from './staff/staff.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { AnimalsModule } from './animals/animals.module';
     VolunteersModule,
     OwnersModule,
     AnimalsModule,
+    StaffModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

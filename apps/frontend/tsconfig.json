@@ -11,6 +11,7 @@
       "@api/*": ["./src/api/*"],
       "@components/*": ["./src/components/*"],
       "@containers/*": ["./src/containers/*"],
+      "@pages/*": ["./src/pages/*"],
       "@public/*": ["./public/*"],
       "@shared/*": ["../../shared/*"],
       "@utils/*": ["./src/utils/*"]

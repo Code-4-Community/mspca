@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -19,7 +18,9 @@ import { validateId } from '../utils/validation.utils';
 import { UpdateVolunteerDto } from './dtos/update-volunteer.dto';
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { UpdateAnimalPreferencesDto } from './dtos/update-animal-preferences.dto';
+import { UpdateSpeciesPreferencesDto } from './dtos/update-species-preferences.dto';
 import { FosterVolunteer } from './volunteers.entity';
+import { FosterType } from './volunteers.types';
 import { CreateVolunteerDto } from './dtos/create-volunteer.dto';
 import { ConfirmVolunteerDto } from './dtos/confirm-volunteer.dto';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
@@ -167,12 +168,12 @@ export class VolunteersController {
     return this.volunteersService.findByIdOrFail(volunteerId);
   }
 
-  // TODO: restrict to coordinators once role guarding is added
+  // TODO: restrict to coordinators and staff once role guarding is added
   @Patch('/:volunteerId/coordinator-update-profile')
   @ApiOperation({
-    summary: "Update a volunteer's profile as a coordinator",
+    summary: "Update a volunteer's profile as a coordinator or staff member",
     description:
-      'Accepts every field a volunteer can edit, plus coordinator-only fields. Returns the full volunteer, including all fields hidden to them.',
+      'Accepts every field a volunteer can edit, plus coordinator-only fields. Returns the full volunteer, including all fields hidden to them. Staff members can also use this endpoint (role guards will be added later).',
   })
   @ApiParam({
     name: 'volunteerId',
@@ -186,7 +187,8 @@ export class VolunteersController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid ID, invalid field, or no fields provided',
+    description:
+      'Invalid ID, invalid field, no fields provided, or childrenAges does not match hasChildren',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -197,9 +199,6 @@ export class VolunteersController {
     @Body() dto: CoordinatorUpdateVolunteerDto,
   ): Promise<FosterVolunteer> {
     validateId(volunteerId, 'Volunteer');
-    if (Object.keys(dto).length === 0) {
-      throw new BadRequestException('At least one field must be provided');
-    }
     return this.volunteersService.coordinatorUpdateVolunteerById(
       volunteerId,
       dto,
@@ -218,15 +217,56 @@ export class VolunteersController {
     description: 'The volunteer was updated',
     type: VolunteerWithoutPrivateFields,
   })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid ID, invalid field, no fields provided, or childrenAges does not match hasChildren',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
   async updateVolunteerById(
     @Param('volunteerId', ParseIntPipe) volunteerId: number,
     @Body() dto: UpdateVolunteerDto,
   ): Promise<VolunteerWithoutPrivateFields> {
     validateId(volunteerId, 'Volunteer');
-    if (Object.keys(dto).length === 0) {
-      throw new BadRequestException('At least one field must be provided');
-    }
     return this.volunteersService.updateVolunteerById(volunteerId, dto);
+  }
+
+  @Patch('/:volunteerId/species-preferences')
+  @ApiOperation({
+    summary:
+      "Update a volunteer's foster type preferences for notifications (not the foster types they actually foster)",
+  })
+  @ApiParam({
+    name: 'volunteerId',
+    type: Number,
+    description: 'ID of the volunteer',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "The volunteer's updated list of foster types",
+    schema: {
+      type: 'array',
+      items: { type: 'string', enum: Object.values(FosterType) },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid ID, inactive volunteer, empty request, overlapping changes, nonexistent removal',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The volunteer does not exist',
+  })
+  async updateSpeciesPreferences(
+    @Param('volunteerId', ParseIntPipe) volunteerId: number,
+    @Body() dto: UpdateSpeciesPreferencesDto,
+  ): Promise<FosterType[]> {
+    validateId(volunteerId, 'Volunteer');
+    return this.volunteersService.updateFosterTypePreferences(volunteerId, dto);
   }
 
   @Patch('/:id/approve')
@@ -291,10 +331,11 @@ export class VolunteersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiOperation({ summary: 'Get all volunteers with their current matches' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'All volunteers, regardless of match status',
+    description:
+      'All volunteers with their active matches, or an empty matches list.',
     type: [VolunteerWithoutPrivateFields],
   })
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
@@ -327,11 +368,6 @@ export class VolunteersController {
     @Body() dto: UpdateAnimalPreferencesDto,
   ): Promise<string[]> {
     validateId(volunteerId, 'Volunteer');
-    if (!dto.added?.length && !dto.removed?.length) {
-      throw new BadRequestException(
-        'At least one of added or removed must be provided',
-      );
-    }
     return this.volunteersService.updateAnimalPreferences(volunteerId, dto);
   }
 
