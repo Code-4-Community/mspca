@@ -59,16 +59,11 @@ describe('PetsService', () => {
       expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
-    it('returns the number of pets updated', async () => {
-      mockRepo.find.mockResolvedValue([pet(1, 1), pet(2, 2)]);
-
-      await expect(service.incrementAllAges()).resolves.toBe(2);
-    });
-
     it('does not save when there are no pets', async () => {
       mockRepo.find.mockResolvedValue([]);
 
-      await expect(service.incrementAllAges()).resolves.toBe(0);
+      await service.incrementAllAges();
+
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
   });

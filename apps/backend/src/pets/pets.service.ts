@@ -11,22 +11,21 @@ export class PetsService {
 
   /**
    * Ages every pet by one month, rolling into the next year after month 11.
-   *
-   * @returns The number of pets updated.
    */
-  async incrementAllAges(): Promise<number> {
+  async incrementAllAges(): Promise<void> {
     const pets = await this.repo.find();
     if (pets.length === 0) {
-      return 0;
+      return;
     }
 
     for (const pet of pets) {
-      const totalMonths = pet.ageYear * MONTHS_PER_YEAR + pet.ageMonth + 1;
-      pet.ageYear = Math.floor(totalMonths / MONTHS_PER_YEAR);
-      pet.ageMonth = totalMonths % MONTHS_PER_YEAR;
+      pet.ageMonth += 1;
+      if (pet.ageMonth === MONTHS_PER_YEAR) {
+        pet.ageMonth = 0;
+        pet.ageYear += 1;
+      }
     }
 
     await this.repo.save(pets);
-    return pets.length;
   }
 }

@@ -647,13 +647,11 @@ export class VolunteersService {
 
   /**
    * Ages every child of every volunteer who has children by one year.
-   *
-   * @returns The number of volunteers updated.
    */
-  async incrementAllChildrenAges(): Promise<number> {
+  async incrementAllChildrenAges(): Promise<void> {
     const volunteers = await this.repo.find({ where: { hasChildren: true } });
     if (volunteers.length === 0) {
-      return 0;
+      return;
     }
 
     for (const volunteer of volunteers) {
@@ -661,7 +659,6 @@ export class VolunteersService {
     }
 
     await this.repo.save(volunteers);
-    return volunteers.length;
   }
 
   /**
