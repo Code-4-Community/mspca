@@ -28,6 +28,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { Homebase } from '../types';
 import { AnimalsService } from '../animals/animals.service';
+import { MatchStatus } from '../matches/matches.types';
 
 @Injectable()
 export class VolunteersService {
@@ -115,8 +116,8 @@ export class VolunteersService {
    * @throws {BadRequestException} If childrenAges doesn't match hasChildren (checked before Cognito is called).
    * @throws {ConflictException} If a Volunteer or Cognito user with the email already exists.
    * @throws {BadRequestException} If Cognito rejects the password.
-   * @throws {InternalServerErrorException} If the Cognito user could not be registered.
-   * @throws {InternalServerErrorException} If the Volunteer could not be saved (the Cognito user is deleted).
+   * @throws {InternalServerErrorException} If the Cognito user could not be registered,
+   * or the Volunteer could not be saved (the Cognito user is then deleted).
    */
   async create(
     dto: CreateVolunteerDto,
@@ -358,6 +359,35 @@ export class VolunteersService {
   }
 
   /**
+   * Fetches the Volunteer who owns a Cognito account, with their assigned
+   * Foster Coordinators. Used to look up the signed-in user from their token.
+   *
+   * @param cognitoSub - The `sub` claim from the user's Cognito access token.
+   * @returns The Volunteer, without coordinator-only fields.
+   * @throws {NotFoundException} If no Volunteer has this Cognito sub.
+   */
+
+  async findByCognitoSubOrFail(
+    cognitoSub: string,
+  ): Promise<VolunteerWithoutPrivateFields> {
+    // Older rows default to an empty sub, so never match on ''.
+    if (!cognitoSub) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    const volunteer = await this.repo.findOne({
+      where: { cognitoSub },
+      relations: ['assignedCoordinators'],
+    });
+
+    if (!volunteer) {
+      throw new NotFoundException('Volunteer not found');
+    }
+
+    return this.withoutPrivateFields(volunteer);
+  }
+
+  /**
    * Ensures a Volunteer's account is active.
    *
    * @param volunteer - The Volunteer to check.
@@ -596,14 +626,22 @@ export class VolunteersService {
   }
 
   /**
-   * Gets all foster volunteers.
-   * Returns every volunteer regardless of match status, or an empty array if there are none.
+   * Gets all foster volunteers, with their assigned coordinators and pets.
+   * Each volunteer includes only their matches with status ACTIVE, or an empty array if there are no volunteers.
    * @returns A list of all volunteers
    */
   async getAllVolunteers(): Promise<VolunteerWithoutPrivateFields[]> {
-    const volunteers = await this.repo.find({
-      relations: ['assignedCoordinators', 'pets'],
-    });
+    const volunteers = await this.repo
+      .createQueryBuilder('volunteer')
+      .leftJoinAndSelect('volunteer.assignedCoordinators', 'coordinator')
+      .leftJoinAndSelect('volunteer.pets', 'pet')
+      .leftJoinAndSelect(
+        'volunteer.matches',
+        'match',
+        'match.status = :status',
+        { status: MatchStatus.ACTIVE },
+      )
+      .getMany();
     return volunteers.map((volunteer) => this.withoutPrivateFields(volunteer));
   }
 
