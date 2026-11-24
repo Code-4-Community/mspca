@@ -7,12 +7,21 @@ import {
   hasAnyCognitoEnv,
   isAuthDisabled,
 } from './cognito.config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { RateLimitGuard } from '../../rate-limit/rate-limit.guard';
+import { DEFAULT_THROTTLERS } from '../../rate-limit/rate-limit.utils';
+import { AuthThenRateLimitGuard } from '../../rate-limit/auth-then-rate-limit.guard';
 
 @Global()
 @Module({
+  // RateLimitGuard needs the throttler settings, so this module provides them itself.
+  imports: [ThrottlerModule.forRoot(DEFAULT_THROTTLERS)],
   providers: [
     CognitoService,
-    { provide: APP_GUARD, useClass: CognitoJWTGuard },
+    CognitoJWTGuard,
+    RateLimitGuard,
+    // One global guard so auth always runs before rate limiting; see auth-then-rate-limit.guard.ts.
+    { provide: APP_GUARD, useClass: AuthThenRateLimitGuard },
   ],
   exports: [CognitoService],
 })

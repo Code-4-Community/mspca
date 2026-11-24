@@ -23,7 +23,7 @@ Some key concepts you'll need to know are:
    - `fetchAuthSession()` returns the cached access token and silently refreshes it when expired, so the 1 hour token lifetime needs no handling
    - if no one is signed in or if errors occur with fetching the auth session it sends the request unauthenticated and lets the guard answer `401`
 
-5. **The Guard checks the token.** `CognitoJWTGuard` runs on every route (it's registered as a global `APP_GUARD`). For each request it:
+5. **The Guard checks the token.** `CognitoJWTGuard` runs on every route: the app's global guard, `AuthThenRateLimitGuard`, calls it first and then applies rate limiting (see [Rate limiting](#rate-limiting)). For each request it:
 
    - lets the request through immediately if auth is explicitly disabled (`AUTH_DISABLED=true`) or if the route is marked `@Public()` (intentional bypass)
    - extracts and verifies the Bearer token, then checks the RS256 signature against the pool's public keys (JWKS), the issuer, expiration, that `token_use === 'access'`, and that `client_id` matches our app client.
@@ -74,7 +74,7 @@ export const REQUIRED_ENV_VARS_WHEN_ENABLED = ['COGNITO_USER_POOL_ID', 'COGNITO_
 ### Auth model
 
 - **Verification** — `CognitoJWTGuard` is the only component that validates JWTs (See [Token validation](#token-validation))
-- **Global guard** — `CognitoModule` registers `CognitoJWTGuard` as an `APP_GUARD`, so every route is protected by default. You do **not** need `@UseGuards(CognitoJWTGuard)` on controllers when using this setup.
+- **Global guard** — `CognitoModule` registers `AuthThenRateLimitGuard` as the app's only `APP_GUARD`. It runs `CognitoJWTGuard`, then `RateLimitGuard`, so every route is protected and rate limited by default. You do **not** need `@UseGuards(...)` on controllers.
 - **`request.user`** — After a successful check, the guard sets `request.user` to the decoded JWT payload (`AccessTokenPayload`: `sub`, `client_id`, `cognito:groups`, `token_use`, etc.)
 
 ### Using Cognito in your app (recommended + implemented: global guard)
@@ -109,6 +109,10 @@ export class HealthController {
   }
 }
 ```
+
+### Rate limiting
+
+Every route is rate limited by `AuthThenRateLimitGuard`, which runs `CognitoJWTGuard` first and then applies the limit. See [`rate-limit/README.md`](../../rate-limit/README.md) for the default and custom limits, how requests are counted, and how the files fit together.
 
 ### `CognitoService.getUser()`
 
