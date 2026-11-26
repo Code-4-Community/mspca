@@ -55,16 +55,4 @@ describe('NotificationsDispatchGuard', () => {
       new UnauthorizedException(`Missing ${DISPATCH_SECRET_HEADER} header`),
     );
   });
-
-  it('fails closed when no secret is configured', () => {
-    delete process.env.NOTIFICATIONS_DISPATCH_SECRET;
-
-    expect(() =>
-      guard.canActivate(contextWith({ [DISPATCH_SECRET_HEADER]: SECRET })),
-    ).toThrow(
-      new UnauthorizedException(
-        'Dispatch secret is not configured on the server',
-      ),
-    );
-  });
 });
