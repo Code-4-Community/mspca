@@ -24,13 +24,51 @@ scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --
 
 ## Connect to the existing dev setup
 
-Nothing to create. The backend won't boot without these 3 in `.env`. Ask the ticket owner by DM, and never commit them:
+Nothing to create. The backend won't boot without these 3 in `.env`. Look them up as below if you have access to the dev AWS account, otherwise ask the ticket owner by DM. Never commit them:
 
 ```
 AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN=
 AWS_SCHEDULER_ROLE_ARN=
 NOTIFICATIONS_DISPATCH_SECRET=      # same value as the Lambda's
 ```
+
+### Where to find each value
+
+In the console, first set the region (top right) to **US East (Ohio) `us-east-2`**. The CLI commands assume `AWS_REGION=us-east-2` and a login to the dev account.
+
+**`AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN`**
+
+1. Open the AWS console and go to **Lambda** > **Functions**.
+2. Click `mspca-notif-dispatch`.
+3. In **Function overview**, copy **Function ARN** (`arn:aws:lambda:us-east-2:<account id>:function:mspca-notif-dispatch`).
+
+```bash
+aws lambda get-function --function-name mspca-notif-dispatch --query Configuration.FunctionArn --output text
+```
+
+**`AWS_SCHEDULER_ROLE_ARN`**
+
+1. Go to **IAM** > **Roles**.
+2. Search for and click `mspca-notif-scheduler-role`.
+3. In **Summary**, copy **ARN** (`arn:aws:iam::<account id>:role/mspca-notif-scheduler-role`).
+
+```bash
+aws iam get-role --role-name mspca-notif-scheduler-role --query Role.Arn --output text
+```
+
+**`NOTIFICATIONS_DISPATCH_SECRET`**
+
+The backend and the Lambda must hold the same value, so copy it from the Lambda:
+
+1. Go to **Lambda** > **Functions** > `mspca-notif-dispatch`.
+2. Open the **Configuration** tab, then **Environment variables**.
+3. Copy the value of `NOTIFICATIONS_DISPATCH_SECRET`.
+
+```bash
+aws lambda get-function-configuration --function-name mspca-notif-dispatch --query Environment.Variables.NOTIFICATIONS_DISPATCH_SECRET --output text
+```
+
+For a new environment, step 5 of "Create from scratch" prints all 3.
 
 The dispatch URL is **not** a backend env var. The backend never reads it. It's the Lambda's `NOTIFICATIONS_DISPATCH_URL`, set in the Lambda's config (step 2 below). It can't be `localhost`, because the Lambda runs in AWS and `localhost` there is the Lambda itself.
 
