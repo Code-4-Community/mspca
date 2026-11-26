@@ -32,6 +32,13 @@ AWS_SCHEDULER_ROLE_ARN=
 NOTIFICATIONS_DISPATCH_SECRET=      # same value as the Lambda's
 ```
 
+The dispatch URL is **not** a backend env var. The backend never reads it. It's the Lambda's `NOTIFICATIONS_DISPATCH_URL`, set in the Lambda's config (step 2 below). It can't be `localhost`, because the Lambda runs in AWS and `localhost` there is the Lambda itself.
+
+| Environment | `NOTIFICATIONS_DISPATCH_URL` on the Lambda |
+| ----------- | ------------------------------------------ |
+| Dev         | `https://<owner's ngrok id>.ngrok-free.app/api/notifications/send-scheduled` |
+| Prod        | `https://<api host>/api/notifications/send-scheduled` |
+
 > The dev Lambda calls the **owner's ngrok tunnel** (`ngrok http 3000`). Any scheduled send, from anyone's laptop, fires into the owner's local backend. Test the full chain on the owner's machine. This goes away once the backend is deployed.
 
 ## Testing
@@ -113,11 +120,18 @@ echo "AWS_SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-schedul
 echo "NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}"
 ```
 
-To change the Lambda's URL or secret later, run `aws lambda update-function-configuration` with the same `--environment` as step 2. After editing `index.mjs`, rezip and run `aws lambda update-function-code --function-name mspca-notif-dispatch --zip-file fileb:///tmp/notif-dispatch.zip`.
+To change the Lambda's URL or secret later (for example, a new ngrok URL), set both again. `--environment` replaces every variable, so leaving one out unsets it:
+
+```bash
+aws lambda update-function-configuration --region ${AWS_REGION} --function-name mspca-notif-dispatch \
+  --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
+```
+
+You can also edit them in the AWS console: Lambda > `mspca-notif-dispatch` > Configuration > Environment variables. After editing `index.mjs`, rezip and run `aws lambda update-function-code --function-name mspca-notif-dispatch --zip-file fileb:///tmp/notif-dispatch.zip`.
 
 ## Prod checklist
 
-- [ ] Add `@Public()` to `/send-scheduled`. The Cognito guard is global, and the Lambda has no token, so it gets a 401 once auth is on.
+- [x] Add `@Public()` to `/send-scheduled`. The Cognito guard is global, and the Lambda has no token, so it gets a 401 once auth is on.
 - [ ] Deploy the backend, point the Lambda's `NOTIFICATIONS_DISPATCH_URL` at it, and put the step 5 vars in the host's config.
 - [ ] Use separate prod resources and a new secret, so dev tests can't email real volunteers.
 - [ ] Send from a verified domain (for example `c4cneu.com`), not Gmail. Gmail sends land in spam.
