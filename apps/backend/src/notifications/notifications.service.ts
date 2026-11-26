@@ -23,8 +23,7 @@ export class NotificationsService {
    * Sends a bulk notification immediately, or schedules it when sendAt is set.
    *
    * @param dto - The subject, HTML body, foster type filters, and optional send time.
-   * @throws {InternalServerErrorException} If the AWS configuration needed for the
-   *   chosen path is missing.
+   * @throws {InternalServerErrorException} If scheduling fails, or every email batch fails to send.
    */
   async createBulkNotification(dto: CreateBulkNotificationDto): Promise<void> {
     if (dto.sendAt) {
@@ -45,29 +44,19 @@ export class NotificationsService {
    *
    * @param content - The subject, HTML body, and foster type filters.
    * @param sendAt - When the notification should go out.
-   * @throws {InternalServerErrorException} If the Scheduler target or role is not configured,
-   *   or if EventBridge Scheduler fails to create the schedule.
+   * @throws {InternalServerErrorException} If EventBridge Scheduler fails to create the schedule.
    */
   private async schedule(
     content: CreateBulkNotificationDto,
     sendAt: Date,
   ): Promise<void> {
-    const targetArn = process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN;
-    const roleArn = process.env.AWS_SCHEDULER_ROLE_ARN;
-
-    if (!targetArn || !roleArn) {
-      throw new InternalServerErrorException(
-        'Scheduled notifications are not configured on this environment',
-      );
-    }
-
     try {
       await this.schedulerService.scheduleOnce({
         // The backend's IAM policy only allows creating schedules named notification-*
         name: `notification-${randomUUID()}`,
         at: sendAt,
-        targetArn,
-        roleArn,
+        targetArn: process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN ?? '',
+        roleArn: process.env.AWS_SCHEDULER_ROLE_ARN ?? '',
         input: {
           subject: content.subject,
           body: content.body,

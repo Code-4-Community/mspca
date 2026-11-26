@@ -40,7 +40,7 @@ export class NotificationsController {
   })
   @ApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'The AWS Scheduler or SES sender email is not configured',
+    description: 'Scheduling failed, or every email batch failed to send',
   })
   async createBulkNotification(
     @Body() body: CreateBulkNotificationDto,

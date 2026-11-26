@@ -242,16 +242,6 @@ describe('NotificationsService', () => {
       });
     });
 
-    it('fails when the scheduler target is not configured', async () => {
-      delete process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN;
-
-      await expect(
-        service.createBulkNotification({ ...dto, sendAt }),
-      ).rejects.toThrow(InternalServerErrorException);
-
-      expect(scheduler.send).not.toHaveBeenCalled();
-    });
-
     it('fails when the scheduler rejects the schedule', async () => {
       scheduler.send.mockRejectedValueOnce(new Error('AccessDenied'));
 
