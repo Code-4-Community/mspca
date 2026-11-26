@@ -14,13 +14,13 @@ scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --
 
 ## Resources (dev, `us-east-2`)
 
-| Resource    | Name                           | Purpose                                                                            |
-| ----------- | ------------------------------ | ---------------------------------------------------------------------------------- |
-| Lambda      | `mspca-notif-dispatch`         | Node 22, 30s timeout, 2 async retries. Forwards the schedule to `/send-scheduled`. |
+| Resource    | Name                           | Purpose                                                                              |
+| ----------- | ------------------------------ | ------------------------------------------------------------------------------------ |
+| Lambda      | `mspca-notif-dispatch`         | Node 22, 30s timeout, 2 async retries. Forwards the schedule to `/send-scheduled`.   |
 | Lambda      | `mspca-notif-dispatch-failed`  | On-failure destination of the above. Logs `Dispatch gave up` with the attempt count. |
-| IAM role    | `mspca-notif-lambda-role`      | Runs both Lambdas (CloudWatch logs, dispatch invokes the failure logger)          |
-| IAM role    | `mspca-notif-scheduler-role`   | Lets Scheduler invoke only this Lambda                                             |
-| User policy | `mspca-notif-create-schedules` | Lets the backend's IAM user create schedules and pass the scheduler role           |
+| IAM role    | `mspca-notif-lambda-role`      | Runs both Lambdas (CloudWatch logs, dispatch invokes the failure logger)             |
+| IAM role    | `mspca-notif-scheduler-role`   | Lets Scheduler invoke only this Lambda                                               |
+| User policy | `mspca-notif-create-schedules` | Lets the backend's IAM user create schedules and pass the scheduler role             |
 
 ## Connect to the existing dev setup
 
@@ -72,10 +72,10 @@ For a new environment, step 5 of "Create from scratch" prints all 3.
 
 The dispatch URL is **not** a backend env var. The backend never reads it. It's the Lambda's `NOTIFICATIONS_DISPATCH_URL`, set in the Lambda's config (step 2 below). It can't be `localhost`, because the Lambda runs in AWS and `localhost` there is the Lambda itself.
 
-| Environment | `NOTIFICATIONS_DISPATCH_URL` on the Lambda |
-| ----------- | ------------------------------------------ |
+| Environment | `NOTIFICATIONS_DISPATCH_URL` on the Lambda                                   |
+| ----------- | ---------------------------------------------------------------------------- |
 | Dev         | `https://<owner's ngrok id>.ngrok-free.app/api/notifications/send-scheduled` |
-| Prod        | `https://<api host>/api/notifications/send-scheduled` |
+| Prod        | `https://<api host>/api/notifications/send-scheduled`                        |
 
 > The dev Lambda calls the **owner's ngrok tunnel** (`ngrok http 3000`). Any scheduled send, from anyone's laptop, fires into the owner's local backend. Test the full chain on the owner's machine. This goes away once the backend is deployed.
 
@@ -83,16 +83,16 @@ The dispatch URL is **not** a backend env var. The backend never reads it. It's 
 
 Run `yarn serve:backend` with `AUTH_DISABLED=true`. In another tab, set `AWS_REGION=us-east-2`, `DISPATCH_SECRET` (your `.env` value) and `DISPATCH_URL`: the ngrok URL on the owner's machine, or `http://localhost:3000/api/notifications/send-scheduled` for everyone else.
 
-| #   | Test                       | Command                                                                                                                                                                                               | Expect                                              | Dev run |
-| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------- |
-| T0  | No secret                  | `curl -i -X POST ${DISPATCH_URL}`                                                                                                                                                                     | 401                                                 | ✅      |
-| T1  | Right secret, empty body   | T0 + `-H "x-notifications-dispatch-secret: ${DISPATCH_SECRET}" -H 'content-type: application/json' -d '{}'`                                                                                           | 400                                                 | ✅      |
-| T2  | Wrong secret               | T1 with secret `wrong` and a valid body                                                                                                                                                               | 401, no email                                       | ✅      |
-| T3  | Send now                   | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                     | 202, only Dog volunteers get it                     | ✅      |
-| T4  | Lambda --> backend (owner) | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json` | `StatusCode 200`, `null`                            | ✅      |
-| T5  | Full chain (owner)         | T3 with `"filters":[]` and `"sendAt":"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)"`                                                                                                                          | 202, all active volunteers get it about 2 min later | ✅      |
-| T6  | Retries (owner)            | Stop the backend, run T4 with `--invocation-type Event`, then `aws logs tail /aws/lambda/mspca-notif-dispatch --since 10m` and `aws logs tail /aws/lambda/mspca-notif-dispatch-failed --since 10m`                                                                            | 3 `Dispatch failed` lines, then 1 `Dispatch gave up ... after 3 attempts` in the `-failed` log, no email | ✅      |
-| T7  | Validation                 | past `sendAt`, `filters:["Horse"]`, missing field, line break in subject                                                                                                                              | 400                                                 | ✅      |
+| #   | Test                       | Command                                                                                                                                                                                               | Expect                                                                                                   | Dev run |
+| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| T0  | No secret                  | `curl -i -X POST ${DISPATCH_URL}`                                                                                                                                                                     | 401                                                                                                      | ✅      |
+| T1  | Right secret, empty body   | T0 + `-H "x-notifications-dispatch-secret: ${DISPATCH_SECRET}" -H 'content-type: application/json' -d '{}'`                                                                                           | 400                                                                                                      | ✅      |
+| T2  | Wrong secret               | T1 with secret `wrong` and a valid body                                                                                                                                                               | 401, no email                                                                                            | ✅      |
+| T3  | Send now                   | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                     | 202, only Dog volunteers get it                                                                          | ✅      |
+| T4  | Lambda --> backend (owner) | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json` | `StatusCode 200`, `null`                                                                                 | ✅      |
+| T5  | Full chain (owner)         | T3 with `"filters":[]` and `"sendAt":"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)"`                                                                                                                          | 202, all active volunteers get it about 2 min later                                                      | ✅      |
+| T6  | Retries (owner)            | Stop the backend, run T4 with `--invocation-type Event`, then `aws logs tail /aws/lambda/mspca-notif-dispatch --since 10m` and `aws logs tail /aws/lambda/mspca-notif-dispatch-failed --since 10m`    | 3 `Dispatch failed` lines, then 1 `Dispatch gave up ... after 3 attempts` in the `-failed` log, no email | ✅      |
+| T7  | Validation                 | past `sendAt`, `filters:["Horse"]`, missing field, line break in subject                                                                                                                              | 400                                                                                                      | ✅      |
 
 The dev run was 2026-10-26/27 (T6 rerun 2026-11-19). Unit tests: `npx jest apps/backend/src/notifications`.
 
