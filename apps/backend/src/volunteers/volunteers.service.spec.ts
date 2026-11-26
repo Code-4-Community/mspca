@@ -2148,10 +2148,19 @@ describe('VolunteersService', () => {
       } as FosterVolunteer);
 
     it('loads and updates only volunteers that have children', async () => {
-      mockRepo.find.mockResolvedValue([
+      const volunteers = [
         volunteerWithChildren(1, [2]),
-        volunteerWithChildren(2, [5]),
-      ]);
+        { volunteerId: 2, hasChildren: false, childrenAges: [] },
+        volunteerWithChildren(3, [5]),
+      ] as FosterVolunteer[];
+      mockRepo.find.mockImplementation(
+        ({ where }: { where: Partial<FosterVolunteer> }) =>
+          Promise.resolve(
+            volunteers.filter(
+              (volunteer) => volunteer.hasChildren === where.hasChildren,
+            ),
+          ),
+      );
 
       await service.incrementAllChildrenAges();
 
@@ -2159,9 +2168,11 @@ describe('VolunteersService', () => {
         where: { hasChildren: true },
       });
       expect(mockRepo.find).toHaveBeenCalledTimes(1);
-      const saved: FosterVolunteer[] = mockRepo.save.mock.calls[0][0];
-      expect(saved).toHaveLength(2);
-      expect(saved.every((volunteer) => volunteer.hasChildren)).toBe(true);
+      expect(mockRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({ volunteerId: 1, hasChildren: true }),
+        expect.objectContaining({ volunteerId: 3, hasChildren: true }),
+      ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('adds one year to every child', async () => {

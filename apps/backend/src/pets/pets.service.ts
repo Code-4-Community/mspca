@@ -11,6 +11,8 @@ export class PetsService {
 
   /**
    * Ages every pet by one month, rolling into the next year after month 11.
+   *
+   * @returns A promise that resolves when every pet's age has been incremented.
    */
   async incrementAllAges(): Promise<void> {
     const pets = await this.repo.find();

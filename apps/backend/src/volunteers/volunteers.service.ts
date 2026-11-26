@@ -647,6 +647,8 @@ export class VolunteersService {
 
   /**
    * Ages every child of every volunteer who has children by one year.
+   *
+   * @returns A promise that resolves when every child's age has been incremented.
    */
   async incrementAllChildrenAges(): Promise<void> {
     const volunteers = await this.repo.find({ where: { hasChildren: true } });
