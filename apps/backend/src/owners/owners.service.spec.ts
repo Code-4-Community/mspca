@@ -3,6 +3,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -148,6 +149,34 @@ describe('OwnersService', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         `Created Cognito user sub-123 for ${dto.email}, but failed to save the owner or delete the Cognito user`,
       );
+    });
+  });
+  describe('findByCognitoSubOrFail', () => {
+    it('returns the owner with the matching Cognito sub', async () => {
+      repo.findOneBy.mockResolvedValue(owner);
+
+      const result = await service.findByCognitoSubOrFail('cognito-sub-123');
+
+      expect(repo.findOneBy).toHaveBeenCalledWith({
+        cognitoSub: 'cognito-sub-123',
+      });
+      expect(result).toBe(owner);
+    });
+
+    it('throws NotFoundException when no owner has the Cognito sub', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.findByCognitoSubOrFail('unknown-sub'),
+      ).rejects.toThrow(new NotFoundException('Owner not found'));
+    });
+
+    it('throws NotFoundException without querying when the sub is empty', async () => {
+      await expect(service.findByCognitoSubOrFail('')).rejects.toThrow(
+        new NotFoundException('Owner not found'),
+      );
+
+      expect(repo.findOneBy).not.toHaveBeenCalled();
     });
   });
 });

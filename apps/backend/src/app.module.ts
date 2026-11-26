@@ -10,6 +10,8 @@ import { VolunteersModule } from './volunteers/volunteers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OwnersModule } from './owners/owners.module';
 import { AnimalsModule } from './animals/animals.module';
+import { StaffModule } from './staff/staff.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { AnimalsModule } from './animals/animals.module';
     NotificationsModule,
     OwnersModule,
     AnimalsModule,
+    StaffModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

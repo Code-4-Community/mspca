@@ -24,6 +24,7 @@ import { UpdateSpeciesPreferencesDto } from './dtos/update-species-preferences.d
 import { CoordinatorUpdateVolunteerDto } from './dtos/coordinator-update-volunteer.dto';
 import { Homebase } from '../types';
 import { UpdateHomebaseDto } from './dtos/update-homebase.dto';
+import { PetDto } from '../pets/dtos/pet.dto';
 
 describe('VolunteersController', () => {
   let controller: VolunteersController;
@@ -163,7 +164,9 @@ describe('VolunteersController', () => {
       city: 'Boston',
       zipcode: '02130',
       homebase: Homebase.BOSTON,
-      residentAnimals: 'One cat',
+      hasChildren: false,
+      hasSeparateFosterRoom: true,
+      livelyNeighborhood: false,
       fosterType: [FosterType.CAT],
       password: 'Str0ng!Password',
     } as CreateVolunteerDto;
@@ -223,6 +226,24 @@ describe('VolunteersController', () => {
       });
 
       expect(result).not.toHaveProperty('completedTrainings');
+    });
+
+    const pet = {
+      ageYear: 3,
+      ageMonth: 11,
+      species: FosterType.CAT,
+      breed: 'Tabby',
+    } as PetDto;
+
+    it('accepts a volunteer with pets and children', async () => {
+      const result = await validationPipe.transform(
+        { ...dto, hasChildren: true, childrenAges: [4, 9], pets: [pet] },
+        { type: 'body', metatype: CreateVolunteerDto },
+      );
+
+      expect(result.hasChildren).toBe(true);
+      expect(result.childrenAges).toEqual([4, 9]);
+      expect(result.pets).toEqual([pet]);
     });
   });
 
@@ -301,6 +322,7 @@ describe('VolunteersController', () => {
       const result = await controller.getVolunteerById(1);
 
       expect(result).toEqual(mockVolunteer);
+      expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledTimes(1);
       expect(mockVolunteersService.findByIdOrFail).toHaveBeenCalledWith(1);
     });
 
