@@ -4,6 +4,7 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { FosterType } from '../volunteers/volunteers.types';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
+import { IS_PUBLIC_KEY } from '../aws/cognito/cognito.decorator';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -88,6 +89,17 @@ describe('NotificationsController', () => {
 
       expect(service.sendNow).toHaveBeenCalledWith(body);
       expect(service.createBulkNotification).not.toHaveBeenCalled();
+    });
+
+    // The Lambda has no Cognito token, so the global CognitoJWTGuard must skip
+    // this route and leave auth to NotificationsDispatchGuard.
+    it('is public to Cognito', () => {
+      expect(
+        Reflect.getMetadata(
+          IS_PUBLIC_KEY,
+          NotificationsController.prototype.dispatchNotification,
+        ),
+      ).toBe(true);
     });
   });
 });

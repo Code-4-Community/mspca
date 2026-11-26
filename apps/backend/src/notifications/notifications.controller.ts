@@ -15,6 +15,7 @@ import {
 import { NotificationsService } from './notifications.service';
 import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
 import { NotificationsDispatchGuard } from './notifications.dispatch.guard';
+import { Public } from '../aws/cognito/cognito.decorator';
 
 @ApiTags('Notifications')
 // @ApiBearerAuth()
@@ -50,16 +51,40 @@ export class NotificationsController {
   /**
    * Sends a notification whose scheduled time has arrived.
    *
-   * Called only by the scheduled-notification Lambda
-   * TODO: implement auth: lambdas don't use cognito, so it can't call our own endpoints (which will have cognito auth on them)
+   * Called only by the scheduled-notification Lambda. The Lambda has no Cognito
+   * token, so the route skips Cognito (@Public) and NotificationsDispatchGuard
+   * checks its shared secret instead.
+   *
    * recipients are resolved at call time & not at schedule time, so Volunteers who went inactive in the meantime can be left out
    *
    * Retry after a partial send repeats earlier batches, sends at least once
    */
   @Post('send-scheduled')
+  @Public()
   @UseGuards(NotificationsDispatchGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
+  // Hidden from Swagger: only the dispatch Lambda calls this. The decorators below
+  // document its responses in code.
   @ApiExcludeEndpoint()
+  @ApiOperation({
+    summary: 'Send a scheduled notification (called by the dispatch Lambda)',
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The notification was sent to at least one recipient',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'The request body failed validation',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'The dispatch secret header is missing or invalid',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Every batch failed to send',
+  })
   async dispatchNotification(
     @Body() body: CreateBulkNotificationDto,
   ): Promise<void> {
