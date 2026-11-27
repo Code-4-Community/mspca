@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CoordinatorsService } from './coordinators.service';
 import { FosterCoordinator } from './coordinators.entity';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
@@ -402,6 +402,46 @@ describe('CoordinatorsService', () => {
 
       expect(result).toEqual([]);
       expect(repo.find).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findActiveByIdsOrFail', () => {
+    it('returns the active coordinators regardless of homebase', async () => {
+      const coordinators = [
+        { coordinatorId: 2, homebase: Homebase.BOSTON, active: true },
+        { coordinatorId: 5, homebase: Homebase.SALEM, active: true },
+      ] as FosterCoordinator[];
+      repo.find.mockResolvedValue(coordinators);
+
+      const result = await service.findActiveByIdsOrFail([5, 2]);
+
+      expect(result).toEqual(coordinators);
+      expect(repo.find).toHaveBeenCalledTimes(1);
+      expect(repo.find).toHaveBeenCalledWith({
+        where: { coordinatorId: In([5, 2]) },
+        order: { coordinatorId: 'ASC' },
+      });
+    });
+
+    it('throws NotFoundException listing the missing IDs', async () => {
+      repo.find.mockResolvedValue([
+        { coordinatorId: 2, active: true },
+      ] as FosterCoordinator[]);
+
+      await expect(service.findActiveByIdsOrFail([2, 4, 9])).rejects.toThrow(
+        new NotFoundException('Coordinators with IDs not found: 4, 9'),
+      );
+    });
+
+    it('throws BadRequestException listing the inactive IDs', async () => {
+      repo.find.mockResolvedValue([
+        { coordinatorId: 2, active: true },
+        { coordinatorId: 7, active: false },
+      ] as FosterCoordinator[]);
+
+      await expect(service.findActiveByIdsOrFail([2, 7])).rejects.toThrow(
+        new BadRequestException('Coordinators with IDs are not active: 7'),
+      );
     });
   });
 

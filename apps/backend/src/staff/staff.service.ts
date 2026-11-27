@@ -13,6 +13,9 @@ import { CreateStaffDto } from './dtos/create-staff.dto';
 import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { EmailsService } from '../aws/ses/email.service';
+import { coordinatorGainedStaffEmail } from '../coordinators/emails/coordinatorGainedStaff';
 
 @Injectable()
 export class StaffService {
@@ -22,6 +25,8 @@ export class StaffService {
     @InjectRepository(FosterStaff)
     private repo: Repository<FosterStaff>,
     private cognitoService: CognitoService,
+    private coordinatorsService: CoordinatorsService,
+    private emailsService: EmailsService,
   ) {}
 
   /**
@@ -203,5 +208,68 @@ export class StaffService {
     staff.active = true;
 
     return this.repo.save(staff);
+  }
+
+  /**
+   * Assigns foster coordinators to a staff member and emails the newly
+   * assigned coordinators.
+   *
+   * Coordinators are added to the existing list, not replaced. Homebase does
+   * not matter. The email is best-effort: a failed send is logged rather than
+   * failing the request, since the assignment is already saved.
+   *
+   * @param id - The ID of the staff member.
+   * @param coordinatorIds - The IDs of the coordinators to assign.
+   * @returns The staff member with their updated assigned coordinators.
+   * @throws {NotFoundException} If the staff member or any coordinator does not exist.
+   * @throws {BadRequestException} If the staff member is inactive, or any coordinator is inactive or is already assigned to the staff member.
+   */
+  async assignCoordinators(
+    id: number,
+    coordinatorIds: number[],
+  ): Promise<FosterStaff> {
+    const [staff, coordinators] = await Promise.all([
+      this.findActiveOrFail(id),
+      this.coordinatorsService.findActiveByIdsOrFail(coordinatorIds),
+    ]);
+
+    const assignedIds = new Set(
+      staff.assignedCoordinators.map((c) => c.coordinatorId),
+    );
+    const alreadyAssigned = coordinatorIds.filter((coordinatorId) =>
+      assignedIds.has(coordinatorId),
+    );
+
+    if (alreadyAssigned.length > 0) {
+      throw new BadRequestException(
+        `Coordinators with IDs already assigned to staff member ${id}: ${alreadyAssigned.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    staff.assignedCoordinators.push(...coordinators);
+    const saved = await this.repo.save(staff);
+
+    const email = coordinatorGainedStaffEmail(saved);
+
+    try {
+      await this.emailsService.sendEmail({
+        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+        ccEmails: coordinators.map((c) => c.email),
+        ...email,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send "${
+          email.subject
+        }" email for staff member: { staffId: ${id}, coordinatorIds: [${coordinatorIds.join(
+          ', ',
+        )}] }`,
+        error,
+      );
+    }
+
+    return saved;
   }
 }

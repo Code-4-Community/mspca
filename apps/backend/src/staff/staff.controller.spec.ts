@@ -7,6 +7,7 @@ import { Homebase } from '../types';
 import { StaffType } from './staff.types';
 import { CreateStaffDto } from './dtos/create-staff.dto';
 import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
+import { AssignCoordinatorsDto } from './dtos/assign-coordinators.dto';
 
 describe('StaffController', () => {
   let controller: StaffController;
@@ -15,6 +16,7 @@ describe('StaffController', () => {
     confirm: jest.Mock;
     deactivate: jest.Mock;
     activate: jest.Mock;
+    assignCoordinators: jest.Mock;
   };
 
   const dto = {
@@ -43,6 +45,7 @@ describe('StaffController', () => {
       confirm: jest.fn(),
       deactivate: jest.fn(),
       activate: jest.fn(),
+      assignCoordinators: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -160,6 +163,34 @@ describe('StaffController', () => {
 
       await expect(controller.activate(999)).rejects.toThrow(
         new NotFoundException('Staff member with ID 999 not found'),
+      );
+    });
+  });
+
+  describe('assignCoordinators', () => {
+    const assignDto = { coordinatorIds: [2, 3] } as AssignCoordinatorsDto;
+
+    it('returns the staff member with their assigned coordinators', async () => {
+      const staff = {
+        staffId: 1,
+        assignedCoordinators: [{ coordinatorId: 2 }, { coordinatorId: 3 }],
+      } as FosterStaff;
+      service.assignCoordinators.mockResolvedValue(staff);
+
+      const result = await controller.assignCoordinators(1, assignDto);
+
+      expect(result).toEqual(staff);
+      expect(service.assignCoordinators).toHaveBeenCalledTimes(1);
+      expect(service.assignCoordinators).toHaveBeenCalledWith(1, [2, 3]);
+    });
+
+    it('propagates errors thrown by the service', async () => {
+      service.assignCoordinators.mockRejectedValue(
+        new NotFoundException('Coordinators with IDs not found: 3'),
+      );
+
+      await expect(controller.assignCoordinators(1, assignDto)).rejects.toThrow(
+        new NotFoundException('Coordinators with IDs not found: 3'),
       );
     });
   });
