@@ -213,19 +213,21 @@ export class StaffService {
   }
 
   /**
-   * Assigns foster coordinators to a staff member and emails both the newly
-   * assigned coordinators and the staff member.
+   * Assigns a foster coordinator to a staff member and emails both the newly
+   * assigned coordinator and the staff member.
    *
-   * Coordinators are added to the existing list, not replaced. Homebase does
-   * not matter. The emails are best-effort: a failed send is logged rather than
-   * failing the request, since the assignment is already saved, and one failed
-   * send does not stop the other.
+   * A staff member usually has one coordinator. More than one is only expected
+   * while their coordinator is being changed and the original one has not been
+   * deactivated yet. The new coordinator is added to the existing list, not
+   * replaced. Homebase does not matter. The emails are best-effort: a failed
+   * send is logged rather than failing the request, since the assignment is
+   * already saved, and one failed send does not stop the other.
    *
    * @param id - The ID of the staff member.
-   * @param coordinatorIds - The IDs of the coordinators to assign.
-   * @returns The staff member with their updated assigned coordinators.
-   * @throws {NotFoundException} If the staff member or any coordinator does not exist.
-   * @throws {BadRequestException} If the staff member is inactive, or any coordinator is inactive or is already assigned to the staff member.
+   * @param coordinatorIds - The ID of the coordinator to assign, usually just one.
+   * @returns The staff member with their updated assigned coordinator.
+   * @throws {NotFoundException} If the staff member or the coordinator does not exist.
+   * @throws {BadRequestException} If the staff member is inactive, or the coordinator is inactive or is already assigned to the staff member.
    */
   async assignCoordinators(
     id: number,
@@ -283,7 +285,7 @@ export class StaffService {
    * Sends an email, logging a failed send instead of throwing.
    *
    * @param email - The email to send.
-   * @param logContext - Identifies the staff member and coordinators in the log message.
+   * @param logContext - Identifies the staff member and coordinator in the log message.
    * @returns A promise that resolves when the send is attempted.
    */
   private async sendEmailOrLog(

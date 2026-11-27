@@ -2,7 +2,7 @@ import { EmailContent, escapeHtml } from '../../utils/emails.utils';
 import { FosterStaff } from '../../staff/staff.entity';
 
 /**
- * Builds the email telling coordinators a staff member has been assigned to them.
+ * Builds the email telling a coordinator a staff member has been assigned to them.
  *
  * @param staff - The staff member who was assigned.
  * @returns The email's subject and HTML body.

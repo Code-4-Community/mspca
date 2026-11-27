@@ -138,9 +138,9 @@ export class StaffController {
 
   @Patch('/:id/coordinators')
   @ApiOperation({
-    summary: 'Assign foster coordinators to a staff member',
+    summary: 'Assign a foster coordinator to a staff member',
     description:
-      'Adds the given coordinators to an active staff member and emails the new coordinators and the staff member. Coordinators must exist and be active; homebase does not matter.',
+      'Adds the coordinator to an active staff member and emails the new coordinator and the staff member. The coordinator must exist and be active; homebase does not matter. Usually one coordinator is sent; more than one is only expected while a staff member is switching coordinators.',
   })
   @ApiParam({
     name: 'id',
@@ -150,17 +150,17 @@ export class StaffController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      'The coordinators were assigned to the staff member and notified',
+      'The coordinator was assigned to the staff member and both were notified',
     type: FosterStaff,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Invalid staff member ID or coordinator IDs, the staff member or a coordinator is inactive, or a coordinator is already assigned',
+      'Invalid staff member ID or coordinator ID, the staff member or coordinator is inactive, or the coordinator is already assigned',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'The staff member or a coordinator does not exist',
+    description: 'The staff member or coordinator does not exist',
   })
   async assignCoordinators(
     @Param('id', ParseIntPipe) id: number,

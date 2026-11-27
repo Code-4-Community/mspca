@@ -2,11 +2,11 @@ import { EmailContent, escapeHtml } from '../../utils/emails.utils';
 import { FosterCoordinator } from '../../coordinators/coordinators.entity';
 
 /**
- * Builds the email telling a staff member which foster coordinators were just
- * assigned to them.
+ * Builds the email telling a staff member which foster coordinator was just
+ * assigned to them. Uses plural wording only when more than one was assigned.
  *
  * @param firstName - The staff member's first name.
- * @param coordinators - The newly assigned coordinators.
+ * @param coordinators - The newly assigned coordinator, usually just one.
  * @returns The email's subject and HTML body.
  */
 export function staffAssignedCoordinatorsEmail(
