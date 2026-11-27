@@ -2212,6 +2212,9 @@ describe('VolunteersService', () => {
       expect(mockRepo.find).toHaveBeenCalledWith({
         where: { status: VolunteerStatus.ACTIVE },
       });
+    });
+  });
+
   describe('incrementAllChildrenAges', () => {
     const volunteerWithChildren = (volunteerId: number, ages: number[]) =>
       ({

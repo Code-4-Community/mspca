@@ -32,9 +32,9 @@ export const handler = async (event, context) => {
   // Lambda doesn't pass attempt number, but request ID stays the same across retries so count those
   if (!response.ok) {
     throw new Error(
-      `Dispatch failed (request ${context.awsRequestId}): ${
-        response.status
-      } ${(await response.text()).slice(0, 500)}`,
+      `Dispatch failed (request ${context.awsRequestId}): ${response.status} ${(
+        await response.text()
+      ).slice(0, 500)}`,
     );
   }
 };

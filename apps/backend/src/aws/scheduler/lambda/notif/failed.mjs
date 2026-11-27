@@ -6,7 +6,8 @@
  * attempt count and original payload. Only logs, never throws, so nothing retries.
  */
 export const handler = async (event) => {
-  const { requestId, condition, approximateInvokeCount } = event.requestContext ?? {};
+  const { requestId, condition, approximateInvokeCount } =
+    event.requestContext ?? {};
   console.error(
     `Dispatch gave up (request ${requestId}): ${condition} after ${approximateInvokeCount} attempts`,
     JSON.stringify(event),
