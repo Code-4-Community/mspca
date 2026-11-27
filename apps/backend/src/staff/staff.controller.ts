@@ -140,7 +140,7 @@ export class StaffController {
   @ApiOperation({
     summary: 'Assign foster coordinators to a staff member',
     description:
-      'Adds the given coordinators to an active staff member and emails them. Coordinators must exist and be active; homebase does not matter.',
+      'Adds the given coordinators to an active staff member and emails the new coordinators and the staff member. Coordinators must exist and be active; homebase does not matter.',
   })
   @ApiParam({
     name: 'id',

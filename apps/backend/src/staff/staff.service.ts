@@ -15,7 +15,9 @@ import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
 import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { EmailsService } from '../aws/ses/email.service';
+import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
 import { coordinatorGainedStaffEmail } from '../coordinators/emails/coordinatorGainedStaff';
+import { staffAssignedCoordinatorsEmail } from './emails/staffAssignedCoordinators';
 
 @Injectable()
 export class StaffService {
@@ -211,12 +213,13 @@ export class StaffService {
   }
 
   /**
-   * Assigns foster coordinators to a staff member and emails the newly
-   * assigned coordinators.
+   * Assigns foster coordinators to a staff member and emails both the newly
+   * assigned coordinators and the staff member.
    *
    * Coordinators are added to the existing list, not replaced. Homebase does
-   * not matter. The email is best-effort: a failed send is logged rather than
-   * failing the request, since the assignment is already saved.
+   * not matter. The emails are best-effort: a failed send is logged rather than
+   * failing the request, since the assignment is already saved, and one failed
+   * send does not stop the other.
    *
    * @param id - The ID of the staff member.
    * @param coordinatorIds - The IDs of the coordinators to assign.
@@ -251,25 +254,49 @@ export class StaffService {
     staff.assignedCoordinators.push(...coordinators);
     const saved = await this.repo.save(staff);
 
-    const email = coordinatorGainedStaffEmail(saved);
+    const logContext = `staff member: { staffId: ${id}, coordinatorIds: [${coordinatorIds.join(
+      ', ',
+    )}] }`;
 
+    await Promise.all([
+      this.sendEmailOrLog(
+        {
+          toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+          ccEmails: coordinators.map((c) => c.email),
+          ...coordinatorGainedStaffEmail(saved),
+        },
+        logContext,
+      ),
+      this.sendEmailOrLog(
+        {
+          toEmail: saved.email,
+          ...staffAssignedCoordinatorsEmail(saved.firstName, coordinators),
+        },
+        logContext,
+      ),
+    ]);
+
+    return saved;
+  }
+
+  /**
+   * Sends an email, logging a failed send instead of throwing.
+   *
+   * @param email - The email to send.
+   * @param logContext - Identifies the staff member and coordinators in the log message.
+   * @returns A promise that resolves when the send is attempted.
+   */
+  private async sendEmailOrLog(
+    email: SendEmailDTO,
+    logContext: string,
+  ): Promise<void> {
     try {
-      await this.emailsService.sendEmail({
-        toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
-        ccEmails: coordinators.map((c) => c.email),
-        ...email,
-      });
+      await this.emailsService.sendEmail(email);
     } catch (error) {
       this.logger.error(
-        `Failed to send "${
-          email.subject
-        }" email for staff member: { staffId: ${id}, coordinatorIds: [${coordinatorIds.join(
-          ', ',
-        )}] }`,
+        `Failed to send "${email.subject}" email for ${logContext}`,
         error,
       );
     }
-
-    return saved;
   }
 }

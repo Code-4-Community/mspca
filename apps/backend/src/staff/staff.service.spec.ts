@@ -20,6 +20,7 @@ import { CoordinatorsService } from '../coordinators/coordinators.service';
 import { FosterCoordinator } from '../coordinators/coordinators.entity';
 import { EmailsService } from '../aws/ses/email.service';
 import { coordinatorGainedStaffEmail } from '../coordinators/emails/coordinatorGainedStaff';
+import { staffAssignedCoordinatorsEmail } from './emails/staffAssignedCoordinators';
 
 describe('StaffService', () => {
   let service: StaffService;
@@ -351,11 +352,23 @@ describe('StaffService', () => {
     } as FosterCoordinator;
 
     const newCoordinators = [
-      { coordinatorId: 2, email: 'two@mspca.org', active: true },
-      { coordinatorId: 3, email: 'three@mspca.org', active: true },
+      {
+        coordinatorId: 2,
+        firstName: 'Cora',
+        lastName: 'Two',
+        email: 'two@mspca.org',
+        active: true,
+      },
+      {
+        coordinatorId: 3,
+        firstName: 'Cole',
+        lastName: 'Three',
+        email: 'three@mspca.org',
+        active: true,
+      },
     ] as FosterCoordinator[];
 
-    it('assigns the coordinators, saves, and emails them', async () => {
+    it('assigns the coordinators, saves, and emails them and the staff member', async () => {
       repo.findOne.mockResolvedValue({ ...staff, assignedCoordinators: [] });
       coordinatorsService.findActiveByIdsOrFail.mockResolvedValue(
         newCoordinators,
@@ -383,16 +396,20 @@ describe('StaffService', () => {
           assignedCoordinators: newCoordinators,
         }),
       );
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
-      expect(emailsService.sendEmail).toHaveBeenCalledWith({
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(1, {
         toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
         ccEmails: ['two@mspca.org', 'three@mspca.org'],
         ...coordinatorGainedStaffEmail(result),
       });
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(2, {
+        toEmail: staff.email,
+        ...staffAssignedCoordinatorsEmail(staff.firstName, newCoordinators),
+      });
       expect(loggerSpy).not.toHaveBeenCalled();
     });
 
-    it('keeps existing coordinators and emails only the new one', async () => {
+    it('keeps existing coordinators and emails only about the new one', async () => {
       repo.findOne.mockResolvedValue({
         ...staff,
         assignedCoordinators: [existingCoordinator],
@@ -415,11 +432,17 @@ describe('StaffService', () => {
           assignedCoordinators: [existingCoordinator, newCoordinators[0]],
         }),
       );
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
-      expect(emailsService.sendEmail).toHaveBeenCalledWith({
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(1, {
         toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
         ccEmails: ['two@mspca.org'],
         ...coordinatorGainedStaffEmail(result),
+      });
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(2, {
+        toEmail: staff.email,
+        ...staffAssignedCoordinatorsEmail(staff.firstName, [
+          newCoordinators[0],
+        ]),
       });
     });
 
@@ -468,20 +491,26 @@ describe('StaffService', () => {
       expect(emailsService.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('returns the saved staff member and logs when the email fails', async () => {
+    it('still emails the staff member and logs when the coordinator email fails', async () => {
       const error = new Error('SES down');
       repo.findOne.mockResolvedValue({ ...staff, assignedCoordinators: [] });
       coordinatorsService.findActiveByIdsOrFail.mockResolvedValue(
         newCoordinators,
       );
       repo.save.mockImplementation(async (value) => value as FosterStaff);
-      emailsService.sendEmail.mockRejectedValue(error);
+      emailsService.sendEmail
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(undefined);
 
       const result = await service.assignCoordinators(1, [2, 3]);
 
       expect(result.assignedCoordinators).toEqual(newCoordinators);
       expect(repo.save).toHaveBeenCalledTimes(1);
-      expect(emailsService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailsService.sendEmail).toHaveBeenCalledTimes(2);
+      expect(emailsService.sendEmail).toHaveBeenNthCalledWith(2, {
+        toEmail: staff.email,
+        ...staffAssignedCoordinatorsEmail(staff.firstName, newCoordinators),
+      });
       expect(loggerSpy).toHaveBeenCalledTimes(1);
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to send "New staff member assigned to you" email for staff member: { staffId: 1, coordinatorIds: [2, 3] }',
