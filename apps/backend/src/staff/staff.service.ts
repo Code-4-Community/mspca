@@ -13,6 +13,11 @@ import { CreateStaffDto } from './dtos/create-staff.dto';
 import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
 import { CognitoService } from '../aws/cognito/cognito.service';
 import { CognitoRole } from '../aws/cognito/cognito.types';
+import { CoordinatorsService } from '../coordinators/coordinators.service';
+import { EmailsService } from '../aws/ses/email.service';
+import { SendEmailDTO } from '../aws/ses/sendEmail.dto';
+import { coordinatorGainedStaffEmail } from '../coordinators/emails/coordinatorGainedStaff';
+import { staffAssignedCoordinatorsEmail } from './emails/staffAssignedCoordinators';
 
 @Injectable()
 export class StaffService {
@@ -22,6 +27,8 @@ export class StaffService {
     @InjectRepository(FosterStaff)
     private repo: Repository<FosterStaff>,
     private cognitoService: CognitoService,
+    private coordinatorsService: CoordinatorsService,
+    private emailsService: EmailsService,
   ) {}
 
   /**
@@ -203,5 +210,95 @@ export class StaffService {
     staff.active = true;
 
     return this.repo.save(staff);
+  }
+
+  /**
+   * Assigns a foster coordinator to a staff member and emails both the newly
+   * assigned coordinator and the staff member.
+   *
+   * A staff member usually has one coordinator. More than one is only expected
+   * while their coordinator is being changed and the original one has not been
+   * deactivated yet. The new coordinator is added to the existing list, not
+   * replaced. Homebase does not matter. The emails are best-effort: a failed
+   * send is logged rather than failing the request, since the assignment is
+   * already saved, and one failed send does not stop the other.
+   *
+   * @param id - The ID of the staff member.
+   * @param coordinatorIds - The ID of the coordinator to assign, usually just one.
+   * @returns The staff member with their updated assigned coordinator.
+   * @throws {NotFoundException} If the staff member or the coordinator does not exist.
+   * @throws {BadRequestException} If the staff member is inactive, or the coordinator is inactive or is already assigned to the staff member.
+   */
+  async assignCoordinators(
+    id: number,
+    coordinatorIds: number[],
+  ): Promise<FosterStaff> {
+    const [staff, coordinators] = await Promise.all([
+      this.findActiveOrFail(id),
+      this.coordinatorsService.findActiveByIdsOrFail(coordinatorIds),
+    ]);
+
+    const assignedIds = new Set(
+      staff.assignedCoordinators.map((c) => c.coordinatorId),
+    );
+    const alreadyAssigned = coordinatorIds.filter((coordinatorId) =>
+      assignedIds.has(coordinatorId),
+    );
+
+    if (alreadyAssigned.length > 0) {
+      throw new BadRequestException(
+        `Coordinators with IDs already assigned to staff member ${id}: ${alreadyAssigned.join(
+          ', ',
+        )}`,
+      );
+    }
+
+    staff.assignedCoordinators.push(...coordinators);
+    const saved = await this.repo.save(staff);
+
+    const logContext = `staff member: { staffId: ${id}, coordinatorIds: [${coordinatorIds.join(
+      ', ',
+    )}] }`;
+
+    await Promise.all([
+      this.sendEmailOrLog(
+        {
+          toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+          ccEmails: coordinators.map((c) => c.email),
+          ...coordinatorGainedStaffEmail(saved),
+        },
+        logContext,
+      ),
+      this.sendEmailOrLog(
+        {
+          toEmail: saved.email,
+          ...staffAssignedCoordinatorsEmail(saved.firstName, coordinators),
+        },
+        logContext,
+      ),
+    ]);
+
+    return saved;
+  }
+
+  /**
+   * Sends an email, logging a failed send instead of throwing.
+   *
+   * @param email - The email to send.
+   * @param logContext - Identifies the staff member and coordinator in the log message.
+   * @returns A promise that resolves when the send is attempted.
+   */
+  private async sendEmailOrLog(
+    email: SendEmailDTO,
+    logContext: string,
+  ): Promise<void> {
+    try {
+      await this.emailsService.sendEmail(email);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send "${email.subject}" email for ${logContext}`,
+        error,
+      );
+    }
   }
 }

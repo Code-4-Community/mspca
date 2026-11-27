@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FosterCoordinator } from './coordinators.entity';
 import { FosterVolunteer } from '../volunteers/volunteers.entity';
 import { Homebase } from '../types';
@@ -167,6 +167,43 @@ export class CoordinatorsService {
       where: { homebase, active: true },
       order: { coordinatorId: 'ASC' },
     });
+  }
+
+  /**
+   * Fetches coordinators by their IDs, requiring that every one exists and is
+   * active. Homebase does not matter.
+   *
+   * @param ids - The IDs of the coordinators to retrieve.
+   * @returns The active coordinators, ordered by ID.
+   * @throws {NotFoundException} If any ID does not match a coordinator.
+   * @throws {BadRequestException} If any coordinator is inactive.
+   */
+  async findActiveByIdsOrFail(ids: number[]): Promise<FosterCoordinator[]> {
+    const coordinators = await this.repo.find({
+      where: { coordinatorId: In(ids) },
+      order: { coordinatorId: 'ASC' },
+    });
+
+    const foundIds = new Set(coordinators.map((c) => c.coordinatorId));
+    const missing = ids.filter((id) => !foundIds.has(id));
+
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `Coordinators with IDs not found: ${missing.join(', ')}`,
+      );
+    }
+
+    const inactive = coordinators
+      .filter((c) => !c.active)
+      .map((c) => c.coordinatorId);
+
+    if (inactive.length > 0) {
+      throw new BadRequestException(
+        `Coordinators with IDs are not active: ${inactive.join(', ')}`,
+      );
+    }
+
+    return coordinators;
   }
 
   /**

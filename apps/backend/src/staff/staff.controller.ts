@@ -13,6 +13,7 @@ import { StaffService } from './staff.service';
 import { FosterStaff } from './staff.entity';
 import { CreateStaffDto } from './dtos/create-staff.dto';
 import { ConfirmStaffDto } from './dtos/confirm-staff.dto';
+import { AssignCoordinatorsDto } from './dtos/assign-coordinators.dto';
 import { Public } from '../aws/cognito/cognito.decorator';
 import { validateId } from '../utils/validation.utils';
 
@@ -133,5 +134,39 @@ export class StaffController {
   async activate(@Param('id', ParseIntPipe) id: number): Promise<FosterStaff> {
     validateId(id, 'Staff member');
     return this.staffService.activate(id);
+  }
+
+  @Patch('/:id/coordinators')
+  @ApiOperation({
+    summary: 'Assign a foster coordinator to a staff member',
+    description:
+      'Adds the coordinator to an active staff member and emails the new coordinator and the staff member. The coordinator must exist and be active; homebase does not matter. Usually one coordinator is sent; more than one is only expected while a staff member is switching coordinators.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Staff member ID',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'The coordinator was assigned to the staff member and both were notified',
+    type: FosterStaff,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid staff member ID or coordinator ID, the staff member or coordinator is inactive, or the coordinator is already assigned',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The staff member or coordinator does not exist',
+  })
+  async assignCoordinators(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignCoordinatorsDto,
+  ): Promise<FosterStaff> {
+    validateId(id, 'Staff member');
+    return this.staffService.assignCoordinators(id, dto.coordinatorIds);
   }
 }
