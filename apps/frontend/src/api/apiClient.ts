@@ -7,6 +7,7 @@ import type {
   AuthenticatedUser,
   CreateMatchBody,
   Match,
+  UpdateVolunteerBody,
   Volunteer,
 } from '../types';
 
@@ -62,6 +63,22 @@ export class ApiClient {
 
   public async getVolunteer(volunteerId: number): Promise<Volunteer> {
     return this.get(`/api/volunteers/${volunteerId}`) as Promise<Volunteer>;
+  }
+
+  public async updateVolunteer(
+    volunteerId: number,
+    body: UpdateVolunteerBody,
+  ): Promise<Volunteer> {
+    return this.patch(
+      `/api/volunteers/${volunteerId}`,
+      body,
+    ) as Promise<Volunteer>;
+  }
+
+  public async getVolunteerMatches(volunteerId: number): Promise<Match[]> {
+    return this.get(`/api/volunteers/${volunteerId}/matches`) as Promise<
+      Match[]
+    >;
   }
 
   public async createMatch(body: CreateMatchBody): Promise<Match> {

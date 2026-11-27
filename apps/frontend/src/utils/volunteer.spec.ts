@@ -1,5 +1,10 @@
 import { colors } from '../theme';
-import { AVATAR_COLORS, getAvatarColor, getInitials } from './volunteer';
+import {
+  AVATAR_COLORS,
+  getAvatarColor,
+  getInitials,
+  parseVolunteerId,
+} from './volunteer';
 
 describe('getInitials', () => {
   it('uses the first letter of each name', () => {
@@ -37,5 +42,24 @@ describe('getAvatarColor', () => {
 
   it('is stable for the same volunteer', () => {
     expect(getAvatarColor(42)).toBe(getAvatarColor(42));
+  });
+});
+
+describe('parseVolunteerId', () => {
+  it('parses a positive integer', () => {
+    expect(parseVolunteerId('12')).toBe(12);
+  });
+
+  it.each([
+    null,
+    '',
+    'abc',
+    '0',
+    '-3',
+    '1.5',
+    '12abc',
+    '99999999999999999999999',
+  ])('returns null for %j', (raw) => {
+    expect(parseVolunteerId(raw)).toBeNull();
   });
 });

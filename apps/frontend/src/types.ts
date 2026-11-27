@@ -88,6 +88,14 @@ export interface Coordinator {
   assignedVolunteers?: Volunteer[];
 }
 
+// A pet that lives with a volunteer. Mirrors the backend's PetDto.
+export interface Pet {
+  species: FosterType;
+  breed: string;
+  ageYear: number;
+  ageMonth: number;
+}
+
 export interface Volunteer {
   volunteerId: number;
   firstName: string;
@@ -99,7 +107,11 @@ export interface Volunteer {
   city: string;
   zipcode: string;
   homebase: Homebase;
-  residentAnimals: string;
+  hasChildren: boolean;
+  childrenAges: number[];
+  hasSeparateFosterRoom: boolean;
+  livelyNeighborhood: boolean;
+  pets: Pet[];
   notes: string | null;
   fosterType: FosterType[];
   animalUpdates: boolean;
@@ -110,6 +122,28 @@ export interface Volunteer {
   cognitoSub: string;
   animalPreferences: string[];
   assignedCoordinators: Coordinator[];
+}
+
+// Fields a volunteer can change on their own profile. Mirrors the backend's
+// UpdateVolunteerDto; every other Volunteer field is read-only for them.
+export interface UpdateVolunteerBody {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  secondaryPhone?: string | null;
+  email?: string;
+  address?: string;
+  city?: string;
+  zipcode?: string;
+  hasChildren?: boolean;
+  childrenAges?: number[];
+  hasSeparateFosterRoom?: boolean;
+  livelyNeighborhood?: boolean;
+  // Replaces the whole list; pets left out are deleted.
+  pets?: Pet[];
+  notes?: string | null;
+  fosterType?: FosterType[];
+  animalUpdates?: boolean;
 }
 
 // Must match the backend's CognitoRole values exactly, since /api/auth/me

@@ -13,3 +13,9 @@ export const getInitials = (firstName: string, lastName: string): string =>
 
 export const getAvatarColor = (volunteerId: number): string =>
   AVATAR_COLORS[volunteerId % AVATAR_COLORS.length];
+
+export const parseVolunteerId = (raw: string | null): number | null => {
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return id > 0 && Number.isSafeInteger(id) ? id : null;
+};

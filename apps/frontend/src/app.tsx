@@ -9,6 +9,7 @@ import Layout from '@containers/Layout';
 import NotFound from '@containers/404';
 import AnimalAvailability from '@pages/AnimalAvailability';
 import SignIn from '@pages/SignIn';
+import VolunteerProfile from '@pages/VolunteerProfile';
 import RequireAuth from './auth/RequireAuth';
 import { ROUTES } from './routes';
 
@@ -51,6 +52,10 @@ export const routes: RouteObject[] = [
               {
                 path: ROUTES.ANIMAL_AVAILABILITY,
                 element: <AnimalAvailability />,
+              },
+              {
+                path: ROUTES.VOLUNTEER_PROFILE,
+                element: <VolunteerProfile />,
               },
               { path: '*', element: <NotFound /> },
             ],
