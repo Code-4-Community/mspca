@@ -17,7 +17,7 @@ export function staffAssignedCoordinatorsEmail(
     .map((c) => escapeHtml(`${c.firstName} ${c.lastName}`))
     .join(', ');
   const noun =
-    coordinators.length === 1 ? 'foster coordinator' : 'foster coordinators';
+    coordinators.length > 1 ? 'foster coordinators' : 'foster coordinator';
   return {
     subject: `New ${noun} assigned to you`,
     bodyHtml: `
