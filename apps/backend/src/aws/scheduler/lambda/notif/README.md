@@ -1,0 +1,201 @@
+# Scheduled notifications: AWS setup
+
+`POST /notifications` with `sendAt` doesn't send right away. It creates a one-time AWS schedule, and AWS calls the backend back at that time.
+
+```
+immediate:  POST /notifications --> sendNow() --> SES
+scheduled:  POST /notifications --> Scheduler (waits until sendAt) --> Lambda --> POST /notifications/send-scheduled --> sendNow() --> SES
+```
+
+- Recipients are looked up at send time, so volunteers who went inactive in between are left out.
+- The schedule deletes itself after it fires.
+- Code: [notifications/](../../../../notifications) · [index.mjs](./index.mjs)
+- `index.mjs` is deployed to Lambda on its own (see "Create from scratch"). It is not imported by the backend and not part of its bundle.
+
+## Resources (dev, `us-east-2`)
+
+| Resource    | Name                           | Purpose                                                                              |
+| ----------- | ------------------------------ | ------------------------------------------------------------------------------------ |
+| Lambda      | `mspca-notif-dispatch`         | Node 22, 30s timeout, 2 async retries. Forwards the schedule to `/send-scheduled`.   |
+| Lambda      | `mspca-notif-dispatch-failed`  | On-failure destination of the above. Logs `Dispatch gave up` with the attempt count. |
+| IAM role    | `mspca-notif-lambda-role`      | Runs both Lambdas (CloudWatch logs, dispatch invokes the failure logger)             |
+| IAM role    | `mspca-notif-scheduler-role`   | Lets Scheduler invoke only this Lambda                                               |
+| User policy | `mspca-notif-create-schedules` | Lets the backend's IAM user create schedules and pass the scheduler role             |
+
+## Connect to the existing dev setup
+
+Nothing to create. The backend won't boot without these 3 in `.env`. Look them up as below if you have access to the dev AWS account, otherwise ask the ticket owner by DM. Never commit them:
+
+```
+AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN=
+AWS_SCHEDULER_ROLE_ARN=
+NOTIFICATIONS_DISPATCH_SECRET=      # same value as the Lambda's
+```
+
+### Where to find each value
+
+In the console, first set the region (top right) to **US East (Ohio) `us-east-2`**. The CLI commands assume `AWS_REGION=us-east-2` and a login to the dev account.
+
+**`AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN`**
+
+1. Open the AWS console and go to **Lambda** > **Functions**.
+2. Click `mspca-notif-dispatch`.
+3. In **Function overview**, copy **Function ARN** (`arn:aws:lambda:us-east-2:<account id>:function:mspca-notif-dispatch`).
+
+```bash
+aws lambda get-function --function-name mspca-notif-dispatch --query Configuration.FunctionArn --output text
+```
+
+**`AWS_SCHEDULER_ROLE_ARN`**
+
+1. Go to **IAM** > **Roles**.
+2. Search for and click `mspca-notif-scheduler-role`.
+3. In **Summary**, copy **ARN** (`arn:aws:iam::<account id>:role/mspca-notif-scheduler-role`).
+
+```bash
+aws iam get-role --role-name mspca-notif-scheduler-role --query Role.Arn --output text
+```
+
+**`NOTIFICATIONS_DISPATCH_SECRET`**
+
+The backend and the Lambda must hold the same value, so copy it from the Lambda:
+
+1. Go to **Lambda** > **Functions** > `mspca-notif-dispatch`.
+2. Open the **Configuration** tab, then **Environment variables**.
+3. Copy the value of `NOTIFICATIONS_DISPATCH_SECRET`.
+
+```bash
+aws lambda get-function-configuration --function-name mspca-notif-dispatch --query Environment.Variables.NOTIFICATIONS_DISPATCH_SECRET --output text
+```
+
+For a new environment, step 5 of "Create from scratch" prints all 3.
+
+The dispatch URL is **not** a backend env var. The backend never reads it. It's the Lambda's `NOTIFICATIONS_DISPATCH_URL`, set in the Lambda's config (step 2 below). It can't be `localhost`, because the Lambda runs in AWS and `localhost` there is the Lambda itself.
+
+| Environment | `NOTIFICATIONS_DISPATCH_URL` on the Lambda                                   |
+| ----------- | ---------------------------------------------------------------------------- |
+| Dev         | `https://<owner's ngrok id>.ngrok-free.app/api/notifications/send-scheduled` |
+| Prod        | `https://<api host>/api/notifications/send-scheduled`                        |
+
+> The dev Lambda calls the **owner's ngrok tunnel** (`ngrok http 3000`). Any scheduled send, from anyone's laptop, fires into the owner's local backend. Test the full chain on the owner's machine. This goes away once the backend is deployed.
+
+## Testing
+
+Run `yarn serve:backend` with `AUTH_DISABLED=true`. In another tab, set `AWS_REGION=us-east-2`, `DISPATCH_SECRET` (your `.env` value) and `DISPATCH_URL`: the ngrok URL on the owner's machine, or `http://localhost:3000/api/notifications/send-scheduled` for everyone else.
+
+| #   | Test                       | Command                                                                                                                                                                                               | Expect                                                                                                   | Dev run |
+| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| T0  | No secret                  | `curl -i -X POST ${DISPATCH_URL}`                                                                                                                                                                     | 401                                                                                                      | ✅      |
+| T1  | Right secret, empty body   | T0 + `-H "x-notifications-dispatch-secret: ${DISPATCH_SECRET}" -H 'content-type: application/json' -d '{}'`                                                                                           | 400                                                                                                      | ✅      |
+| T2  | Wrong secret               | T1 with secret `wrong` and a valid body                                                                                                                                                               | 401, no email                                                                                            | ✅      |
+| T3  | Send now                   | `curl -i -X POST localhost:3000/api/notifications -H 'content-type: application/json' -d '{"subject":"t3","body":"<p>t3</p>","filters":["Dog"]}'`                                                     | 202, only Dog volunteers get it                                                                          | ✅      |
+| T4  | Lambda --> backend (owner) | `aws lambda invoke --region ${AWS_REGION} --function-name mspca-notif-dispatch --cli-binary-format raw-in-base64-out --payload '{"subject":"t4","body":"<p>t4</p>","filters":["Cat"]}' /tmp/out.json` | `StatusCode 200`, `null`                                                                                 | ✅      |
+| T5  | Full chain (owner)         | T3 with `"filters":[]` and `"sendAt":"$(date -u -v+2M +%Y-%m-%dT%H:%M:%SZ)"`                                                                                                                          | 202, all active volunteers get it about 2 min later                                                      | ✅      |
+| T6  | Retries (owner)            | Stop the backend, run T4 with `--invocation-type Event`, then `aws logs tail /aws/lambda/mspca-notif-dispatch --since 10m` and `aws logs tail /aws/lambda/mspca-notif-dispatch-failed --since 10m`    | 3 `Dispatch failed` lines, then 1 `Dispatch gave up ... after 3 attempts` in the `-failed` log, no email | ✅      |
+| T7  | Validation                 | past `sendAt`, `filters:["Horse"]`, missing field, line break in subject                                                                                                                              | 400                                                                                                      | ✅      |
+
+The dev run was 2026-10-26/27 (T6 rerun 2026-11-19). Unit tests: `npx jest apps/backend/src/notifications`.
+
+## Create from scratch (prod / rebuild)
+
+Only for a new environment or if the dev resources are deleted. For prod, use new names and a new secret. You need a CLI login with IAM and Lambda admin rights.
+
+> **zsh:** write `${VAR}` with braces. `$ACCOUNT_ID:role` gets eaten by zsh's `:r` modifier.
+
+```bash
+# 0. shell vars (this tab only; save the secret)
+export AWS_REGION=us-east-2
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export DISPATCH_SECRET=$(openssl rand -hex 32)
+export DISPATCH_URL=https://<api host>/api/notifications/send-scheduled
+
+# 1. lambda role
+aws iam create-role --role-name mspca-notif-lambda-role \
+  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+aws iam attach-role-policy --role-name mspca-notif-lambda-role \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+sleep 10   # let the role propagate
+
+# 2. lambda
+zip -j /tmp/notif-dispatch.zip apps/backend/src/aws/scheduler/lambda/notif/index.mjs
+aws lambda create-function --region ${AWS_REGION} --function-name mspca-notif-dispatch \
+  --runtime nodejs22.x --handler index.handler --timeout 30 \
+  --zip-file fileb:///tmp/notif-dispatch.zip \
+  --role arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-lambda-role \
+  --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
+aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
+  --function-name mspca-notif-dispatch --maximum-retry-attempts 2
+
+# 2b. failure logger: gets a record when dispatch runs out of retries, logs "Dispatch gave up"
+zip -j /tmp/notif-failed.zip apps/backend/src/aws/scheduler/lambda/notif/failed.mjs
+aws lambda create-function --region ${AWS_REGION} --function-name mspca-notif-dispatch-failed \
+  --runtime nodejs22.x --handler failed.handler --timeout 10 \
+  --zip-file fileb:///tmp/notif-failed.zip \
+  --role arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-lambda-role
+aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
+  --function-name mspca-notif-dispatch-failed --maximum-retry-attempts 0
+aws iam put-role-policy --role-name mspca-notif-lambda-role --policy-name invoke-notif-dispatch-failed \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch-failed\"}]}"
+sleep 10
+aws lambda put-function-event-invoke-config --region ${AWS_REGION} \
+  --function-name mspca-notif-dispatch --maximum-retry-attempts 2 \
+  --destination-config "{\"OnFailure\":{\"Destination\":\"arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch-failed\"}}"
+
+# 3. scheduler role
+aws iam create-role --role-name mspca-notif-scheduler-role \
+  --assume-role-policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"scheduler.amazonaws.com\"},\"Action\":\"sts:AssumeRole\",\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"${ACCOUNT_ID}\"}}}]}"
+aws iam put-role-policy --role-name mspca-notif-scheduler-role --policy-name invoke-notif-dispatch \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch\"}]}"
+
+# 4. backend IAM user (the one behind .env's AWS key)
+export BACKEND_USER=$( (set -a; source .env; aws sts get-caller-identity --query Arn --output text) | sed 's|.*/||' )
+aws iam put-user-policy --user-name ${BACKEND_USER} --policy-name mspca-notif-create-schedules \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"scheduler:CreateSchedule\",\"Resource\":\"arn:aws:scheduler:${AWS_REGION}:${ACCOUNT_ID}:schedule/default/notification-*\"},{\"Effect\":\"Allow\",\"Action\":\"iam:PassRole\",\"Resource\":\"arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-scheduler-role\",\"Condition\":{\"StringEquals\":{\"iam:PassedToService\":\"scheduler.amazonaws.com\"}}}]}"
+
+# 5. backend env: paste into .env or the host's config, then restart
+echo "AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN=arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:mspca-notif-dispatch"
+echo "AWS_SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/mspca-notif-scheduler-role"
+echo "NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}"
+```
+
+To change the Lambda's URL or secret later (for example, a new ngrok URL), set both again. `--environment` replaces every variable, so leaving one out unsets it:
+
+```bash
+aws lambda update-function-configuration --region ${AWS_REGION} --function-name mspca-notif-dispatch \
+  --environment "Variables={NOTIFICATIONS_DISPATCH_URL=${DISPATCH_URL},NOTIFICATIONS_DISPATCH_SECRET=${DISPATCH_SECRET}}"
+```
+
+You can also edit them in the AWS console: Lambda > `mspca-notif-dispatch` > Configuration > Environment variables. After editing `index.mjs`, rezip and run `aws lambda update-function-code --function-name mspca-notif-dispatch --zip-file fileb:///tmp/notif-dispatch.zip`.
+
+## Prod checklist
+
+- [x] Add `@Public()` to `/send-scheduled`. The Cognito guard is global, and the Lambda has no token, so it gets a 401 once auth is on.
+- [ ] Deploy the backend, point the Lambda's `NOTIFICATIONS_DISPATCH_URL` at it, and put the step 5 vars in the host's config.
+- [ ] Use separate prod resources and a new secret, so dev tests can't email real volunteers.
+- [ ] Send from a verified domain (for example `c4cneu.com`), not Gmail. Gmail sends land in spam.
+- [ ] Follow-ups: failed SES batches aren't retried (only logged); coordinator-only role gating; `ArrayOverlap()` after [#11](https://github.com/Code-4-Community/mspca/pull/11).
+
+## Troubleshooting
+
+| Symptom                                         | Fix                                                                                     |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| ARN regex error like `...177ole/`               | zsh `:r` modifier. Use `${VAR}` braces.                                                 |
+| `POST /notifications` with `sendAt` returns 500 | Scheduler env vars unset, or step 4 `iam:PassRole` missing. Check the backend log.      |
+| Lambda log `Dispatch failed: 401`               | Secrets differ between `.env` and the Lambda (in prod, also the `@Public()` item above) |
+| Lambda log `Dispatch failed: 404` / `502`       | Wrong URL path, or the tunnel/backend is down                                           |
+| No Lambda logs at all                           | Scheduler can't invoke it. Check the step 3 role and the ARN in `.env`.                 |
+
+## Cleanup
+
+```bash
+aws lambda delete-function --region ${AWS_REGION} --function-name mspca-notif-dispatch
+aws lambda delete-function --region ${AWS_REGION} --function-name mspca-notif-dispatch-failed
+aws iam delete-role-policy --role-name mspca-notif-lambda-role --policy-name invoke-notif-dispatch-failed
+aws iam detach-role-policy --role-name mspca-notif-lambda-role --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+aws iam delete-role --role-name mspca-notif-lambda-role
+aws iam delete-role-policy --role-name mspca-notif-scheduler-role --policy-name invoke-notif-dispatch
+aws iam delete-role --role-name mspca-notif-scheduler-role
+aws iam delete-user-policy --user-name ${BACKEND_USER} --policy-name mspca-notif-create-schedules
+```
+
+Refs: [Scheduler one-time schedules](https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html#one-time) · [Scheduler execution role](https://docs.aws.amazon.com/scheduler/latest/UserGuide/setting-up.html#setting-up-execution-role) · [Lambda async retries](https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html) · [`iam:PassRole`](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html)

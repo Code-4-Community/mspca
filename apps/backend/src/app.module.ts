@@ -8,6 +8,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { MatchesModule } from './matches/matches.module';
 import { CoordinatorsModule } from './coordinators/coordinators.module';
 import { VolunteersModule } from './volunteers/volunteers.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OwnersModule } from './owners/owners.module';
 import { AnimalsModule } from './animals/animals.module';
 import { StaffModule } from './staff/staff.module';
@@ -31,6 +32,7 @@ import { JobsModule } from './jobs/jobs.module';
     MatchesModule,
     CoordinatorsModule,
     VolunteersModule,
+    NotificationsModule,
     OwnersModule,
     AnimalsModule,
     StaffModule,

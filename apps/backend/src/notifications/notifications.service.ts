@@ -1,0 +1,148 @@
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { EmailsService } from '../aws/ses/email.service';
+import { VolunteersService } from '../volunteers/volunteers.service';
+import { CreateBulkNotificationDto } from './dtos/create-bulk-notification.dto';
+import { SchedulerService } from '../aws/scheduler/scheduler.service';
+
+@Injectable()
+export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private volunteersService: VolunteersService,
+    private emailsService: EmailsService,
+    private schedulerService: SchedulerService,
+  ) {}
+
+  /**
+   * Sends a bulk notification immediately, or schedules it when sendAt is set.
+   *
+   * @param dto - The subject, HTML body, foster type filters, and optional send time.
+   * @throws {InternalServerErrorException} If scheduling fails, or every email batch fails to send.
+   */
+  async createBulkNotification(dto: CreateBulkNotificationDto): Promise<void> {
+    if (dto.sendAt) {
+      return this.schedule(dto, dto.sendAt);
+    }
+
+    return this.sendNow(dto);
+  }
+
+  /**
+   * Hands the notification to EventBridge Scheduler, which invokes the dispatch
+   * Lambda at `sendAt`.
+   *
+   * The notification itself is stored in the schedule's payload rather than in our
+   * database, and the schedule deletes itself once it has fired. Only the filters
+   * are stored, never the resolved recipients, so Volunteers whose status changed before
+   * `sendAt` are correctly left out when the dispatch actually runs.
+   *
+   * @param content - The subject, HTML body, and foster type filters.
+   * @param sendAt - When the notification should go out.
+   * @throws {InternalServerErrorException} If EventBridge Scheduler fails to create the schedule.
+   */
+  private async schedule(
+    content: CreateBulkNotificationDto,
+    sendAt: Date,
+  ): Promise<void> {
+    try {
+      await this.schedulerService.scheduleOnce({
+        // The backend's IAM policy only allows creating schedules named notification-*
+        name: `notification-${randomUUID()}`,
+        at: sendAt,
+        targetArn: process.env.AWS_NOTIFICATION_DISPATCH_LAMBDA_ARN ?? '',
+        roleArn: process.env.AWS_SCHEDULER_ROLE_ARN ?? '',
+        input: {
+          subject: content.subject,
+          body: content.body,
+          filters: content.filters ?? [],
+        },
+        // Scheduler's default retries run up to 185 times over 24 hours. Three
+        // attempts in ten minutes rides out a blip without hammering the dispatch
+        // route all day when the configuration is simply wrong.
+        retryPolicy: {
+          MaximumRetryAttempts: 2,
+          MaximumEventAgeInSeconds: 600,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        'Failed to schedule bulk notification',
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw new InternalServerErrorException(
+        'Failed to schedule bulk notification',
+      );
+    }
+  }
+
+  /**
+   * Emails every active Volunteer whose foster type is one of `content.filters`,
+   * or every active Volunteer when no filters are given.
+   *
+   * Recipients are Bcc'd in batches of 49 so they can't see each other, with the
+   * SES sender address in the To slot. A batch that fails to send is logged and
+   * the remaining batches are still attempted, so one bad address can't stop the
+   * rest of the send.
+   *
+   * @param content - The subject, HTML body, and foster type filters.
+   * @throws {InternalServerErrorException} If every batch fails to send.
+   */
+  async sendNow(content: CreateBulkNotificationDto): Promise<void> {
+    // TODO: adjust once notification filters are confirmed with client - will likely be more complex
+    const volunteers = await this.volunteersService.findActiveByFosterTypes(
+      content.filters ?? [],
+    );
+    // Volunteer emails are unique and validated on write, so they pass SendEmailDTO as-is
+    const recipients = volunteers.map((v) => v.email);
+
+    if (recipients.length === 0) {
+      this.logger.warn(
+        'No active Volunteers matched the notification filters. Nothing sent.',
+      );
+      return;
+    }
+
+    let failed = 0;
+    // SES caps a message at 50 recipients across To, Cc and Bcc combined. To is the
+    // sender's own address (keeps volunteers hidden in Bcc), so 49 Bcc per batch.
+    for (let i = 0; i < recipients.length; i += 49) {
+      const batch = recipients.slice(i, i + 49);
+
+      try {
+        await this.emailsService.sendEmail({
+          // NotificationsModule requires this at boot; the fallback only satisfies TypeScript
+          toEmail: process.env.AWS_SES_SENDER_EMAIL ?? '',
+          subject: content.subject,
+          bodyHtml: content.body,
+          bccEmails: batch,
+        });
+      } catch (err) {
+        failed += batch.length;
+        this.logger.error(
+          `Bulk notification failed for ${batch.length} recipient(s)`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
+
+    if (failed === recipients.length) {
+      throw new InternalServerErrorException(
+        `Bulk notification failed: none of ${recipients.length} recipient(s) were emailed`,
+      );
+    }
+
+    // TODO: implement retry mechanism for failed email sends
+    // failed batches are logged & never retried, caller still gets 202
+    if (failed > 0) {
+      this.logger.warn(
+        `Bulk notification partially sent: ${failed} of ${recipients.length} recipient(s) not emailed`,
+      );
+    }
+  }
+}
