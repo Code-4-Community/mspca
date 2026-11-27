@@ -108,7 +108,8 @@ export class VolunteersService {
    * that succeeds, so a Cognito failure never leaves a Volunteer without a login.
    * If the save fails, the Cognito user is deleted so the email can be reused.
    * Cognito emails the Volunteer a verification code, which they pass to
-   * {@link confirm}. New Volunteers are pending until a coordinator approves them.
+   * {@link confirm}. New Volunteers are unconfirmed until they verify their email,
+   * then pending until a coordinator approves them.
    * Assigns every active coordinator at the Volunteer's homebase.
    *
    * @param dto - The Volunteer's profile fields and chosen password.
@@ -151,7 +152,7 @@ export class VolunteersService {
         email,
         childrenAges,
         pets,
-        status: VolunteerStatus.PENDING,
+        status: VolunteerStatus.UNCONFIRMED,
         mostRecentWaiverSigned: true,
         cognitoSub,
         assignedCoordinators,
@@ -171,7 +172,8 @@ export class VolunteersService {
   }
 
   /**
-   * Confirms a signed-up Volunteer's email and gives them the FosterVolunteer role.
+   * Confirms a signed-up Volunteer's email, gives them the FosterVolunteer role,
+   * and moves them from unconfirmed to pending.
    *
    * Only emails with a Volunteer row can be confirmed. The app client is public,
    * so this stops someone who signed up directly with Cognito (skipping
@@ -182,6 +184,7 @@ export class VolunteersService {
    *
    * @param dto - The Volunteer's email and the verification code Cognito emailed them.
    * @throws {NotFoundException} If no Volunteer or Cognito user with the email exists.
+   * @throws {ConflictException} If the Volunteer is not unconfirmed.
    * @throws {BadRequestException} If the code is wrong or has expired, or the user can't be confirmed or is already confirmed.
    * @throws {HttpException} 429 if there have been too many attempts.
    * @throws {InternalServerErrorException} If confirmation or adding the role fails.
@@ -194,11 +197,20 @@ export class VolunteersService {
       throw new NotFoundException('No volunteer with this email exists');
     }
 
+    if (volunteer.status !== VolunteerStatus.UNCONFIRMED) {
+      throw new ConflictException(
+        'Only unconfirmed Volunteers can be confirmed',
+      );
+    }
+
     await this.cognitoService.confirmUser(
       email,
       dto.code,
       CognitoRole.FosterVolunteer,
     );
+
+    volunteer.status = VolunteerStatus.PENDING;
+    await this.repo.save(volunteer);
   }
 
   /**

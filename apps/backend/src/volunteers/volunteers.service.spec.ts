@@ -320,7 +320,7 @@ describe('VolunteersService', () => {
         ...profile,
         childrenAges: [],
         pets: [],
-        status: VolunteerStatus.PENDING,
+        status: VolunteerStatus.UNCONFIRMED,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
         assignedCoordinators: bostonCoordinators,
@@ -330,7 +330,7 @@ describe('VolunteersService', () => {
         ...profile,
         childrenAges: [],
         pets: [],
-        status: VolunteerStatus.PENDING,
+        status: VolunteerStatus.UNCONFIRMED,
         mostRecentWaiverSigned: true,
         cognitoSub: 'cognito-sub-123',
         assignedCoordinators: bostonCoordinators,
@@ -551,7 +551,7 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           ...profile,
-          status: VolunteerStatus.PENDING,
+          status: VolunteerStatus.UNCONFIRMED,
           cognitoSub: 'cognito-sub-123',
         }),
       );
@@ -566,6 +566,7 @@ describe('VolunteersService', () => {
     it('confirms the Cognito user with the FosterVolunteer role when the volunteer exists', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
       mockCognitoService.confirmUser.mockResolvedValue(undefined);
 
@@ -585,6 +586,54 @@ describe('VolunteersService', () => {
       expect(mockRepo.delete).not.toHaveBeenCalled();
     });
 
+    it('moves an unconfirmed volunteer to pending once their email is confirmed', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
+      } as FosterVolunteer);
+      mockCognitoService.confirmUser.mockResolvedValue(undefined);
+
+      await service.confirm({ email: 'jane@example.com', code: '123456' });
+
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          volunteerId: 1,
+          status: VolunteerStatus.PENDING,
+        }),
+      );
+    });
+
+    it('throws ConflictException without calling Cognito if the volunteer is not unconfirmed', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.PENDING,
+      } as FosterVolunteer);
+
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '123456' }),
+      ).rejects.toThrow(
+        new ConflictException('Only unconfirmed Volunteers can be confirmed'),
+      );
+      expect(mockCognitoService.confirmUser).not.toHaveBeenCalled();
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('does not move the volunteer to pending when Cognito confirmation fails', async () => {
+      mockRepo.findOneBy.mockResolvedValue({
+        volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
+      } as FosterVolunteer);
+      mockCognitoService.confirmUser.mockRejectedValue(
+        new BadRequestException('Invalid verification code'),
+      );
+
+      await expect(
+        service.confirm({ email: 'jane@example.com', code: '000000' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundException without calling Cognito when no volunteer has the email', async () => {
       mockRepo.findOneBy.mockResolvedValue(null);
 
@@ -600,6 +649,7 @@ describe('VolunteersService', () => {
     it('propagates errors from Cognito', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
       const error = new BadRequestException('Invalid verification code');
       mockCognitoService.confirmUser.mockRejectedValue(error);
@@ -615,6 +665,7 @@ describe('VolunteersService', () => {
     it('propagates group assignment failures from Cognito without attempting duplicate cleanup', async () => {
       mockRepo.findOneBy.mockResolvedValue({
         volunteerId: 1,
+        status: VolunteerStatus.UNCONFIRMED,
       } as FosterVolunteer);
 
       const error = new InternalServerErrorException('Failed to confirm user');

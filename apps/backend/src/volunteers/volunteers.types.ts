@@ -15,4 +15,5 @@ export enum VolunteerStatus {
   ACTIVE = 'Active',
   INACTIVE = 'Inactive',
   PENDING = 'Pending',
+  UNCONFIRMED = 'Unconfirmed',
 }

@@ -110,7 +110,7 @@ export class FosterVolunteer {
   @Column({
     type: 'enum',
     enum: VolunteerStatus,
-    default: VolunteerStatus.PENDING,
+    default: VolunteerStatus.UNCONFIRMED,
   })
   status!: VolunteerStatus;
 

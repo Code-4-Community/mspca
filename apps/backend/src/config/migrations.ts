@@ -15,6 +15,7 @@ import { AddFosterTypePreferences1793600000000 } from '../migrations/17936000000
 import { AddStaffAndUpdateMatches1795372304908 } from '../migrations/1795372304908-AddStaffAndUpdateMatches';
 import { AddPetsAndHouseholdDetails1794408338094 } from '../migrations/1794408338094-AddPetsAndHouseholdDetails';
 import { AddMatchAdditionalComments1794784721012 } from '../migrations/1794784721012-AddMatchAdditionalComments';
+import { AddUnconfirmedVolunteerStatus1795298132520 } from '../migrations/1795298132520-AddUnconfirmedVolunteerStatus';
 
 const schemaMigrations = [
   InitialSchemas1789354568323,
@@ -33,6 +34,7 @@ const schemaMigrations = [
   AddFosterTypePreferences1793600000000,
   AddPetsAndHouseholdDetails1794408338094,
   AddMatchAdditionalComments1794784721012,
+  AddUnconfirmedVolunteerStatus1795298132520,
   AddStaffAndUpdateMatches1795372304908,
 ];
 
