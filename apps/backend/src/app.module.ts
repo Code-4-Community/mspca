@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import typeorm from './config/typeorm';
@@ -11,6 +12,7 @@ import { OwnersModule } from './owners/owners.module';
 import { AnimalsModule } from './animals/animals.module';
 import { StaffModule } from './staff/staff.module';
 import { AuthModule } from './auth/auth.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { AuthModule } from './auth/auth.module';
       useFactory: (configService: ConfigService) =>
         configService.getOrThrow('typeorm'),
     }),
+    ScheduleModule.forRoot(),
     CognitoModule,
     RecommendationsModule,
     MatchesModule,
@@ -32,6 +35,7 @@ import { AuthModule } from './auth/auth.module';
     AnimalsModule,
     StaffModule,
     AuthModule,
+    JobsModule,
   ],
 })
 export class AppModule {}

@@ -2138,4 +2138,75 @@ describe('VolunteersService', () => {
       expect(mockRepo.save).not.toHaveBeenCalled();
     });
   });
+
+  describe('incrementAllChildrenAges', () => {
+    const volunteerWithChildren = (volunteerId: number, ages: number[]) =>
+      ({
+        volunteerId,
+        hasChildren: true,
+        childrenAges: ages,
+      } as FosterVolunteer);
+
+    it('loads and updates only volunteers that have children', async () => {
+      const volunteers = [
+        volunteerWithChildren(1, [2]),
+        { volunteerId: 2, hasChildren: false, childrenAges: [] },
+        volunteerWithChildren(3, [5]),
+      ] as FosterVolunteer[];
+      mockRepo.find.mockImplementation(
+        ({ where }: { where: Partial<FosterVolunteer> }) =>
+          Promise.resolve(
+            volunteers.filter(
+              (volunteer) => volunteer.hasChildren === where.hasChildren,
+            ),
+          ),
+      );
+
+      await service.incrementAllChildrenAges();
+
+      expect(mockRepo.find).toHaveBeenCalledWith({
+        where: { hasChildren: true },
+      });
+      expect(mockRepo.find).toHaveBeenCalledTimes(1);
+      expect(mockRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({ volunteerId: 1, hasChildren: true }),
+        expect.objectContaining({ volunteerId: 3, hasChildren: true }),
+      ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('adds one year to every child', async () => {
+      mockRepo.find.mockResolvedValue([volunteerWithChildren(1, [0, 7, 15])]);
+
+      await service.incrementAllChildrenAges();
+
+      expect(mockRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({ volunteerId: 1, childrenAges: [1, 8, 16] }),
+      ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates each volunteer independently', async () => {
+      mockRepo.find.mockResolvedValue([
+        volunteerWithChildren(1, [2]),
+        volunteerWithChildren(2, [5, 9]),
+      ]);
+
+      await service.incrementAllChildrenAges();
+
+      expect(mockRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({ volunteerId: 1, childrenAges: [3] }),
+        expect.objectContaining({ volunteerId: 2, childrenAges: [6, 10] }),
+      ]);
+      expect(mockRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not save when no volunteer has children', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await service.incrementAllChildrenAges();
+
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
 });
